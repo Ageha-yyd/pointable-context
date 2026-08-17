@@ -2,9 +2,9 @@
 
 The current product requirements and qualification boundary are maintained in [docs/PRD-inline-pointable-widgets.md](docs/PRD-inline-pointable-widgets.md).
 
-This directory implements the PRD's first independent delivery slice: the **P0-A Selection Core**, a bundled headless MCP fixture probe, an opt-in fixture companion, an experimental live local-workspace companion, and a minimal App Server-owned conversation client. It is not the complete P0-A slice and the Codex CDP surface is not a portable public host contract.
+This directory implements the PRD's first independent delivery slices: the **P0-A Selection Core**, a bundled MCP fixture probe, a compact **P0-B inline MCP App**, opt-in Desktop selection companions, and a browser-based App Server research harness. The product-default route is the current Codex Desktop conversation: resolve an entity, render its verified detail inline, and explicitly send a referent-aware follow-up back to that task without opening a browser.
 
-The shipped MCP path remains intentionally UI-free and pinned to `fixtures/mini-project`; every MCP tool result is marked `FIXTURE-ONLY`. Two separate, opt-in CDP companions are available: the deterministic fixture companion and a live local-workspace companion. The latter requires an explicit user bind of one host-visible Codex task to one canonical workspace root, then indexes only bounded file identities and reads file detail live on click. Neither companion is started automatically by the Plugin.
+The shipped MCP path remains pinned to `fixtures/mini-project`; every MCP tool result and Widget is marked `FIXTURE-ONLY`. The two data tools remain UI-free and retain complete model-readable text fallback. Only `render_project_entity_widget` advertises the MCP App resource. Two separate, opt-in CDP companions are also available: the deterministic fixture companion and a live local-workspace companion. The latter requires an explicit user bind of one host-visible Codex task to one canonical workspace root, then indexes only bounded file identities and reads file detail live on click. Neither companion is started automatically by the Plugin.
 
 ## Included
 
@@ -17,7 +17,9 @@ The shipped MCP path remains intentionally UI-free and pinned to `fixtures/mini-
 - Verification method/time and explicit source/fact projection counts.
 - Aggregate index/work budgets and abortable, deadline-bounded port calls.
 - Fixture project and unit/CLI/MCP stdio tests.
-- Two headless read tools: `resolve_project_entities` and `read_project_entity`.
+- Two UI-free read tools: `resolve_project_entities` and `read_project_entity`.
+- One focused render tool, `render_project_entity_widget`, linked to a self-contained `text/html;profile=mcp-app` resource; it preserves the same text/structured fallback.
+- An inline read-only card with bounded identity, revision, observed time, freshness, facts, sources, and an explicit `ui/message` follow-up form for the current conversation.
 - Opaque, time-limited `entity_ref` capabilities bound to the full trusted-binding tuple and index revision.
 - A self-contained `mcp/server.mjs` bundle, Plugin manifest, `.mcp.json`, and fixture-specific Skill.
 - A controlled Codex CDP Host Adapter with local selection eligibility, trusted-click gating, contextual fences, bounded display, lifecycle cleanup, and a fixture-only private probe entrypoint.
@@ -33,8 +35,8 @@ The shipped MCP path remains intentionally UI-free and pinned to `fixtures/mini-
 ## Not yet claimed
 
 - A portable or production-qualified Codex Chat Lane selection integration. The local private fixture probe is a narrow runtime qualification, not a general host contract.
-- Inline MCP App rendering.
-- Same-task referent roundtrip from the existing private Desktop CDP card into that current Desktop task. The separate App Server-owned task route is qualified.
+- Live Codex Desktop qualification of the newly added inline MCP App and its `ui/message` roundtrip. Automated MCP/resource/stdio coverage passes; the installed-host gate is tracked separately.
+- Same-task referent roundtrip from the existing private Desktop CDP selection card. The inline Agent-output Widget and the private selection overlay remain separate entry paths.
 - Dashboard or write actions.
 - A portable/public production host contract. Current task evidence is qualified only for this Codex Desktop CDP/DOM adapter.
 - Remote, team, SaaS, database, or project-management Providers. The first live Provider is local read-only workspace files; DCPM/CWA remains one optional reference Provider.
@@ -47,13 +49,14 @@ The shipped MCP path remains intentionally UI-free and pinned to `fixtures/mini-
 
 The shipped `.mcp.json` uses the camelCase `{ "mcpServers": ... }` wrapper accepted by the local Plugin validator and the matching Codex 0.146 runtime parser. It sets `cwd: "."`, so Codex anchors relative paths to the installed plugin root. It does not depend on `${PLUGIN_ROOT}` expansion. Package-level MCP v2 stdio and the self-contained bundle are covered by tests; host-level Codex CLI and Desktop qualification are reported separately.
 
-Runtime qualification on 2026-08-17: an installed `pointable-context@personal` cache was loaded by a fresh Codex CLI 0.146 app-server. Without starting a model turn, the probe verified Plugin attribution, both advertised tools, `GOV-1` resolution, opaque `entity_ref` handoff, fixture detail read, model-readable text, `fixture_read` verification, and absence of UI metadata. A fresh Codex Desktop task then used the same two tools to resolve and read `GOV-1`. These results qualify only the fixture path; trusted live context-scope binding and production Providers remain unverified.
+Runtime qualification on 2026-08-17: an installed `pointable-context@personal` cache was loaded by a fresh Codex CLI 0.146 app-server. Without starting a model turn, the probe verified Plugin attribution, `GOV-1` resolution, opaque `entity_ref` handoff, fixture detail read, model-readable text, and `fixture_read` verification. A fresh Codex Desktop task then used the data tools to resolve and read `GOV-1`. On 2026-08-18 the server added a decoupled MCP App render tool and self-contained inline resource; protocol, resource, compiled-stdio and bundled-stdio tests pass. Installed Desktop rendering and same-task `ui/message` remain a distinct live gate until explicitly observed. These results qualify only the fixture path; trusted live context-scope binding and production Providers remain unverified.
 
 ## Verification snapshot
 
 | Check | Result | Boundary |
 |---|---|---|
-| Automated tests | `178 / 178 PASS` | Core, fixture adapters, live workspace binding/index/provider, CLI, MCP stdio/bundle, both companions, App Server referent/session/conversation client, explicit unbind/rebind, and regressions |
+| Automated tests | `178 / 178 PASS` | Core, fixture adapters, live workspace binding/index/provider, CLI, MCP App resource/render tool, stdio/bundle, both companions, App Server research harness, explicit unbind/rebind, and regressions |
+| Inline MCP App protocol | `PASS_AUTOMATED / LIVE_PENDING` | Data/render split, standard MIME/resource metadata, restrictive CSP, text fallback, structured detail, `ui/initialize`, model-context update and `ui/message`; current Desktop iframe/follow-up still requires live observation |
 | Independent security audit | `PASS (private fixture boundary)` | No known P0/P1 in the controlled loopback CDP Host Adapter; not a production authority approval |
 | Codex CLI 0.146 app-server direct resolve→read | `PASS` | Installed headless Plugin; direct RPC; bundled mini-project only |
 | Codex Desktop fixture invocation | `PASS_FIXTURE` | Fresh task used the installed headless fixture tools; no real context authority claim |

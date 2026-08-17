@@ -2,6 +2,8 @@
 
 Observed and qualified on 2026-08-17. This matrix freezes the private Selection Host support surface; it does not turn CDP or Codex DOM selectors into a public OpenAI contract.
 
+Inline MCP App work is tracked as a separate host gate. It must not be inferred from the private Selection overlay, and the Selection overlay must not be described as an MCP App.
+
 ## Qualified snapshot
 
 | Boundary | Qualified value | Evidence |
@@ -38,6 +40,21 @@ Observed and qualified on 2026-08-17. This matrix freezes the private Selection 
 - Automatic background start, automatic task/workspace inference, semantic recognition of arbitrary prose, workspace mutation, remote providers, telemetry, or administrator deployment.
 - Treating the private renderer as MCP Apps UI, an Agent message payload, or a portable Codex extension contract.
 - Referent return to the model or “ask Agent” from the card. Detail viewing currently creates no new turn.
+
+## Inline MCP App gate (2026-08-18)
+
+| Gate | Result | Meaning |
+|---|---|---|
+| Official architecture | `SUPPORTED PATTERN` | OpenAI's Plugin UI guide defines `_meta.ui.resourceUri`, `text/html;profile=mcp-app`, `ui/notifications/tool-result`, and `ui/message`; it explicitly documents optional UI in ChatGPT, not a general Codex Desktop guarantee |
+| Installed package implementation | `PRESENT / PRIVATE BUILD EVIDENCE` | Read-only inspection of `OpenAI.Codex 26.810.7004.0` found MCP App resource parsing, sandbox iframe setup, `ui/initialize`, `ui/message`, model-context updates, and a current-thread follow-up handler |
+| Top-level Chat Lane bridge | `ABSENT` | CDP probe found no top-level `window.openai`, `sendFollowUpMessage`, `updateModelContext`, or `callTool`; the generic private Electron bridge is not an authorized product integration surface |
+| Plugin discovery | `PASS` | Fresh Codex CLI 0.146 App Server attributed the installed render tool to `pointable-context@personal` and exposed its `ui://pointable-context/entity-detail-v1.html` metadata |
+| MCP/resource contract | `PASS_AUTOMATED` | Data/render separation, standard MIME, restrictive resource CSP, text fallback, structured detail and stdio bundle all pass |
+| iframe interaction | `PASS_ISOLATED_EDGE` | A real iframe completed initialize, received tool result, rendered `WU:GOV-1`, and a trusted submit emitted both bounded model context and `ui/message` |
+| Current Desktop inline mount | `PENDING_LIVE` | Requires a post-install Codex task to visibly mount the actual MCP App beside the render tool result |
+| Current Desktop same-task return | `PENDING_LIVE` | Requires the Widget's trusted submit to create the next user turn in that exact Codex task with the bound entity/revision |
+
+Only the last two rows can promote P0-B/P0-C from implementation-qualified to current-host-qualified. A standalone browser page or a direct App Server tool call cannot close them.
 
 ## Version and failure policy
 

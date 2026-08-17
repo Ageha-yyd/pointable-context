@@ -1,5 +1,7 @@
 # App Server Conversation Client
 
+> Route status (2026-08-18): this browser surface is retained only as a protocol and independent-host research harness. It leaves the current Codex Desktop task, so it is no longer the default Pointable Context product entry and cannot substitute for the current Chat Lane MCP App live gate.
+
 ## Purpose
 
 This prototype puts Chat, Selection Quick Look, a visible referent chip, and the later question in one App Server-owned Codex task. It is the first implementation of PRD stage 2 after the headless referent protocol qualification.

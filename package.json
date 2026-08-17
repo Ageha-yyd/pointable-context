@@ -2,7 +2,7 @@
   "name": "pointable-context",
   "version": "0.1.0",
   "private": true,
-  "description": "Explicit Pointable Context lookup with Desktop companions and an App Server-owned conversation client.",
+  "description": "Explicit Pointable Context lookup with an inline MCP App and text fallback.",
   "type": "module",
   "bin": {
     "pointable": "./dist/src/cli.js",
@@ -21,6 +21,7 @@
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "pnpm run build && node --test \"dist/test/*.test.js\"",
     "test:host-browser": "node scripts/renderer-close-headless-acceptance.mjs",
+    "test:widget-browser": "node scripts/mcp-widget-browser-acceptance.mjs",
     "test:conversation-browser": "node scripts/conversation-client-browser-acceptance.mjs",
     "probe:app-server-referent": "node scripts/probe-app-server-referent.mjs",
     "probe:app-server-conversation": "node scripts/probe-app-server-conversation.mjs",

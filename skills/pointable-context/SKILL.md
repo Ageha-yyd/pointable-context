@@ -1,6 +1,6 @@
 ---
 name: pointable-context
-description: Exercise and inspect the bundled Pointable Context mini-project fixture through deterministic read-only entity resolution and detail lookup. Use only when the user explicitly asks to run, validate, or inspect this fixture/demo. Do not use it as evidence about the active Codex project, CWA, or a real production authority, and do not trigger merely because text was selected or copied.
+description: Exercise and inspect the bundled Pointable Context mini-project fixture through deterministic read-only entity resolution, text detail, or an inline MCP App card in the current conversation. Use only when the user explicitly asks to run, validate, inspect, or show this fixture/demo. Do not use it as evidence about the active Codex project, CWA, or a real production authority, and do not trigger merely because text was selected or copied.
 ---
 
 # Pointable Context
@@ -14,11 +14,11 @@ Use the smallest reliable lookup path while keeping the current runtime boundary
 3. Treat every result as fixture data. Preserve its `FIXTURE-ONLY` warning in the answer.
 4. Route by deduplicated candidate count:
    - 0: report no match and offer Chat clarification.
-   - 1: call `read_project_entity` with exactly the returned `entity_ref`.
+   - 1: if the user asks to show, inspect, or interact with the detail in place, call `render_project_entity_widget` with exactly the returned `entity_ref`; otherwise call `read_project_entity` for text-only detail.
    - 2–3: show compact candidates with name, type, project, and match reason; ask the user to choose, then pass exactly that candidate's `entity_ref`.
    - More than 3 or mixed results: ask the user to narrow the text or use project search.
 5. Never invent, edit, persist, or reuse an expired `entity_ref`. Re-resolve after an invalid, stale, or context-changed reference.
-6. Return a read-only fixture snapshot with stable entity identity, useful facts, source, revision, observed time, verification method, and freshness.
+6. Return a read-only fixture snapshot with stable entity identity, useful facts, source, revision, observed time, verification method, and freshness. Preserve the model-readable text fallback even when the host renders the Widget.
 7. Keep stale, partial, unavailable, ambiguous, and access-denied states explicit. Never fill missing facts or imply that fixture data came from the user's active project.
 8. Preserve the self-contained model-readable text projection. Mark bounded source/fact omissions explicitly; do not imply that the projection contains every field.
 
@@ -29,5 +29,6 @@ Use the smallest reliable lookup path while keeping the current runtime boundary
 - Do not search outside the bundled mini-project after it returns no match.
 - Do not treat an index timestamp as authoritative detail freshness.
 - Do not execute writes, deployment, sending, purchasing, or other side effects.
-- Do not claim selection capture, anchored UI, Inline Widget rendering, or same-task referent roundtrip unless the current host has passed those capability gates.
-- If either Pointable Context tool is unavailable, state that the fixture runtime is unavailable and use only user-provided facts; do not simulate a successful lookup.
+- Do not claim selection capture or the private anchored-selection companion merely because the inline Widget renders; they are separate paths.
+- If the inline render tool or host UI is unavailable, use `read_project_entity` and state that the text fallback was used. Do not simulate a successful Widget.
+- If the Pointable Context tools are unavailable, state that the fixture runtime is unavailable and use only user-provided facts; do not simulate a successful lookup.

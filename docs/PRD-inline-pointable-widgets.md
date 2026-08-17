@@ -1,7 +1,7 @@
 # PRD：Agent Chat Lane 可指点上下文
 
-- 版本：v0.11
-- 状态：通用 context-scope 边界已冻结；P0-A core、fixture-only Headless MCP Plugin、Desktop fixture/live companions、App Server referent 协议和最小同表面 conversation client 已实现。当前 Codex Desktop 私有路径已通过人工点查，App Server 自有任务已通过 Chat→Selection→detail→referent chip→后续显式追问的端到端验证。现有 Desktop 私有 CDP 卡片回流到当前 Desktop 任务、Inline MCP App、大众分发与正式用户研究尚未资格化
+- 版本：v0.12
+- 状态：通用 context-scope 边界已冻结；P0-A core、fixture-only MCP Plugin、Desktop fixture/live selection companions 已实现。P0-B 已按 data/render 分离模式增加原位 MCP App resource 与专用 render tool，自动协议/资源/stdio 回归通过；当前 Codex Desktop 的实际 iframe 呈现与 `ui/message` 同任务回流仍是下一项 live gate。浏览器 App Server client 降级为研究 harness，不再作为产品默认入口。Desktop 私有 Selection 卡片回流、大众分发与正式用户研究尚未资格化
 - 日期：2026-08-18
 - 工作名：Pointable Output / Selection Quick Look
 - 首个研究与资格化宿主：当前 Codex desktop
@@ -20,6 +20,16 @@
 4. **Full View / Dashboard**：复杂上下文中的比较、关系导航、历史、审计和批量操作表面。
 
 Widget 和 Quick Look 是 Chat 的局部加速器；Dashboard 是可选的复杂任务工作台。三者共享同一 Provider-backed 事实，不互相替代，也不分别建立事实真源。
+
+### 1.1 v0.12 路线收敛
+
+- **产品默认宿主**：当前 Codex Desktop 的当前任务与 Chat Lane。
+- **默认详情表面**：Agent 已持有结构化对象时，调用独立 render tool，在产生该工具结果的 turn 附近显示最小 inline card。
+- **默认回流**：卡片内显式提交问题，通过标准 `ui/message` 回到当前任务；提交前用 `ui/update-model-context` 绑定稳定 ID、revision、observed time 与 freshness。若上下文更新不可用，消息本身仍携带同一有界 referent。
+- **无 UI 降级**：相同工具结果必须保留完整、可读的 text 与 structured content；不因 Widget 加载失败而阻断任务。
+- **Selection 路线**：历史文本或 Agent 未预置对象继续使用锚定 Selection Quick Look；它不是 Inline Widget 的前置步骤。
+- **浏览器路线**：App Server conversation client 只保留为 referent 协议、SSE 与独立宿主研究工具。它不能作为“当前 Codex 任务内降低切换成本”的产品验收证据。
+- **当前证据边界**：自动测试证明 server/resource/widget 合同，不等同于当前 Desktop 已实际 mount iframe 或成功生成同任务 user turn；两项必须用安装后的宿主逐项观察。
 
 ## 2. 产品主张与研究假设
 

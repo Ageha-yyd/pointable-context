@@ -12,6 +12,7 @@ const marketplacePath =
   process.env.POINTABLE_MARKETPLACE_PATH ??
   "C:\\Users\\UIA\\.agents\\plugins\\marketplace.json";
 const requestTimeoutMs = 20_000;
+const widgetResourceUri = "ui://pointable-context/entity-detail-v1.html";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -98,7 +99,8 @@ async function waitForPointableServer(threadId) {
     if (
       status?.serverInfo &&
       toolNames.includes("resolve_project_entities") &&
-      toolNames.includes("read_project_entity")
+      toolNames.includes("read_project_entity") &&
+      toolNames.includes("render_project_entity_widget")
     ) {
       return { status, toolNames };
     }
@@ -146,6 +148,12 @@ async function main() {
     status.serverInfo.name === "pointable-context-fixture-probe",
     "unexpected MCP server identity",
   );
+  assert(
+    JSON.stringify(status.tools?.render_project_entity_widget ?? {}).includes(
+      widgetResourceUri,
+    ),
+    "render tool did not advertise its MCP App resource",
+  );
 
   const resolved = await request("mcpServer/tool/call", {
     threadId,
@@ -178,6 +186,22 @@ async function main() {
   assert(text.includes("FIXTURE-ONLY"), "model-readable fixture warning missing");
   assert(text.includes("Verification: fixture_read"), "verification text missing");
 
+  const rendered = await request("mcpServer/tool/call", {
+    threadId,
+    server: "pointable-context",
+    tool: "render_project_entity_widget",
+    arguments: { entity_ref: entityRef },
+  });
+  assert(rendered.isError !== true, "render_project_entity_widget returned an error");
+  assert(rendered.structuredContent?.status === "detail", "render detail status missing");
+  assert(
+    rendered.structuredContent?.entity?.entityId === "WU:GOV-1",
+    "render tool returned the wrong entity",
+  );
+  const renderedText =
+    rendered.content?.find((item) => item.type === "text")?.text ?? "";
+  assert(renderedText.includes("FIXTURE-ONLY"), "render text fallback warning missing");
+
   process.stdout.write(
     `${JSON.stringify(
       {
@@ -190,9 +214,12 @@ async function main() {
         tools: toolNames,
         resolveStatus: resolved.structuredContent.status,
         detailEntityId: detail.structuredContent.entity.entityId,
+        renderEntityId: rendered.structuredContent.entity.entityId,
         verification: detail.structuredContent.verification,
         fixtureWarningPresent: true,
-        uiMetadataPresent: false,
+        dataToolUiMetadataPresent: false,
+        renderToolUiResource: widgetResourceUri,
+        renderTextFallbackPresent: true,
       },
       null,
       2,

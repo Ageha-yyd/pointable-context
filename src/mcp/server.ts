@@ -11,6 +11,11 @@ import {
   readFailure,
   resolveFailure,
 } from "./fixture-tool-service.js";
+import {
+  POINTABLE_ENTITY_WIDGET_HTML,
+  POINTABLE_ENTITY_WIDGET_MIME,
+  POINTABLE_ENTITY_WIDGET_URI,
+} from "./entity-widget.js";
 
 const errorSchema = z
   .object({
@@ -138,11 +143,42 @@ export function createFixtureProbeMcpServer(
     {
       instructions: [
         FIXTURE_WARNING,
-        "This server is a headless development probe, not a production Codex project binding.",
-        "Call resolve_project_entities first. Pass only its opaque entity_ref to read_project_entity.",
+        "This server is a fixture-only development probe, not a production Codex project binding.",
+        "Call resolve_project_entities first. Pass only its opaque entity_ref to read_project_entity for text or render_project_entity_widget for an inline detail card.",
         "Never invent or pass authority locators, provider ids, project ids, or workspace roots.",
       ].join(" "),
     },
+  );
+
+  server.registerResource(
+    "pointable-context-entity-detail",
+    POINTABLE_ENTITY_WIDGET_URI,
+    {
+      title: "Pointable Context entity detail",
+      description:
+        "Inline, read-only entity detail with a same-conversation follow-up control.",
+      mimeType: POINTABLE_ENTITY_WIDGET_MIME,
+    },
+    async () => ({
+      contents: [
+        {
+          uri: POINTABLE_ENTITY_WIDGET_URI,
+          mimeType: POINTABLE_ENTITY_WIDGET_MIME,
+          text: POINTABLE_ENTITY_WIDGET_HTML,
+          _meta: {
+            ui: {
+              prefersBorder: true,
+              csp: {
+                connectDomains: [],
+                resourceDomains: [],
+                frameDomains: [],
+                baseUriDomains: [],
+              },
+            },
+          },
+        },
+      ],
+    }),
   );
 
   server.registerTool(
@@ -186,6 +222,44 @@ export function createFixtureProbeMcpServer(
         destructiveHint: false,
         idempotentHint: false,
         openWorldHint: false,
+      },
+    },
+    async (args, ctx) => {
+      if (!exactArguments(args, "entity_ref") || args.entity_ref.length === 0) {
+        return callToolResult(
+          readFailure(
+            "invalid_arguments",
+            "只接受 resolve_project_entities 返回的非空 entity_ref；不接受 locator、provider、projectId 或路径覆盖。",
+          ),
+        );
+      }
+      return callToolResult(
+        await service.readProjectEntity(args.entity_ref, ctx.mcpReq.signal),
+      );
+    },
+  );
+
+  server.registerTool(
+    "render_project_entity_widget",
+    {
+      title: "Render Pointable Context detail",
+      description:
+        "Render one resolved fixture entity as a compact inline card in the current conversation. First call resolve_project_entities, then pass only its opaque entity_ref. Use this instead of read_project_entity when the user asks to show, inspect, or interact with the detail in place.",
+      inputSchema: readInputSchema,
+      outputSchema: readOutputSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      _meta: {
+        ui: {
+          resourceUri: POINTABLE_ENTITY_WIDGET_URI,
+          visibility: ["model", "app"],
+        },
+        "openai/toolInvocation/invoking": "正在读取上下文对象…",
+        "openai/toolInvocation/invoked": "上下文对象已就地显示。",
       },
     },
     async (args, ctx) => {

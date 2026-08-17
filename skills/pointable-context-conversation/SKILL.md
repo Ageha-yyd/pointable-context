@@ -1,11 +1,11 @@
 ---
 name: pointable-context-conversation
-description: Start, inspect, or stop the opt-in Pointable Context App Server conversation client for an explicit local workspace. Use only when the user asks to open or manage the same-surface research client that combines Chat, selected-text Quick Look, visible object references, and later Agent questions. Do not trigger for ordinary chat, text selection, fixture MCP lookup, or the separate Codex Desktop companion.
+description: Start, inspect, or stop the opt-in browser-based Pointable Context App Server research harness for an explicit local workspace. Use only when the user explicitly asks for that separate browser harness. It is not the default product route because it leaves the current Codex Desktop task. Do not trigger for ordinary chat, inline Widget use, text selection, fixture MCP lookup, or the Codex Desktop companion.
 ---
 
 # Pointable Context Conversation
 
-Run the local research client on a new Codex App Server-owned task. Keep it separate from the current Codex Desktop task and the CDP workspace companion.
+Run the browser research harness on a new Codex App Server-owned task. Keep it separate from the current Codex Desktop task and the CDP workspace companion. Before starting it, explicitly tell the user that this path opens a browser and is only for protocol research; prefer the inline MCP App for the product's no-surface-switch path.
 
 ## Boundaries
 

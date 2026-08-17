@@ -21,6 +21,10 @@ import {
   FIXTURE_RUNTIME,
   FixtureProjectEntityToolService,
 } from "../src/mcp/fixture-tool-service.js";
+import {
+  POINTABLE_ENTITY_WIDGET_MIME,
+  POINTABLE_ENTITY_WIDGET_URI,
+} from "../src/mcp/entity-widget.js";
 import { createFixtureProbeMcpServer } from "../src/mcp/server.js";
 
 const fixture = resolve("fixtures/mini-project");
@@ -83,7 +87,7 @@ function text(result: { content: Array<{ type: string; text?: string }> }): stri
   return result.content[0]!.text!;
 }
 
-test("MCP exposes only two headless read tools and resolve never prefetches detail", async () => {
+test("MCP keeps data tools headless and exposes one focused inline render tool", async () => {
   const provider = new CountingProvider();
   const server = createFixtureProbeMcpServer(fixtureService(provider));
   const client = new Client({ name: "pointable-context-test", version: "1" });
@@ -95,27 +99,81 @@ test("MCP exposes only two headless read tools and resolve never prefetches deta
     const listed = await client.listTools();
     assert.deepEqual(
       listed.tools.map((tool) => tool.name).sort(),
-      ["read_project_entity", "resolve_project_entities"],
+      [
+        "read_project_entity",
+        "render_project_entity_widget",
+        "resolve_project_entities",
+      ],
     );
     for (const tool of listed.tools) {
       assert.equal(tool.annotations?.readOnlyHint, true);
       assert.equal(tool.annotations?.destructiveHint, false);
       assert.equal(tool.annotations?.idempotentHint, false);
       assert.equal(tool.annotations?.openWorldHint, false);
-      assert.equal(tool._meta, undefined);
       assert.equal(tool.icons, undefined);
     }
     const readTool = listed.tools.find((tool) => tool.name === "read_project_entity");
+    const renderTool = listed.tools.find(
+      (tool) => tool.name === "render_project_entity_widget",
+    );
     const resolveTool = listed.tools.find(
       (tool) => tool.name === "resolve_project_entities",
     );
     assert.ok(readTool);
+    assert.ok(renderTool);
     assert.ok(resolveTool);
+    assert.equal(readTool._meta, undefined);
+    assert.equal(resolveTool._meta, undefined);
+    assert.deepEqual(renderTool._meta?.ui, {
+      resourceUri: POINTABLE_ENTITY_WIDGET_URI,
+      visibility: ["model", "app"],
+    });
     assert.deepEqual(Object.keys(readTool.inputSchema.properties ?? {}), ["entity_ref"]);
     assert.deepEqual(readTool.inputSchema.required, ["entity_ref"]);
     assert.equal(readTool.inputSchema.additionalProperties, false);
+    assert.deepEqual(Object.keys(renderTool.inputSchema.properties ?? {}), ["entity_ref"]);
+    assert.deepEqual(renderTool.inputSchema.required, ["entity_ref"]);
+    assert.equal(renderTool.inputSchema.additionalProperties, false);
     assert.deepEqual(resolveTool.inputSchema.required, ["selection"]);
     assert.equal(resolveTool.inputSchema.additionalProperties, false);
+
+    const resources = await client.listResources();
+    assert.equal(resources.resources.length, 1);
+    assert.equal(resources.resources[0]?.uri, POINTABLE_ENTITY_WIDGET_URI);
+    assert.equal(resources.resources[0]?.mimeType, POINTABLE_ENTITY_WIDGET_MIME);
+    const widgetResource = await client.readResource({
+      uri: POINTABLE_ENTITY_WIDGET_URI,
+    });
+    assert.equal(widgetResource.contents.length, 1);
+    const widgetContent = widgetResource.contents[0];
+    assert.equal(widgetContent?.uri, POINTABLE_ENTITY_WIDGET_URI);
+    assert.equal(widgetContent?.mimeType, POINTABLE_ENTITY_WIDGET_MIME);
+    assert.ok(widgetContent && "text" in widgetContent);
+    const widgetHtml = "text" in widgetContent ? widgetContent.text : "";
+    assert.match(widgetHtml, /^<!doctype html>/u);
+    assert.match(widgetHtml, /ui\/initialize/u);
+    assert.match(widgetHtml, /ui\/notifications\/initialized/u);
+    assert.match(widgetHtml, /ui\/notifications\/tool-result/u);
+    assert.match(widgetHtml, /ui\/update-model-context/u);
+    assert.match(widgetHtml, /ui\/message/u);
+    assert.match(widgetHtml, /sendFollowUpMessage/u);
+    assert.match(widgetHtml, /event\.isTrusted/u);
+    assert.match(widgetHtml, /textContent/u);
+    assert.match(widgetHtml, /FIXTURE-ONLY/u);
+    assert.doesNotMatch(widgetHtml, /<script\s+[^>]*src=/iu);
+    assert.doesNotMatch(widgetHtml, /https?:\/\//iu);
+    assert.doesNotMatch(widgetHtml, /\bfetch\s*\(/u);
+    assert.deepEqual(widgetContent?._meta, {
+      ui: {
+        prefersBorder: true,
+        csp: {
+          connectDomains: [],
+          resourceDomains: [],
+          frameDomains: [],
+          baseUriDomains: [],
+        },
+      },
+    });
 
     const resolved = await client.callTool({
       name: "resolve_project_entities",
@@ -186,6 +244,21 @@ test("MCP exposes only two headless read tools and resolve never prefetches deta
     assert.match(detailText, /^Fact\[status\]: completed$/mu);
     assert.doesNotMatch(detailText, /work-units\/gov-1/u);
     assert.doesNotMatch(JSON.stringify(detailContent), /work-units\/gov-1/u);
+
+    const rendered = await client.callTool({
+      name: "render_project_entity_widget",
+      arguments: { entity_ref: entityRef },
+    });
+    const renderedContent = structured(rendered);
+    assert.equal(rendered.isError, false);
+    assert.equal(renderedContent.status, "detail");
+    assert.equal(
+      (renderedContent.entity as Record<string, unknown>).entityId,
+      "WU:GOV-1",
+    );
+    assert.match(text(rendered), /FIXTURE-ONLY/u);
+    assert.equal(provider.calls, 2);
+    assert.deepEqual(provider.locators, ["work-units/gov-1", "work-units/gov-1"]);
   } finally {
     await client.close();
     await server.close();

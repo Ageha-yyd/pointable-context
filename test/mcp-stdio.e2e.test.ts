@@ -3,6 +3,10 @@ import { resolve } from "node:path";
 import test from "node:test";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
+import {
+  POINTABLE_ENTITY_WIDGET_MIME,
+  POINTABLE_ENTITY_WIDGET_URI,
+} from "../src/mcp/entity-widget.js";
 
 const entrypoint = resolve("dist/src/mcp/stdio.js");
 const fixture = resolve("fixtures/mini-project");
@@ -44,7 +48,27 @@ for (const scenario of scenarios) test(`official v2 client completes a real stdi
     const tools = await client.listTools();
     assert.deepEqual(
       tools.tools.map((tool) => tool.name).sort(),
-      ["read_project_entity", "resolve_project_entities"],
+      [
+        "read_project_entity",
+        "render_project_entity_widget",
+        "resolve_project_entities",
+      ],
+    );
+    const renderTool = tools.tools.find(
+      (tool) => tool.name === "render_project_entity_widget",
+    );
+    assert.equal(
+      (renderTool?._meta?.ui as Record<string, unknown>)?.resourceUri,
+      POINTABLE_ENTITY_WIDGET_URI,
+    );
+    const resource = await client.readResource({ uri: POINTABLE_ENTITY_WIDGET_URI });
+    assert.equal(resource.contents[0]?.mimeType, POINTABLE_ENTITY_WIDGET_MIME);
+    assert.ok(resource.contents[0] && "text" in resource.contents[0]);
+    assert.match(
+      resource.contents[0] && "text" in resource.contents[0]
+        ? resource.contents[0].text
+        : "",
+      /ui\/message/u,
     );
     const result = await client.callTool({
       name: "resolve_project_entities",
@@ -57,6 +81,18 @@ for (const scenario of scenarios) test(`official v2 client completes a real stdi
       "unique",
     );
     assert.equal(result.content[0]?.type, "text");
+    const candidates = (
+      result.structuredContent as Record<string, unknown>
+    ).candidates as Array<Record<string, unknown>>;
+    const rendered = await client.callTool({
+      name: "render_project_entity_widget",
+      arguments: { entity_ref: candidates[0]?.entity_ref },
+    });
+    assert.equal(rendered.isError, false);
+    assert.equal(
+      (rendered.structuredContent as Record<string, unknown>).status,
+      "detail",
+    );
   } finally {
     await client.close();
   }
