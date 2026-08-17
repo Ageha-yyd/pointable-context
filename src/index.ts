@@ -11,3 +11,5 @@ export * from "./adapters/local-workspace.js";
 export * from "./app-server/client.js";
 export * from "./app-server/referent.js";
 export * from "./app-server/referent-session.js";
+export * from "./app-server/conversation-service.js";
+export * from "./app-server/conversation-http.js";

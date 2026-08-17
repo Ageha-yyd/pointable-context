@@ -2,13 +2,14 @@
   "name": "pointable-context",
   "version": "0.1.0",
   "private": true,
-  "description": "Explicit Pointable Context lookup with fixture and live local-workspace Desktop companions.",
+  "description": "Explicit Pointable Context lookup with Desktop companions and an App Server-owned conversation client.",
   "type": "module",
   "bin": {
     "pointable": "./dist/src/cli.js",
     "pointable-context-mcp-fixture": "./dist/src/mcp/stdio.js",
     "pointable-context-fixture-companion": "./host/fixture-companion.mjs",
-    "pointable-context-workspace-companion": "./host/workspace-companion.mjs"
+    "pointable-context-workspace-companion": "./host/workspace-companion.mjs",
+    "pointable-context-app-client": "./dist/src/app-server/conversation-cli.js"
   },
   "scripts": {
     "build": "pnpm run build:ts && pnpm run build:mcp && pnpm run build:host",
@@ -20,7 +21,10 @@
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "pnpm run build && node --test \"dist/test/*.test.js\"",
     "test:host-browser": "node scripts/renderer-close-headless-acceptance.mjs",
+    "test:conversation-browser": "node scripts/conversation-client-browser-acceptance.mjs",
     "probe:app-server-referent": "node scripts/probe-app-server-referent.mjs",
+    "probe:app-server-conversation": "node scripts/probe-app-server-conversation.mjs",
+    "client:app-server": "node dist/src/app-server/conversation-cli.js --workspace-root .",
     "pointable": "node dist/src/cli.js",
     "mcp:fixture": "node dist/src/mcp/stdio.js",
     "companion:fixture": "node host/fixture-companion.mjs",

@@ -2,7 +2,7 @@
 
 The current product requirements and qualification boundary are maintained in [docs/PRD-inline-pointable-widgets.md](docs/PRD-inline-pointable-widgets.md).
 
-This directory implements the PRD's first independent delivery slice: the **P0-A Selection Core**, a bundled headless MCP fixture probe, an opt-in fixture companion, and an experimental live local-workspace companion. It is not the complete P0-A slice and the Codex CDP surface is not a portable public host contract.
+This directory implements the PRD's first independent delivery slice: the **P0-A Selection Core**, a bundled headless MCP fixture probe, an opt-in fixture companion, an experimental live local-workspace companion, and a minimal App Server-owned conversation client. It is not the complete P0-A slice and the Codex CDP surface is not a portable public host contract.
 
 The shipped MCP path remains intentionally UI-free and pinned to `fixtures/mini-project`; every MCP tool result is marked `FIXTURE-ONLY`. Two separate, opt-in CDP companions are available: the deterministic fixture companion and a live local-workspace companion. The latter requires an explicit user bind of one host-visible Codex task to one canonical workspace root, then indexes only bounded file identities and reads file detail live on click. Neither companion is started automatically by the Plugin.
 
@@ -27,6 +27,8 @@ The shipped MCP path remains intentionally UI-free and pinned to `fixtures/mini-
 - A bounded local-workspace file index plus `live_read` Provider that returns current path, metadata, content revision, preview, and source without requiring a Dashboard.
 - A persistent live local-workspace companion with `start`, `status`, `bind`/rebind, `unbind`, and `stop`, plus a self-contained `host/workspace-companion.mjs` bundle and an explicit-only management Skill.
 - A bounded `PointableReferentV1` envelope plus a reusable Codex App Server client/session that can inject an explicit reference without creating a turn, then ask about it in the same App Server-owned task.
+- A loopback App Server conversation client that keeps Chat, message selection, local-workspace detail, visible referent chips, SSE Agent output, and later questions on one supported task surface.
+- An explicit-only `pointable-context-conversation` Skill that starts and manages that local App Server-owned client without impersonating the current Desktop task.
 
 ## Not yet claimed
 
@@ -37,6 +39,7 @@ The shipped MCP path remains intentionally UI-free and pinned to `fixtures/mini-
 - A portable/public production host contract. Current task evidence is qualified only for this Codex Desktop CDP/DOM adapter.
 - Remote, team, SaaS, database, or project-management Providers. The first live Provider is local read-only workspace files; DCPM/CWA remains one optional reference Provider.
 - A production Codex Desktop integration or model-mediated lookup against live context. A fresh Desktop task qualifies only the fixture MCP fallback.
+- Production conversation-client concerns such as task resume, approval UI, remote authentication, multi-user isolation, write actions, or a public hosted surface.
 
 `FixtureFileProjectBinding` and `JsonAuthoritativeProvider` are fixture/development adapters. A file manifest is not proof of the active production host context, and `fixture_read` cannot claim live-current freshness. The bundled MCP server exposes only the mini-project and must not be presented as the production trust boundary.
 
@@ -50,7 +53,7 @@ Runtime qualification on 2026-08-17: an installed `pointable-context@personal` c
 
 | Check | Result | Boundary |
 |---|---|---|
-| Automated tests | `172 / 172 PASS` | Core, fixture adapters, live workspace binding/index/provider, CLI, MCP stdio/bundle, both companions, App Server referent/client/session, explicit unbind/rebind, and regressions |
+| Automated tests | `178 / 178 PASS` | Core, fixture adapters, live workspace binding/index/provider, CLI, MCP stdio/bundle, both companions, App Server referent/session/conversation client, explicit unbind/rebind, and regressions |
 | Independent security audit | `PASS (private fixture boundary)` | No known P0/P1 in the controlled loopback CDP Host Adapter; not a production authority approval |
 | Codex CLI 0.146 app-server direct resolve→read | `PASS` | Installed headless Plugin; direct RPC; bundled mini-project only |
 | Codex Desktop fixture invocation | `PASS_FIXTURE` | Fresh task used the installed headless fixture tools; no real context authority claim |
@@ -61,6 +64,7 @@ Runtime qualification on 2026-08-17: an installed `pointable-context@personal` c
 | Current Chat Lane live-workspace card | `PASS_USER_MANUAL` | User manually verified three visible workspace keywords, live detail display, and the repaired close interaction in the current Codex task |
 | App Server referent injection | `PASS_ZERO_TURN` | `thread/inject_items` preserved zero turns in an App Server-owned task; the exact probe task was deleted afterward |
 | App Server model-visible referent | `PASS_SAME_TASK_MODEL_VISIBLE` | A later explicit turn in the same task returned the exact injected entity, revision, and unpredictable token |
+| App Server same-surface client | `PASS_LOCAL_RESEARCH_CLIENT` | Real lookup→reference kept zero turns; a later question streamed Agent deltas and exactly returned entity+revision; headless Edge passed detail, chip, and close |
 
 ## Development
 
@@ -107,6 +111,14 @@ node host/workspace-companion.mjs stop
 # turn; --verify-model adds one explicit test question and deletes the probe task.
 pnpm run probe:app-server-referent
 node scripts/probe-app-server-referent.mjs --verify-model
+
+# Minimal same-task client: Chat + Selection Quick Look + referent chip.
+pnpm run build
+pnpm run client:app-server
+
+# Real protocol and browser-level acceptance.
+pnpm run probe:app-server-conversation
+pnpm run test:conversation-browser
 ```
 
 `status` exposes the currently host-visible task binding without exposing the control token. Repeating explicit `bind` is a rebind with a new revision; `unbind` removes only the current host-visible task entry. `eligible` is local and reads no project data. Running `lookup` is the explicit activation. Standard input (`--stdin`) is the recommended input path so selection text does not appear in the process list. `--text` is available only with the explicit `--allow-argv-text` acknowledgement.
@@ -118,3 +130,5 @@ The companions and private Desktop probe are deliberately separate from the Plug
 The private Desktop support boundary is frozen in [docs/codex-desktop-host-compatibility.md](docs/codex-desktop-host-compatibility.md). A package or DOM change is unqualified until the matrix gates are rerun; selectors must not be silently widened.
 
 The supported referent route, runtime evidence, and remaining Desktop boundary are documented in [docs/app-server-referent-prototype.md](docs/app-server-referent-prototype.md).
+
+The minimal same-surface client, run instructions, security boundary, and qualification evidence are documented in [docs/app-server-conversation-client.md](docs/app-server-conversation-client.md).

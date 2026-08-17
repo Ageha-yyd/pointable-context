@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pointable Context Conversation"
+  short_description: "Start the same-surface App Server client"
+  default_prompt: "Use $pointable-context-conversation to start a local Pointable Context conversation for this workspace."

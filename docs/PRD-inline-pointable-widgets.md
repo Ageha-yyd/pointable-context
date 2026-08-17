@@ -1,7 +1,7 @@
 # PRD：Agent Chat Lane 可指点上下文
 
-- 版本：v0.10
-- 状态：通用 context-scope 边界已冻结；P0-A core、fixture-only Headless MCP Plugin、常驻 fixture companion，以及实验性的 live local-workspace companion 已实现。当前 Codex Desktop 已通过 fixture 的真实鼠标验收；用户也已在当前任务中手动验证三个工作区关键词、live detail 与关闭交互。App Server 自有任务的 referent 零 turn 注入与后续同任务模型可见性已通过；现有 Desktop 私有 CDP 卡片回流到当前 Desktop 任务、Inline UI 与大众分发尚未资格化
+- 版本：v0.11
+- 状态：通用 context-scope 边界已冻结；P0-A core、fixture-only Headless MCP Plugin、Desktop fixture/live companions、App Server referent 协议和最小同表面 conversation client 已实现。当前 Codex Desktop 私有路径已通过人工点查，App Server 自有任务已通过 Chat→Selection→detail→referent chip→后续显式追问的端到端验证。现有 Desktop 私有 CDP 卡片回流到当前 Desktop 任务、Inline MCP App、大众分发与正式用户研究尚未资格化
 - 日期：2026-08-18
 - 工作名：Pointable Output / Selection Quick Look
 - 首个研究与资格化宿主：当前 Codex desktop
@@ -903,6 +903,15 @@ A/B/C 使用共同起点 `target_bearing_output_ready`：包含目标实体提�
 - **当前边界**：这是 App Server-owned task 的受支持协议路径，不是把现有 Desktop CDP/DOM companion 的卡片注入当前 Desktop task。两个宿主任务图仍然分离。
 - **实现策略**：查看详情不注入、不调用模型；用户显式选择“引用”后才调用 `thread/inject_items`；用户显式提交问题后才调用 `turn/start`。App Server 未文档化 item 级删除/修改，因此更改引用应注入可见的 superseding referent，或新建/分叉任务，不得假装改写历史。
 
+### 19.0.2 App Server 同表面客户端快照（2026-08-18）
+
+- **已实现**：本地 loopback client 在一个 App Server-owned task 中同时拥有 Chat lane、user/assistant message 选区、Quick Look、候选菜单、详情卡、可见 referent tray 和 composer；不自动操作 Codex Desktop DOM/composer。
+- **已通过（交互顺序）**：selection 只运行浏览器本地 eligibility；可信点击后才执行 bounded local-workspace lookup；详情引用只执行 `thread/inject_items` 并显示 host-owned chip；显式提交 composer 后才执行 `turn/start`。
+- **已通过（真实协议）**：`README.md` live lookup 返回 `file:README.md` 与 content revision；引用后 task turns 仍为 0；后续问题产生非空 Agent delta 流，最终文本与 referent 中的 entity ID/revision 完全一致；probe task 已删除。
+- **已通过（浏览器）**：Headless Edge 验证 2 条可见消息、message-only selection、锚定 detail、1 个 referent chip、关闭交互和零额外 lookup/reference turn。
+- **安全边界**：HTTP 只绑定 `127.0.0.1`；随机 fragment capability 经专用 header 回传；API/asset/body/header 有界；CSP 禁止外部脚本、frame 和连接；对象内容只通过 `textContent` 投影；candidate/detail 引用是短时、一次性、task-local opaque capability。
+- **尚未资格化**：重启后 resume、approval/user-input UI、remote/team Provider、远程认证、多用户隔离、写操作、当前 Windows Inline MCP App 与生产托管。
+
 ### 19.1 产品门禁
 
 - 0 匹配在用户显式 lookup 后只显示有界无结果反馈，不生成伪对象卡。
@@ -1094,15 +1103,15 @@ DCPM/CWA Adapter 的正式定位是 **optional reference Provider**：用于验�
 
 后续推荐顺序：
 
-1. **已完成协议资格化**：App Server-owned task 的“引用不新增 turn，显式追问才启动 turn，后续模型可见”已通过零 turn 与随机 token 探针。
-2. 构建最小 App Server conversation client，在同一受支持表面中同时拥有 Chat task、Pointable detail、可见 referent chip 和显式追问；不使用 Desktop composer DOM 自动化桥接。
-3. 复用或扩展 MCP App 探针，分别验证 Inline、tool callback、referent、model-visible context 和 lifecycle；能力按宿主独立标记。
-4. 构建 A/B/C 最小研究原型；先研究唯一 exact point lookup，再加入候选歧义和 stale，并正式采集 TTVF。
-5. 只有时间收益、正确率和误触门禁通过后，才进入 Markdown 概念索引、语义识别、Full View 与大众产品化；remote MCP、认证、管理员策略、遥测、隐私和发布审核在此阶段补齐。
-6. DCPM/CWA、GitHub、Linear、论文库继续仅作为可选 Provider；不得反向定义核心实体协议。
+1. **已完成**：App Server referent 协议和最小同表面 conversation client 已通过自动测试、真实模型读回与 Headless Edge 交互验收。
+2. 复用同一对象/referent 合同扩展 MCP App 探针，分别验证 Inline、tool callback、referent、model-visible context 和 lifecycle；能力按宿主独立标记。
+3. 把 App Server client 收窄为 A/B/C 最小研究原型；先研究唯一 exact point lookup，再加入候选歧义和 stale，并正式采集 TTVF。
+4. 只有时间收益、正确率和误触门禁通过后，才进入 task resume、approval UI、Markdown 概念索引、语义识别、Full View 与大众产品化；remote MCP、认证、管理员策略、遥测、隐私和发布审核在此阶段补齐。
+5. DCPM/CWA、GitHub、Linear、论文库继续仅作为可选 Provider；不得反向定义核心实体协议。
 
 ## 25. 变更记录
 
+- v0.11：完成最小 App Server-owned conversation client；同一表面提供 Chat、message selection、局部文件详情、candidate/detail opaque capability、可见 referent chip、SSE Agent 输出与后续追问。真实 App Server 验证引用后 0 turns、后续产生非空 delta 流并精确读回 entity/revision；Headless Edge 验证详情、chip 与关闭。加入 loopback token、CSP、有界 API、turn abort 和 text-only projection；自动测试更新为 `178 / 178 PASS`。明确其为本地研究 client，不等同于当前 Desktop task bridge 或生产 Chat replacement。
 - v0.10：按推荐路线新增 `PointableReferentV1`、有界 Codex App Server JSONL client 与 referent session；实跑 `thread/inject_items` 证明引用注入不新增 turn，并在同一 App Server task 的后续显式 turn 中准确读回 entity/revision/随机 token。自动测试更新为 `172 / 172 PASS`。明确区分 App Server-owned task 已通过与现有 Desktop 私有 CDP 卡片尚未回流当前 Desktop task；下一阶段改为最小 App Server conversation client，而不是自动操作 Desktop composer。
 - v0.9：在不依赖 DCPM/CWA 的前提下完成宿主复验的 Codex task tuple、显式 task→workspace 注册表、opaque workspace scope、本地文件 exact index、点击后 `live_read` 详情与常驻 workspace companion；旧 fixture companion 与 live companion 明确互斥运行。注册表/任务/路由/根路径/authority tuple 漂移均 fail closed；文件数量、目录深度、路径和读取大小均有硬预算。自动测试更新为 `164 / 164 PASS`。用户已手动验证三个工作区关键词、live detail 与关闭交互；companion 已封装为仅显式触发的 Skill，真实 status/unbind/rebind 回读通过；`docs/codex-desktop-host-compatibility.md` 冻结当前 Desktop 私有支持面与版本失效规则。
 - v0.8：将一次性 Selection Host probe 扩展为显式启停的 fixture-only 常驻 companion；加入周期目标发现、断线重连、本机令牌控制面和优雅清理；用可信 CDP 鼠标拖选验证 `GOV-1` 的选区惰性、点击后原位详情、零新增 turn 和 companion 持续运行。根据人工反馈修复原生选区折叠竞态与关闭后 UI 重建，新增 Edge 真实浏览器的“拖选 → 详情 → 关闭 → 250ms 无重建”回归。该资格化仍不代表 Plugin 能自动启动 Selection Host，也不代表真实项目数据已接入。

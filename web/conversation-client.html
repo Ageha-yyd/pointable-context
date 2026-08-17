@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <title>Pointable Context · App Server Client</title>
+    <link rel="stylesheet" href="/conversation-client.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true">P</div>
+          <div>
+            <div class="brand-title">Pointable Context</div>
+            <div class="brand-subtitle">App Server conversation client</div>
+          </div>
+        </div>
+        <div class="session-meta" aria-label="当前任务状态">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="workspace-label">正在连接…</span>
+          <span class="meta-divider" aria-hidden="true"></span>
+          <span id="thread-label">Task —</span>
+        </div>
+      </header>
+
+      <main class="conversation-region">
+        <section class="lane" id="chat-lane" aria-label="对话内容" aria-live="polite">
+          <div class="empty-state" id="empty-state">
+            <div class="empty-orbit" aria-hidden="true"><span></span></div>
+            <h1>在同一个任务里查看、引用、追问</h1>
+            <p>发送一条消息后，可选中 user 或 Agent 消息里的文件名。选区只产生本地入口，点击后才读取详情。</p>
+            <div class="example-row" aria-label="可尝试的关键词">
+              <span>README.md</span>
+              <span>package.json</span>
+              <span>PRD-inline-pointable-widgets.md</span>
+            </div>
+          </div>
+          <div id="messages"></div>
+          <div id="stream-anchor" aria-hidden="true"></div>
+        </section>
+
+        <footer class="composer-shell">
+          <section class="reference-tray" id="reference-tray" aria-label="已引用对象" hidden>
+            <div class="reference-heading">
+              <span>已引用到当前任务</span>
+              <span class="reference-note">随后提交的问题可以直接使用这些对象</span>
+            </div>
+            <div class="reference-chips" id="reference-chips"></div>
+          </section>
+          <form class="composer" id="composer-form">
+            <label class="sr-only" for="composer-input">发送消息</label>
+            <textarea id="composer-input" rows="1" maxlength="8000" placeholder="询问当前工作区，或引用详情后继续追问…" required></textarea>
+            <button class="send-button" id="send-button" type="submit" aria-label="发送消息">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m0 0-6 6m6-6 6 6"></path></svg>
+            </button>
+          </form>
+          <div class="composer-footnote">详情查看与引用不会启动模型；只有发送消息才会开始新 turn。</div>
+        </footer>
+      </main>
+    </div>
+
+    <button class="selection-action" id="selection-action" type="button" hidden>
+      <span class="selection-icon" aria-hidden="true">⌁</span>
+      查看上下文
+    </button>
+
+    <section class="detail-popover" id="detail-popover" role="dialog" aria-modal="false" aria-labelledby="detail-title" hidden>
+      <div class="detail-toolbar">
+        <span class="detail-kicker">POINTABLE CONTEXT</span>
+        <button class="icon-button" id="detail-close" type="button" aria-label="关闭详情">×</button>
+      </div>
+      <div class="detail-body" id="detail-body"></div>
+    </section>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+    <script src="/conversation-client.js" defer></script>
+  </body>
+</html>

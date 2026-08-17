@@ -1,7 +1,7 @@
 {
   "name": "pointable-context",
   "version": "0.1.0",
-  "description": "Fixture MCP probe plus an opt-in Codex Desktop companion for read-only local-workspace Quick Look.",
+  "description": "Pointable Context fixture tools, opt-in Desktop Quick Look, and an App Server-owned conversation client.",
   "author": {
     "name": "Local developer"
   },
@@ -14,8 +14,8 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Pointable Context",
-    "shortDescription": "Fixture lookup and opt-in local workspace Quick Look.",
-    "longDescription": "Run the headless fixture-only MCP probe, or explicitly manage the experimental Codex Desktop local-workspace companion through its separate Skill. MCP results remain pinned to the bundled mini-project. The companion binds one host-visible Codex task to one user-approved local root and performs bounded read-only file lookup; it is not a DCPM/CWA Dashboard or a portable public host contract.",
+    "shortDescription": "Pointable lookup in Desktop or an App Server task.",
+    "longDescription": "Run the headless fixture-only MCP probe, explicitly manage the experimental Codex Desktop local-workspace companion, or start a separate App Server-owned conversation client through dedicated Skills. The conversation client keeps Chat, selected-text Quick Look, visible object references, and later Agent questions on one supported task surface. It remains a local research client, not a DCPM/CWA Dashboard or a portable public host contract.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
@@ -25,7 +25,8 @@
       "Run the Pointable Context fixture probe for GOV-1.",
       "Resolve ARCH-7 inside the bundled mini-project without reading detail yet.",
       "Show the fixture source, revision, and freshness for a returned entity reference.",
-      "Use the Pointable Context Workspace skill to bind this task to an explicit local workspace."
+      "Use the Pointable Context Workspace skill to bind this task to an explicit local workspace.",
+      "Use the Pointable Context Conversation skill to start a same-surface local research client for this workspace."
     ]
   }
 }
