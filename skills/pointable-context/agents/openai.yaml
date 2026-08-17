@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pointable Context"
+  short_description: "Resolve project entities with verified freshness"
+  default_prompt: "Use $pointable-context to look up a project entity with verified source and freshness."

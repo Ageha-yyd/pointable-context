@@ -1,0 +1,75 @@
+{
+  "provider_id": "json-fixture",
+  "snapshots": [
+    {
+      "authority_locator": "work-units/gov-1",
+      "snapshot": {
+        "project_id": "PRJ-01",
+        "entity_id": "WU:GOV-1",
+        "entity_type": "work_unit",
+        "entity_revision": "r18",
+        "observed_at": "2026-08-17T08:10:00Z",
+        "freshness": "stale",
+        "facts": {
+          "status": "completed",
+          "owner": null,
+          "remaining": "deferred",
+          "related_sessions": 10
+        },
+        "relations": [],
+        "source_refs": [
+          {
+            "source_type": "query_model",
+            "source_id": "wu_gov_1"
+          }
+        ]
+      }
+    },
+    {
+      "authority_locator": "work-units/dev-54a",
+      "snapshot": {
+        "project_id": "PRJ-01",
+        "entity_id": "WU:DEV-54A",
+        "entity_type": "work_unit",
+        "entity_revision": "r31",
+        "observed_at": "2026-08-17T08:12:00Z",
+        "freshness": "partial",
+        "facts": {
+          "technical_status": "pass",
+          "formal_gate": "open",
+          "evidence_rows": 340
+        },
+        "relations": ["WU:GOV-1"],
+        "source_refs": [
+          {
+            "source_type": "evidence_package",
+            "source_id": "dev54a-round3"
+          }
+        ]
+      }
+    },
+    {
+      "authority_locator": "decisions/arch-7",
+      "snapshot": {
+        "project_id": "PRJ-01",
+        "entity_id": "DEC:ARCH-7",
+        "entity_type": "decision",
+        "entity_revision": "r4",
+        "observed_at": "2026-08-17T08:15:00Z",
+        "freshness": "stale",
+        "facts": {
+          "decision": "explicit-click-only",
+          "status": "accepted",
+          "model_before_click": false
+        },
+        "relations": [],
+        "source_refs": [
+          {
+            "source_type": "decision_log",
+            "source_id": "arch-7"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "pointable-context": {
+      "command": "node",
+      "args": [
+        "./mcp/server.mjs",
+        "--fixture-root",
+        "./fixtures/mini-project",
+        "--project-id",
+        "PRJ-01"
+      ],
+      "cwd": ".",
+      "tool_timeout_sec": 30
+    }
+  }
+}

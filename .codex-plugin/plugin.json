@@ -1,0 +1,31 @@
+{
+  "name": "pointable-context",
+  "version": "0.1.0",
+  "description": "Fixture MCP probe plus an opt-in Codex Desktop companion for read-only local-workspace Quick Look.",
+  "author": {
+    "name": "Local developer"
+  },
+  "keywords": [
+    "project-context",
+    "entity-lookup",
+    "selection-quick-look"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Pointable Context",
+    "shortDescription": "Fixture lookup and opt-in local workspace Quick Look.",
+    "longDescription": "Run the headless fixture-only MCP probe, or explicitly manage the experimental Codex Desktop local-workspace companion through its separate Skill. MCP results remain pinned to the bundled mini-project. The companion binds one host-visible Codex task to one user-approved local root and performs bounded read-only file lookup; it is not a DCPM/CWA Dashboard or a portable public host contract.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [
+      "Read"
+    ],
+    "defaultPrompt": [
+      "Run the Pointable Context fixture probe for GOV-1.",
+      "Resolve ARCH-7 inside the bundled mini-project without reading detail yet.",
+      "Show the fixture source, revision, and freshness for a returned entity reference.",
+      "Use the Pointable Context Workspace skill to bind this task to an explicit local workspace."
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Pointable Context Workspace"
+  short_description: "Manage the opt-in live local workspace companion"
+  default_prompt: "Use $pointable-context-workspace to start the companion and explicitly bind this Codex task to my local workspace."
+
+policy:
+  allow_implicit_invocation: false

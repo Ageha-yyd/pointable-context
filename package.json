@@ -1,0 +1,42 @@
+{
+  "name": "pointable-context",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Explicit Pointable Context lookup with fixture and live local-workspace Desktop companions.",
+  "type": "module",
+  "bin": {
+    "pointable": "./dist/src/cli.js",
+    "pointable-context-mcp-fixture": "./dist/src/mcp/stdio.js",
+    "pointable-context-fixture-companion": "./host/fixture-companion.mjs",
+    "pointable-context-workspace-companion": "./host/workspace-companion.mjs"
+  },
+  "scripts": {
+    "build": "pnpm run build:ts && pnpm run build:mcp && pnpm run build:host",
+    "build:ts": "tsc -p tsconfig.json",
+    "build:mcp": "esbuild src/mcp/stdio.ts --bundle --platform=node --format=esm --target=node20 --outfile=mcp/server.mjs",
+    "build:host": "pnpm run build:host:fixture && pnpm run build:host:workspace",
+    "build:host:fixture": "esbuild src/host/codex-cdp/fixture-companion-cli.ts --bundle --platform=node --format=esm --target=node20 --outfile=host/fixture-companion.mjs",
+    "build:host:workspace": "esbuild src/host/codex-cdp/workspace-companion-cli.ts --bundle --platform=node --format=esm --target=node20 --outfile=host/workspace-companion.mjs",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "pnpm run build && node --test \"dist/test/*.test.js\"",
+    "test:host-browser": "node scripts/renderer-close-headless-acceptance.mjs",
+    "probe:app-server-referent": "node scripts/probe-app-server-referent.mjs",
+    "pointable": "node dist/src/cli.js",
+    "mcp:fixture": "node dist/src/mcp/stdio.js",
+    "companion:fixture": "node host/fixture-companion.mjs",
+    "companion:workspace": "node host/workspace-companion.mjs"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.0.0",
+    "@types/node": "24.13.3",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.0.0",
+    "zod": "4.4.3"
+  }
+}
