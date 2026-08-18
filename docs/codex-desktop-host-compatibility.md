@@ -27,11 +27,13 @@ Inline MCP App work is tracked as a separate host gate. It must not be inferred 
 ## Qualification evidence
 
 - `pnpm run check`: pass.
-- `pnpm test`: `164 / 164 PASS`.
+- `pnpm test`: `186 / 186 PASS` after the v1.2 Artifact Context increment, including packaged-layout start, deterministic Markdown parsing, Git enrichment, non-Git fallback, and option-like path regression coverage.
 - `pnpm run test:host-browser`: trusted drag → detail → close; native selection cleared and no remount after 250 ms.
+- Real repository Artifact probe: `docs/PRD-inline-pointable-widgets.md` returned purpose, current changed sections, three bounded literal references, Git status, and relative path in 128 ms total on the qualified machine (16 ms index + 112 ms detail). This is one local probe, not a population latency claim.
 - User manual gate: three visible workspace keywords produced live details; the repaired close action worked.
+- User manual Artifact Context gate (2026-08-18): after binding the active Codex task to this repository, selecting `PRD-inline-pointable-widgets.md` in the native Chat Lane exposed the v1.2 purpose, current change, impact, Git status, and path fields in place, without opening a browser or adding a Chat Turn.
 - Live management gate: persisted binding read-back, explicit `unbind`, empty binding status, explicit `bind`, and `replaced: true` rebind all passed.
-- Plugin cache: `pointable-context@personal 0.1.0+codex.20260817152630`, with the workspace Skill and identical companion bundle in source, marketplace source, and installed cache.
+- Plugin cache: the current `pointable-context@personal` cachebuster version is read back after each local reinstall, with all three Skills and the rebuilt companion bundle required in the installed cache.
 
 ## Unsupported or unqualified
 
@@ -41,20 +43,20 @@ Inline MCP App work is tracked as a separate host gate. It must not be inferred 
 - Treating the private renderer as MCP Apps UI, an Agent message payload, or a portable Codex extension contract.
 - Referent return to the model or “ask Agent” from the card. Detail viewing currently creates no new turn.
 
-## Inline MCP App gate (2026-08-18)
+## Optional inline Context Capsule renderer gate (2026-08-18)
 
 | Gate | Result | Meaning |
 |---|---|---|
-| Official architecture | `SUPPORTED PATTERN` | OpenAI's Plugin UI guide defines `_meta.ui.resourceUri`, `text/html;profile=mcp-app`, `ui/notifications/tool-result`, and `ui/message`; it explicitly documents optional UI in ChatGPT, not a general Codex Desktop guarantee |
-| Installed package implementation | `PRESENT / PRIVATE BUILD EVIDENCE` | Read-only inspection of `OpenAI.Codex 26.810.7004.0` found MCP App resource parsing, sandbox iframe setup, `ui/initialize`, `ui/message`, model-context updates, and a current-thread follow-up handler |
+| Official architecture | `SUPPORTED PATTERN` | OpenAI's Plugin UI guide defines a tool-linked UI resource, `text/html;profile=mcp-app`, iframe rendering, initialization, and tool-result delivery. It does not promise that arbitrary prose spans can be rewritten as links. |
+| Installed package implementation | `PRESENT / PRIVATE BUILD EVIDENCE` | Read-only inspection of `OpenAI.Codex 26.810.7004.0` found MCP App resource parsing, sandbox iframe setup, initialization, and tool-result delivery. This optional renderer does not depend on follow-up messaging or model-context mutation. |
 | Top-level Chat Lane bridge | `ABSENT` | CDP probe found no top-level `window.openai`, `sendFollowUpMessage`, `updateModelContext`, or `callTool`; the generic private Electron bridge is not an authorized product integration surface |
-| Plugin discovery | `PASS` | Fresh Codex CLI 0.146 App Server attributed the installed render tool to `pointable-context@personal` and exposed its `ui://pointable-context/entity-detail-v1.html` metadata |
-| MCP/resource contract | `PASS_AUTOMATED` | Data/render separation, standard MIME, restrictive resource CSP, text fallback, structured detail and stdio bundle all pass |
-| iframe interaction | `PASS_ISOLATED_EDGE` | A real iframe completed initialize, received tool result, rendered `WU:GOV-1`, and a trusted submit emitted both bounded model context and `ui/message` |
-| Current Desktop inline mount | `PENDING_LIVE` | Requires a post-install Codex task to visibly mount the actual MCP App beside the render tool result |
-| Current Desktop same-task return | `PENDING_LIVE` | Requires the Widget's trusted submit to create the next user turn in that exact Codex task with the bound entity/revision |
+| Plugin discovery | `PASS_INSTALLED` | Fresh Codex CLI 0.146 App Server attributed `render_context_capsule` to `pointable-context@personal` and exposed `ui://pointable-context/context-capsule-v2.html`. The exact cachebuster is read back during installation. This remains an explicit diagnostic rather than the default product trigger. |
+| MCP/resource contract | `PASS_AUTOMATED` | Data/render separation, standard MIME, restrictive resource CSP, text fallback, structured detail, fixture development types, and stdio bundle pass. |
+| iframe interaction | `PASS_ISOLATED_EDGE_ZERO_TURN` | A real iframe completed initialization, received a document result, exposed type-specific facts, and expanded/collapsed locally. No `ui/message`, model-context update, or browser navigation was emitted. |
+| Current Desktop inline mount | `PENDING_LIVE` | Requires a post-install fresh Codex task to visibly mount `context-capsule-v2` beside the render tool result. |
+| Current Desktop zero-turn behavior | `PENDING_LIVE` | Requires observing that expand/collapse leaves the task turn count unchanged and does not navigate away. |
 
-Only the last two rows can promote P0-B/P0-C from implementation-qualified to current-host-qualified. A standalone browser page or a direct App Server tool call cannot close them.
+These last two rows qualify only the optional renderer. They do not replace the v1.1 Selection Host gate, and a standalone browser page or direct App Server tool call cannot close either native-host claim.
 
 ## Version and failure policy
 

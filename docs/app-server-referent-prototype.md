@@ -1,8 +1,10 @@
 # App Server Referent Prototype
 
+> Historical research route after the v1.1 product reset. This document proves a supported App Server referent mechanism for a client-owned task, but it is not the Pointable Context product-default route because it leaves the user's current Codex Desktop task. It must not be used as evidence for selection-triggered Quiet Context Reveal acceptance.
+
 ## Outcome
 
-The recommended same-task route is now qualified for an **App Server-owned Codex task**:
+The App Server-owned same-task research route is qualified for an **App Server-owned Codex task**:
 
 1. A user opens a Pointable Context detail card. This is a read-only local action and starts no model turn.
 2. Only after the user explicitly chooses **Reference** does the host append a bounded `POINTABLE_CONTEXT_REFERENT_V1` item with `thread/inject_items`.
@@ -78,4 +80,3 @@ The expected and actual values matched, and the probe task was deleted afterward
 The current live selection UI is a private Codex Desktop CDP/DOM companion. The referent prototype is a separate App Server client path. Those two host task graphs are not currently joined.
 
 The recommended next implementation is therefore a minimal App Server-owned conversation client that renders Chat and Pointable Context affordances in one surface. In that client, the task ID, referent injection, subsequent question, and visible reference chip can share one supported host lifecycle. DOM automation of the existing Desktop composer is not the recommended bridge.
-

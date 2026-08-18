@@ -209,7 +209,7 @@ test("fixture binding reloads manifest and fails closed on project, revision, or
 test("fixture index and authority provider preserve the full identity tuple", async () => {
   const binding = await resolveFixtureBinding();
   const records = await new JsonContextIndex(resolve(fixture, "index.json")).list(binding);
-  assert.equal(records.length, 3);
+  assert.equal(records.length, 6);
   const gov = records.find((record) => record.canonicalKey === "GOV-1");
   assert.ok(gov);
 

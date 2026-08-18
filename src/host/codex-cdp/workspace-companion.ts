@@ -113,7 +113,7 @@ export function createWorkspaceCompanion(
     ...(options.maxConcurrentLookupsPerTarget === undefined
       ? {}
       : { maxConcurrentLookupsPerTarget: options.maxConcurrentLookupsPerTarget }),
-    actionLabel: options.actionLabel ?? "查看工作区上下文",
+    actionLabel: options.actionLabel ?? "查看上下文",
   };
   const adapter = new CodexCdpHostAdapter(adapterOptions);
   let state: WorkspaceCompanionStatus["state"] = "idle";

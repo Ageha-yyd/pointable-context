@@ -1,137 +1,129 @@
 # Pointable Context
 
-The current product requirements and qualification boundary are maintained in [docs/PRD-inline-pointable-widgets.md](docs/PRD-inline-pointable-widgets.md).
+Pointable Context explores one narrow product claim: in long-running software-development tasks, people should be able to select a compressed project reference in the current Codex conversation and reveal verified context in place, without opening a browser, reading an entire file, or creating another Chat Turn.
 
-This directory implements the PRD's first independent delivery slices: the **P0-A Selection Core**, a bundled MCP fixture probe, a compact **P0-B inline MCP App**, opt-in Desktop selection companions, and a browser-based App Server research harness. The product-default route is the current Codex Desktop conversation: resolve an entity, render its verified detail inline, and explicitly send a referent-aware follow-up back to that task without opening a browser.
+The normative product definition is [docs/PRD-inline-pointable-widgets.md](docs/PRD-inline-pointable-widgets.md).
 
-The shipped MCP path remains pinned to `fixtures/mini-project`; every MCP tool result and Widget is marked `FIXTURE-ONLY`. The two data tools remain UI-free and retain complete model-readable text fallback. Only `render_project_entity_widget` advertises the MCP App resource. Two separate, opt-in CDP companions are also available: the deterministic fixture companion and a live local-workspace companion. The latter requires an explicit user bind of one host-visible Codex task to one canonical workspace root, then indexes only bounded file identities and reads file detail live on click. Neither companion is started automatically by the Plugin.
+## Product direction
 
-## Included
+The primary interaction is **Quiet Context Reveal**:
 
-- Pure pre-click selection eligibility with no context-data dependency.
-- File-backed development/fixture binding and fail-closed context revalidation.
-- Exact canonical key, name, scope-local alias, and normalized matching.
-- `0 / 1 / 2–3 / >3` routing without prefetching candidate details.
-- Authoritative JSON provider with identity and freshness validation.
-- Bounded human-readable projection plus complete structured JSON detail.
-- Verification method/time and explicit source/fact projection counts.
-- Aggregate index/work budgets and abortable, deadline-bounded port calls.
-- Fixture project and unit/CLI/MCP stdio tests.
-- Two UI-free read tools: `resolve_project_entities` and `read_project_entity`.
-- One focused render tool, `render_project_entity_widget`, linked to a self-contained `text/html;profile=mcp-app` resource; it preserves the same text/structured fallback.
-- An inline read-only card with bounded identity, revision, observed time, freshness, facts, sources, and an explicit `ui/message` follow-up form for the current conversation.
-- Opaque, time-limited `entity_ref` capabilities bound to the full trusted-binding tuple and index revision.
-- A self-contained `mcp/server.mjs` bundle, Plugin manifest, `.mcp.json`, and fixture-specific Skill.
-- A controlled Codex CDP Host Adapter with local selection eligibility, trusted-click gating, contextual fences, bounded display, lifecycle cleanup, and a fixture-only private probe entrypoint.
-- A fixture-only companion with `start`, `status`, and `stop`, periodic target discovery, reconnect support, graceful renderer cleanup, and a self-contained `host/fixture-companion.mjs` bundle.
-- A host-vouched Codex task tuple (`threadId`, `hostId`, route, fingerprint) re-read before lookup and during core revalidation.
-- A user-local task→workspace registry with opaque workspace scope IDs, canonical-root pinning, revision invalidation, and fail-closed task/route/root drift handling.
-- A bounded local-workspace file index plus `live_read` Provider that returns current path, metadata, content revision, preview, and source without requiring a Dashboard.
-- A persistent live local-workspace companion with `start`, `status`, `bind`/rebind, `unbind`, and `stop`, plus a self-contained `host/workspace-companion.mjs` bundle and an explicit-only management Skill.
-- A bounded `PointableReferentV1` envelope plus a reusable Codex App Server client/session that can inject an explicit reference without creating a turn, then ask about it in the same App Server-owned task.
-- A loopback App Server conversation client that keeps Chat, message selection, local-workspace detail, visible referent chips, SSE Agent output, and later questions on one supported task surface.
-- An explicit-only `pointable-context-conversation` Skill that starts and manages that local App Server-owned client without impersonating the current Desktop task.
+1. The Agent's work populates a lightweight Context Index with stable document, module, decision, and task identities.
+2. The ordinary Chat Lane stays visually unchanged until the user selects a relevant reference.
+3. A small `查看上下文` action appears for a bounded, eligible message selection; this local step does not inspect workspace data.
+4. A trusted click deterministically resolves exact keys, file names/paths, stable names, or scope-local aliases, then opens current detail beside the selection.
+5. No browser opens, no model call is made, and no follow-up turn is created.
 
-## Not yet claimed
+There is deliberately no "identify more concepts" or semantic-model branch. General semantic questions already belong in Codex Chat; adding another model pass inside the selection path would increase latency and ambiguity. The browser App Server client, DCPM/CWA integration ideas, and a full Dashboard are research references, not the default product route.
 
-- A portable or production-qualified Codex Chat Lane selection integration. The local private fixture probe is a narrow runtime qualification, not a general host contract.
-- Live Codex Desktop qualification of the newly added inline MCP App and its `ui/message` roundtrip. Automated MCP/resource/stdio coverage passes; the installed-host gate is tracked separately.
-- Same-task referent roundtrip from the existing private Desktop CDP selection card. The inline Agent-output Widget and the private selection overlay remain separate entry paths.
-- Dashboard or write actions.
-- A portable/public production host contract. Current task evidence is qualified only for this Codex Desktop CDP/DOM adapter.
-- Remote, team, SaaS, database, or project-management Providers. The first live Provider is local read-only workspace files; DCPM/CWA remains one optional reference Provider.
-- A production Codex Desktop integration or model-mediated lookup against live context. A fresh Desktop task qualifies only the fixture MCP fallback.
-- Production conversation-client concerns such as task resume, approval UI, remote authentication, multi-user isolation, write actions, or a public hosted surface.
+## Live Markdown artifact context
 
-`FixtureFileProjectBinding` and `JsonAuthoritativeProvider` are fixture/development adapters. A file manifest is not proof of the active production host context, and `fixture_read` cannot claim live-current freshness. The bundled MCP server exposes only the mini-project and must not be presented as the production trust boundary.
+For an explicitly bound local Git workspace, Markdown documents now expose a deterministic five-fact view after the trusted click:
 
-`LookupService.issueActivation()` is a host-private boundary, not a public MCP/data tool. A production adapter may call it only after a verified explicit user action and must keep the issued ticket bound to that host event.
+- purpose from the first H1 and first useful prose paragraph;
+- current change from dirty diff sections, or the latest commit when clean;
+- impact from at most three tracked files that literally reference the selected file name;
+- Git state;
+- workspace-relative path.
 
-The shipped `.mcp.json` uses the camelCase `{ "mcpServers": ... }` wrapper accepted by the local Plugin validator and the matching Codex 0.146 runtime parser. It sets `cwd: "."`, so Codex anchors relative paths to the installed plugin root. It does not depend on `${PLUGIN_ROOT}` expansion. Package-level MCP v2 stdio and the self-contained bundle are covered by tests; host-level Codex CLI and Desktop qualification are reported separately.
+The extractor runs on demand, uses bounded local file/Git reads, and makes no model call. If Git is unavailable, the file remains readable and the Git state is shown as unavailable. Literal references are evidence of mention, not a semantic dependency graph.
 
-Runtime qualification on 2026-08-17: an installed `pointable-context@personal` cache was loaded by a fresh Codex CLI 0.146 app-server. Without starting a model turn, the probe verified Plugin attribution, `GOV-1` resolution, opaque `entity_ref` handoff, fixture detail read, model-readable text, and `fixture_read` verification. A fresh Codex Desktop task then used the data tools to resolve and read `GOV-1`. On 2026-08-18 the server added a decoupled MCP App render tool and self-contained inline resource; protocol, resource, compiled-stdio and bundled-stdio tests pass. Installed Desktop rendering and same-task `ui/message` remain a distinct live gate until explicitly observed. These results qualify only the fixture path; trusted live context-scope binding and production Providers remain unverified.
+## Current fixture
 
-## Verification snapshot
+The installed MCP server is deliberately pinned to `fixtures/mini-project`. Every result is marked `FIXTURE-ONLY`; it is not evidence about the active workspace.
 
-| Check | Result | Boundary |
+Development-oriented examples include:
+
+| Key | Capsule type | Demonstrates |
 |---|---|---|
-| Automated tests | `178 / 178 PASS` | Core, fixture adapters, live workspace binding/index/provider, CLI, MCP App resource/render tool, stdio/bundle, both companions, App Server research harness, explicit unbind/rebind, and regressions |
-| Inline MCP App protocol | `PASS_AUTOMATED / LIVE_PENDING` | Data/render split, standard MIME/resource metadata, restrictive CSP, text fallback, structured detail, `ui/initialize`, model-context update and `ui/message`; current Desktop iframe/follow-up still requires live observation |
-| Independent security audit | `PASS (private fixture boundary)` | No known P0/P1 in the controlled loopback CDP Host Adapter; not a production authority approval |
-| Codex CLI 0.146 app-server direct resolve→read | `PASS` | Installed headless Plugin; direct RPC; bundled mini-project only |
-| Codex Desktop fixture invocation | `PASS_FIXTURE` | Fresh task used the installed headless fixture tools; no real context authority claim |
-| Selection / anchored UI | `PASS_PRIVATE_FIXTURE_PERSISTENT` | Current Desktop only; trusted CDP mouse drag → inert selection → explicit trusted click → bounded fixture card → no new turn; companion remains attached until stopped |
-| Close interaction | `PASS_EDGE_HEADLESS` | Trusted drag → detail → close; native selection cleared and no action/card remounted after 250 ms |
-| Trusted local workspace scope | `PASS_PRIVATE_IMPLEMENTATION` | Explicit task bind, registry/root/revision drift gates, callback-time host task revalidation, and unit/E2E tests pass |
-| Live local workspace Provider | `PASS_PRIVATE_IMPLEMENTATION` | Bounded filenames/paths, exact resolver, fresh file read, revision change, traversal rejection, and source projection pass |
-| Current Chat Lane live-workspace card | `PASS_USER_MANUAL` | User manually verified three visible workspace keywords, live detail display, and the repaired close interaction in the current Codex task |
-| App Server referent injection | `PASS_ZERO_TURN` | `thread/inject_items` preserved zero turns in an App Server-owned task; the exact probe task was deleted afterward |
-| App Server model-visible referent | `PASS_SAME_TASK_MODEL_VISIBLE` | A later explicit turn in the same task returned the exact injected entity, revision, and unpredictable token |
-| App Server same-surface client | `PASS_LOCAL_RESEARCH_CLIENT` | Real lookup→reference kept zero turns; a later question streamed Agent deltas and exactly returned entity+revision; headless Edge passed detail, chip, and close |
+| `PRD-inline-pointable-widgets.md` | File / document | purpose, recent change, impact, revision |
+| `ContextScopeRef` | Module / concept | definition, responsibility, dependencies, maturity |
+| `ARCH-7` | Decision | decision, rationale, alternatives, consequence |
+| `NATIVE-CAPSULE-P0` | Task state | goal, completed work, next step, blocker |
+| `GOV-1`, `DEV-54A` | Legacy work unit | compatibility with the earlier lookup fixture |
+
+The fixture MCP server exposes:
+
+- `resolve_project_entities`: deterministic identity resolution; detail is not prefetched;
+- `read_project_entity`: bounded text/structured detail fallback;
+- `render_context_capsule`: optional type-specific rendering probe linked to a self-contained MCP App resource; it is not the default product trigger.
+
+The default Desktop companion keeps the lane clean until selection. A trusted click reveals 3–7 prioritized facts, revision, observed time, freshness, relations, sources, and verification. All progressive disclosure is local UI state. The optional MCP resource contains no question form, `ui/message`, model-context update, network request, or navigation.
+
+## Reused foundations
+
+- Pure pre-click eligibility with no project-data request.
+- Exact key, name, scope-local alias, and normalized matching.
+- `0 / 1 / 2–3 / >3` routing without candidate detail prefetch.
+- Opaque, time-limited references bound to trusted scope, entity identity, authority, and index revision.
+- Fail-closed context/index/provider revalidation.
+- Bounded facts, sources, text fallback, timeouts, cancellation, and work budgets.
+- Private Codex CDP selection adapter with trusted-click, navigation, context, lifecycle, and stale-response fences.
+- Explicitly bound local-workspace file lookup as the first reference Provider.
+
+These foundations are implementation assets. Selection is the visual trigger; it is not permission to add semantic guessing or a browser-first route.
+
+## Current boundaries
+
+- The shipped MCP data is fixture-only.
+- The standard MCP App path renders beside a tool result; it does not provide the required ordinary-prose selection hook.
+- The private Desktop selection companion is currently the primary interaction prototype, but remains host/build-specific and must be qualified per Codex build.
+- Markdown artifact context is implemented; code-module, decision, task, and verification Providers remain later stages.
+- Real Agent work results do not yet systematically emit context references.
+- Real module, decision, task, and verification Providers are not yet connected.
+- A persistent multi-object capsule strip is no longer a default product goal.
+- No formal user study has yet proven the expected efficiency gain.
+
+## Research harnesses retained as references
+
+The repository still contains:
+
+- fixture and local-workspace CDP companions;
+- App Server referent/session prototypes;
+- a browser conversation client;
+- host and browser acceptance scripts.
+
+They remain useful for protocol, security, and fallback research. They are not P0 product surfaces and must not be presented as substitutes for the current Codex Desktop Chat Lane.
 
 ## Development
 
 ```powershell
 pnpm install
+pnpm run check
 pnpm test
-pnpm run build
 
-"GOV-1" | node dist/src/cli.js eligible --stdin --surface assistant_message
-"请查看 GOV-1" | node dist/src/cli.js lookup --stdin --project-dir ./fixtures/mini-project
-"harness" | node dist/src/cli.js lookup --stdin --project-dir ./fixtures/mini-project --json
+# Headless fixture MCP server
 node mcp/server.mjs --fixture-root ./fixtures/mini-project --project-id PRJ-01
 
-# Persistent, fixture-only Desktop companion. It remains active until stopped.
+# Deterministic CLI lookup
+"PRD-inline-pointable-widgets.md" | node dist/src/cli.js lookup --stdin --project-dir ./fixtures/mini-project
+
+# Primary Quiet Context Reveal prototype in a controlled Desktop build
 node host/fixture-companion.mjs start
 node host/fixture-companion.mjs status
 node host/fixture-companion.mjs stop
 
-# With the companion running, select GOV-1, ARCH-7, or harness inside a
-# user/assistant Chat Lane message, then click “查看上下文（fixture）”.
-
-# Mouse-level live acceptance without stopping the companion.
-node scripts/fixture-companion-live-acceptance.mjs GOV-1
-
-# Browser-isolated regression for action positioning and terminal close.
-pnpm run test:host-browser
-
-# Private, local-only Desktop qualification. It injects a fixture-only card,
-# exercises it with a trusted CDP mouse click, then removes all injected state.
-node scripts/private-fixture-desktop-probe.mjs
-
-# Experimental live local-workspace companion. Do not run it together with
-# the fixture companion: each owns one renderer binding on the same Chat Lane.
-node host/workspace-companion.mjs start
-node host/workspace-companion.mjs status
-node host/workspace-companion.mjs bind --workspace-root "D:\github repository\CHI"
-node host/workspace-companion.mjs unbind
-
-# Then select an exact visible file identity such as README.md, package.json,
-# or PRD-inline-pointable-widgets.md and click “查看工作区上下文”.
-node host/workspace-companion.mjs stop
-
-# Supported same-task referent protocol probe. The default path starts no model
-# turn; --verify-model adds one explicit test question and deletes the probe task.
-pnpm run probe:app-server-referent
-node scripts/probe-app-server-referent.mjs --verify-model
-
-# Minimal same-task client: Chat + Selection Quick Look + referent chip.
-pnpm run build
-pnpm run client:app-server
-
-# Real protocol and browser-level acceptance.
-pnpm run probe:app-server-conversation
-pnpm run test:conversation-browser
+# Isolated rendering acceptance for the zero-turn capsule
+pnpm run test:widget-browser
 ```
 
-`status` exposes the currently host-visible task binding without exposing the control token. Repeating explicit `bind` is a rebind with a new revision; `unbind` removes only the current host-visible task entry. `eligible` is local and reads no project data. Running `lookup` is the explicit activation. Standard input (`--stdin`) is the recommended input path so selection text does not appear in the process list. `--text` is available only with the explicit `--allow-argv-text` acknowledgement.
+After a local Plugin update, reinstall it through the configured local marketplace and use a fresh Codex task so the new MCP tools, resource URI, and Skill are loaded.
 
-Lookup exit codes are stable for shell integration: `0` detail, `2` blocked/invalid input, `3` authority or activation unavailable, `4` candidate choice required, `5` no match, and `6` overflow/refinement required.
+## Acceptance focus
 
-The companions and private Desktop probe are deliberately separate from the Plugin's default MCP path. They require a locally trusted Codex Desktop loopback CDP endpoint. The fixture companion never reads a real workspace. The live companion reads only the explicitly bound local workspace and ignores common build/cache trees; a file-count or depth overflow fails closed instead of silently truncating. `DCPM/CWA` is not imported or started by either path. Control state is user-local under `%LOCALAPPDATA%\PointableContext`; each control server binds only to `127.0.0.1` and requires a random per-process token. `stop` removes the renderer, binding, state file, and runtime lock before returning; the explicit task-workspace registry is intentionally retained until it is replaced by another explicit bind.
+P0 is successful only when Quiet Context Reveal:
 
-The private Desktop support boundary is frozen in [docs/codex-desktop-host-compatibility.md](docs/codex-desktop-host-compatibility.md). A package or DOM change is unqualified until the matrix gates are rerun; selectors must not be silently widened.
+- leaves the Chat Lane unchanged until a relevant selection is made;
+- shows a small action only after local deterministic eligibility;
+- performs no Provider read or model call on selection alone;
+- opens detail beside the selection after a trusted explicit action;
+- does not open a browser or Dashboard;
+- creates zero additional Chat Turns;
+- does not call a model to reveal existing facts;
+- uses type-specific information priorities;
+- exposes identity, source, revision, observed time, and freshness;
+- preserves text and structured fallback;
+- closes and restores reading context reliably;
+- contains no semantic-model or "identify more concepts" path.
 
-The supported referent route, runtime evidence, and remaining Desktop boundary are documented in [docs/app-server-referent-prototype.md](docs/app-server-referent-prototype.md).
-
-The minimal same-surface client, run instructions, security boundary, and qualification evidence are documented in [docs/app-server-conversation-client.md](docs/app-server-conversation-client.md).
+The primary research metrics are `time_to_verified_fact`, `chat_turns_to_fact`, fact-answer accuracy, card sufficiency, lane-leave rate, and stale/wrong-entity rate.

@@ -21948,14 +21948,14 @@ function createLocalFixtureToolService(options) {
 }
 
 // src/mcp/entity-widget.ts
-var POINTABLE_ENTITY_WIDGET_URI = "ui://pointable-context/entity-detail-v1.html";
+var POINTABLE_ENTITY_WIDGET_URI = "ui://pointable-context/context-capsule-v2.html";
 var POINTABLE_ENTITY_WIDGET_MIME = "text/html;profile=mcp-app";
 var POINTABLE_ENTITY_WIDGET_HTML = String.raw`<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Pointable Context</title>
+  <title>Pointable Context Capsule</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -21966,53 +21966,106 @@ var POINTABLE_ENTITY_WIDGET_HTML = String.raw`<!doctype html>
       --pc-muted: var(--color-text-secondary, light-dark(#64748b, #a6adbb));
       --pc-border: var(--color-border-primary, light-dark(#dbe2ea, #3b3f47));
       --pc-accent: var(--color-text-link, light-dark(#175cd3, #8ab4ff));
+      --pc-accent-bg: light-dark(#eef5ff, #182b48);
       --pc-warn: light-dark(#8a4b08, #ffd08a);
       --pc-warn-bg: light-dark(#fff7e8, #3a2a13);
-      --pc-danger: light-dark(#9f1c20, #ff9ca0);
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: transparent; color: var(--pc-text); }
     body { min-width: 0; }
-    .card { padding: 14px; background: var(--pc-bg); border: 1px solid var(--pc-border); border-radius: 14px; }
-    .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-    .eyebrow { margin: 0 0 5px; color: var(--pc-accent); font-size: 11px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
-    h1 { margin: 0; font-size: 17px; line-height: 1.3; overflow-wrap: anywhere; }
-    .summary { margin: 7px 0 0; color: var(--pc-muted); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
-    .badge { flex: 0 0 auto; padding: 4px 8px; border: 1px solid var(--pc-border); border-radius: 999px; color: var(--pc-muted); font-size: 11px; font-weight: 700; }
-    .badge.stale, .badge.partial { color: var(--pc-warn); background: var(--pc-warn-bg); }
-    .meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
-    .cell { min-width: 0; padding: 9px 10px; background: var(--pc-subtle); border-radius: 9px; }
-    .label { display: block; margin-bottom: 3px; color: var(--pc-muted); font-size: 11px; }
-    .value { display: block; font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
-    .section { margin-top: 12px; }
-    .section h2 { margin: 0 0 7px; color: var(--pc-muted); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-    dl { display: grid; grid-template-columns: minmax(92px, .75fr) minmax(0, 1.5fr); gap: 6px 12px; margin: 0; font-size: 12px; }
-    dt { color: var(--pc-muted); overflow-wrap: anywhere; }
-    dd { margin: 0; overflow-wrap: anywhere; }
-    .source { margin: 0; color: var(--pc-muted); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
-    .fixture { margin: 12px 0 0; padding: 8px 10px; color: var(--pc-warn); background: var(--pc-warn-bg); border-radius: 9px; font-size: 11px; line-height: 1.4; }
-    form { display: flex; gap: 7px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--pc-border); }
-    input { min-width: 0; flex: 1 1 auto; padding: 8px 10px; color: var(--pc-text); background: var(--pc-bg); border: 1px solid var(--pc-border); border-radius: 9px; font: inherit; font-size: 12px; }
-    button { flex: 0 0 auto; padding: 8px 11px; color: white; background: #175cd3; border: 0; border-radius: 9px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
-    button:disabled { cursor: wait; opacity: .65; }
-    input:focus-visible, button:focus-visible { outline: 2px solid var(--pc-accent); outline-offset: 2px; }
-    .status { min-height: 17px; margin: 6px 0 0; color: var(--pc-muted); font-size: 11px; }
-    .status.error { color: var(--pc-danger); }
-    .empty { padding: 20px 12px; color: var(--pc-muted); text-align: center; font-size: 12px; }
-    @media (max-width: 430px) { .meta { grid-template-columns: 1fr; } form { flex-direction: column; } button { width: 100%; } }
+    .capsule { overflow: hidden; background: var(--pc-bg); border: 1px solid var(--pc-border); border-radius: 14px; }
+    .trigger { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; width: 100%; padding: 11px 12px; color: inherit; background: transparent; border: 0; text-align: left; cursor: pointer; }
+    .trigger:hover { background: var(--pc-subtle); }
+    .trigger:focus-visible { outline: 2px solid var(--pc-accent); outline-offset: -2px; }
+    .kind { align-self: start; padding: 4px 7px; color: var(--pc-accent); background: var(--pc-accent-bg); border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: .04em; white-space: nowrap; }
+    .identity { min-width: 0; }
+    .title { display: block; font-size: 14px; font-weight: 750; line-height: 1.35; overflow-wrap: anywhere; }
+    .summary { display: block; margin-top: 3px; color: var(--pc-muted); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+    .chevron { align-self: center; color: var(--pc-muted); font-size: 15px; transition: transform .15s ease; }
+    .trigger[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+    .detail { padding: 0 12px 12px; border-top: 1px solid var(--pc-border); }
+    .detail[hidden] { display: none; }
+    .trust { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 11px 0; }
+    .trust-cell { min-width: 0; padding: 8px 9px; background: var(--pc-subtle); border-radius: 8px; }
+    .trust-label { display: block; margin-bottom: 2px; color: var(--pc-muted); font-size: 10px; }
+    .trust-value { display: block; font-size: 11px; line-height: 1.35; overflow-wrap: anywhere; }
+    .fact-list { display: grid; grid-template-columns: minmax(90px, .7fr) minmax(0, 1.5fr); gap: 7px 12px; margin: 0; font-size: 12px; }
+    .fact-list dt { color: var(--pc-muted); overflow-wrap: anywhere; }
+    .fact-list dd { margin: 0; line-height: 1.45; overflow-wrap: anywhere; }
+    details { margin-top: 11px; padding-top: 9px; border-top: 1px solid var(--pc-border); }
+    summary { color: var(--pc-accent); font-size: 11px; font-weight: 700; cursor: pointer; }
+    details .fact-list { margin-top: 9px; }
+    .source { margin: 8px 0 0; color: var(--pc-muted); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+    .warning { margin: 10px 0 0; padding: 7px 9px; color: var(--pc-warn); background: var(--pc-warn-bg); border-radius: 8px; font-size: 10px; line-height: 1.4; }
+    .empty { padding: 16px 12px; color: var(--pc-muted); text-align: center; font-size: 12px; }
+    @media (max-width: 430px) {
+      .trigger { grid-template-columns: minmax(0, 1fr) auto; }
+      .kind { grid-column: 1 / -1; justify-self: start; }
+      .trust { grid-template-columns: 1fr; }
+      .fact-list { grid-template-columns: 1fr; gap: 2px; }
+      .fact-list dd { margin-bottom: 7px; }
+    }
   </style>
 </head>
 <body>
-  <main id="app" class="card" aria-live="polite"><div class="empty">正在读取上下文对象…</div></main>
+  <main id="app" class="capsule" aria-live="polite"><div class="empty">正在读取上下文胶囊…</div></main>
   <script>
   (() => {
     "use strict";
     const PROTOCOL_VERSION = "2026-01-26";
     const pending = new Map();
     let nextId = 1;
-    let current = null;
     let initialized = false;
     let lastSize = "";
+
+    const labels = {
+      purpose: "用途",
+      change_summary: "本次变化",
+      impact: "影响范围",
+      status: "当前状态",
+      key_sections: "关键部分",
+      related_modules: "相关模块",
+      path: "位置",
+      definition: "定义",
+      responsibility: "责任",
+      introduced_because: "引入原因",
+      replaces: "替代对象",
+      interfaces: "接口",
+      dependencies: "依赖",
+      maturity: "成熟度",
+      risk: "风险",
+      decision: "决策",
+      rationale: "原因",
+      consequence: "影响",
+      rejected_alternatives: "未采用方案",
+      constraints: "约束",
+      goal: "目标",
+      completed: "已完成",
+      current_state: "当前状态",
+      next_step: "下一步",
+      blocker: "阻塞",
+      owner: "负责人",
+      evidence: "证据",
+      remaining: "剩余工作",
+      related_sessions: "相关会话",
+      technical_status: "技术状态",
+      formal_gate: "正式门禁",
+      evidence_rows: "证据条目",
+      model_before_click: "点击前调用模型"
+    };
+
+    const profiles = {
+      artifact: { name: "文件 / 文档", primary: ["purpose", "change_summary", "impact", "status"] },
+      document: { name: "文件 / 文档", primary: ["purpose", "change_summary", "impact", "status"] },
+      file: { name: "文件 / 文档", primary: ["purpose", "change_summary", "impact", "status"] },
+      module: { name: "模块 / 概念", primary: ["definition", "responsibility", "introduced_because", "maturity"] },
+      concept: { name: "模块 / 概念", primary: ["definition", "responsibility", "introduced_because", "maturity"] },
+      decision: { name: "决策", primary: ["decision", "rationale", "consequence", "status"] },
+      task: { name: "任务状态", primary: ["goal", "completed", "current_state", "next_step"] },
+      task_state: { name: "任务状态", primary: ["goal", "completed", "current_state", "next_step"] },
+      work_unit: { name: "任务状态", primary: ["status", "remaining", "owner", "related_sessions"] },
+      verification: { name: "验证证据", primary: ["status", "evidence", "impact", "risk"] }
+    };
 
     function isObject(value) {
       return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -22021,8 +22074,14 @@ var POINTABLE_ENTITY_WIDGET_HTML = String.raw`<!doctype html>
     function text(value, max) {
       if (typeof value === "string") return value.slice(0, max);
       if (typeof value === "number" || typeof value === "boolean") return String(value).slice(0, max);
-      if (value === null) return "null";
+      if (value === null) return "未指定";
       return "—";
+    }
+
+    function displayValue(value) {
+      return Array.isArray(value)
+        ? value.slice(0, 5).map((item) => text(item, 140)).join(" · ")
+        : text(value, 320);
     }
 
     function request(method, params, timeoutMs) {
@@ -22055,142 +22114,111 @@ var POINTABLE_ENTITY_WIDGET_HTML = String.raw`<!doctype html>
       return element;
     }
 
-    function addMeta(container, label, value) {
-      const cell = node("div", "cell");
-      cell.append(node("span", "label", label), node("span", "value", value));
-      container.append(cell);
+    function appendFacts(container, entries) {
+      for (const [key, value] of entries) {
+        container.append(
+          node("dt", "", labels[key] || key.replaceAll("_", " ")),
+          node("dd", "", displayValue(value))
+        );
+      }
     }
 
     function render(raw) {
       const root = document.getElementById("app");
       root.replaceChildren();
       if (!isObject(raw) || raw.status !== "detail" || !isObject(raw.entity)) {
-        root.append(node("div", "empty", "上下文详情暂时不可用；请使用文本结果。"));
-        current = null;
+        root.append(node("div", "empty", "上下文胶囊暂时不可用；请使用文本结果。"));
         reportSize();
         return;
       }
 
       const entity = raw.entity;
-      const verification = isObject(raw.verification) ? raw.verification : {};
-      current = {
-        entityId: text(entity.entityId, 160),
-        entityType: text(entity.entityType, 80),
-        label: text(entity.label, 200),
-        summary: text(entity.summary, 500),
-        revision: text(entity.entityRevision, 160),
-        observedAt: text(entity.observedAt, 80),
-        freshness: text(entity.freshness, 20),
-        projectId: text(raw.projectId, 100)
-      };
+      const type = text(entity.entityType, 80);
+      const profile = profiles[type] || { name: "上下文对象", primary: [] };
+      const facts = isObject(entity.facts) ? Object.entries(entity.facts).slice(0, 16) : [];
+      const primaryKeys = new Set(profile.primary);
+      const selected = [];
+      for (const key of profile.primary) {
+        const match = facts.find((entry) => entry[0] === key);
+        if (match && selected.length < 7) selected.push(match);
+      }
+      for (const entry of facts) {
+        if (selected.length >= 4 || primaryKeys.has(entry[0])) continue;
+        selected.push(entry);
+      }
+      const selectedKeys = new Set(selected.map((entry) => entry[0]));
+      const additional = facts.filter((entry) => !selectedKeys.has(entry[0]));
 
-      const header = node("div", "top");
-      const heading = node("div");
-      heading.append(node("p", "eyebrow", current.entityType + " · " + current.entityId));
-      heading.append(node("h1", "", current.label));
-      heading.append(node("p", "summary", current.summary));
-      const badge = node("span", "badge " + current.freshness, current.freshness);
-      header.append(heading, badge);
-      root.append(header);
+      const trigger = node("button", "trigger");
+      trigger.type = "button";
+      trigger.setAttribute("aria-expanded", "false");
+      trigger.setAttribute("aria-controls", "pointable-capsule-detail");
+      trigger.append(node("span", "kind", profile.name));
+      const identity = node("span", "identity");
+      identity.append(
+        node("span", "title", text(entity.label, 200)),
+        node("span", "summary", text(entity.summary, 500))
+      );
+      trigger.append(identity, node("span", "chevron", "⌄"));
 
-      const meta = node("div", "meta");
-      addMeta(meta, "修订", current.revision);
-      addMeta(meta, "数据时间", current.observedAt);
-      addMeta(meta, "范围", current.projectId);
-      addMeta(meta, "验证", text(verification.method, 60));
-      root.append(meta);
+      const detail = node("section", "detail");
+      detail.id = "pointable-capsule-detail";
+      detail.hidden = true;
 
-      const facts = isObject(entity.facts) ? Object.entries(entity.facts).slice(0, 5) : [];
-      if (facts.length) {
-        const section = node("section", "section");
-        section.append(node("h2", "", "关键事实"));
-        const list = node("dl");
-        for (const pair of facts) {
-          const value = Array.isArray(pair[1])
-            ? pair[1].slice(0, 5).map((item) => text(item, 120)).join(" · ")
-            : text(pair[1], 240);
-          list.append(node("dt", "", text(pair[0], 100)), node("dd", "", value));
+      const trust = node("div", "trust");
+      for (const item of [
+        ["修订", entity.entityRevision],
+        ["数据时间", entity.observedAt],
+        ["新鲜度", entity.freshness]
+      ]) {
+        const cell = node("div", "trust-cell");
+        cell.append(node("span", "trust-label", item[0]), node("span", "trust-value", text(item[1], 160)));
+        trust.append(cell);
+      }
+      detail.append(trust);
+
+      if (selected.length) {
+        const list = node("dl", "fact-list");
+        appendFacts(list, selected);
+        detail.append(list);
+      }
+
+      const relations = Array.isArray(entity.relations) ? entity.relations.slice(0, 8) : [];
+      if (additional.length || relations.length) {
+        const more = node("details");
+        more.append(node("summary", "", "更多影响与关系"));
+        const list = node("dl", "fact-list");
+        appendFacts(list, additional);
+        if (relations.length) {
+          list.append(node("dt", "", "相关对象"), node("dd", "", relations.map((item) => text(item, 120)).join(" · ")));
         }
-        section.append(list);
-        root.append(section);
+        more.append(list);
+        detail.append(more);
       }
 
       const sources = Array.isArray(entity.sources) ? entity.sources.slice(0, 5) : [];
+      const verification = isObject(raw.verification) ? raw.verification : {};
+      const evidence = node("details");
+      evidence.append(node("summary", "", "来源与验证"));
+      evidence.append(node("p", "source", "对象：" + text(entity.entityId, 160) + " · 范围：" + text(raw.projectId, 100)));
+      evidence.append(node("p", "source", "验证：" + text(verification.method, 80) + " · " + text(verification.verifiedAt, 100)));
       if (sources.length) {
-        const section = node("section", "section");
-        section.append(node("h2", "", "来源"));
-        section.append(node("p", "source", sources.map((source) => {
+        evidence.append(node("p", "source", "来源：" + sources.map((source) => {
           if (!isObject(source)) return "—";
           return text(source.sourceType, 80) + " / " + text(source.sourceId, 120);
         }).join("；")));
-        root.append(section);
       }
+      detail.append(evidence);
 
-      root.append(node("p", "fixture", text(raw.warning, 500)));
-      const form = node("form");
-      form.setAttribute("aria-label", "就此对象询问 Agent");
-      const input = node("input");
-      input.type = "text";
-      input.name = "question";
-      input.maxLength = 300;
-      input.placeholder = "例如：这个状态意味着什么？";
-      input.setAttribute("aria-label", "关于此对象的问题");
-      const submit = node("button", "", "问 Agent");
-      submit.type = "submit";
-      const status = node("p", "status");
-      form.append(input, submit);
-      root.append(form, status);
+      if (raw.warning) detail.append(node("p", "warning", text(raw.warning, 500)));
+      root.append(trigger, detail);
 
-      form.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        if (!event.isTrusted || !current || submit.disabled) return;
-        const question = input.value.trim().slice(0, 300) || "请解释这个对象的当前状态、依据和需要注意的事项。";
-        const referent = "Pointable Context 对象 " + current.entityId +
-          "（类型 " + current.entityType + "，修订 " + current.revision +
-          "，数据时间 " + current.observedAt + "，freshness " + current.freshness + "）";
-        const prompt = "请基于刚才原位 Widget 展示的 " + referent + " 回答：" + question +
-          " 这是 FIXTURE-ONLY 演示数据，不要把它表述为当前项目的实时权威状态。";
-        submit.disabled = true;
-        status.className = "status";
-        status.textContent = "正在回到当前任务…";
-        try {
-          try {
-            await request("ui/update-model-context", {
-              content: [{ type: "text", text: referent }],
-              structuredContent: {
-                entityId: current.entityId,
-                entityType: current.entityType,
-                revision: current.revision,
-                observedAt: current.observedAt,
-                freshness: current.freshness,
-                fixtureOnly: true
-              }
-            }, 3000);
-          } catch (_) {
-            // The full referent is also carried in ui/message, so context update is optional.
-          }
-          await request("ui/message", {
-            role: "user",
-            content: { type: "text", text: prompt }
-          }, 7000);
-          status.textContent = "已发送到当前任务。";
-          input.value = "";
-        } catch (error) {
-          const bridge = window.openai;
-          const timedOut = error instanceof Error && error.message === "bridge_timeout";
-          if (!timedOut && bridge && typeof bridge.sendFollowUpMessage === "function") {
-            try {
-              await bridge.sendFollowUpMessage({ prompt, context: referent, title: "询问上下文对象" });
-              status.textContent = "已发送到当前任务。";
-              input.value = "";
-              return;
-            } catch (_) {}
-          }
-          status.className = "status error";
-          status.textContent = "当前宿主未确认消息回流；请在对话框中继续询问。";
-        } finally {
-          submit.disabled = false;
-        }
+      trigger.addEventListener("click", (event) => {
+        if (!event.isTrusted) return;
+        const expanded = trigger.getAttribute("aria-expanded") === "true";
+        trigger.setAttribute("aria-expanded", String(!expanded));
+        detail.hidden = expanded;
+        reportSize();
       });
       reportSize();
     }
@@ -22222,24 +22250,20 @@ var POINTABLE_ENTITY_WIDGET_HTML = String.raw`<!doctype html>
         render(isObject(message.params) ? message.params.structuredContent : null);
         return;
       }
-      if (message.method === "ui/resource-teardown" && message.id !== undefined) {
-        respond(message.id, {});
-      }
+      if (message.method === "ui/resource-teardown" && message.id !== undefined) respond(message.id, {});
     }, { passive: true });
 
     async function initialize() {
       try {
         await request("ui/initialize", {
-          appInfo: { name: "pointable-context-entity-widget", version: "0.1.0" },
+          appInfo: { name: "pointable-context-capsule", version: "1.0.0" },
           appCapabilities: { availableDisplayModes: ["inline"] },
           protocolVersion: PROTOCOL_VERSION
         }, 5000);
         initialized = true;
         notify("ui/notifications/initialized", {});
         if (window.ResizeObserver) new ResizeObserver(reportSize).observe(document.body);
-      } catch (_) {
-        // Compatibility data below still keeps the text-only fallback useful.
-      }
+      } catch (_) {}
       const bridge = window.openai;
       if (bridge && bridge.toolOutput) render(bridge.toolOutput);
       reportSize();
@@ -22346,17 +22370,17 @@ function createFixtureProbeMcpServer(service) {
       instructions: [
         FIXTURE_WARNING,
         "This server is a fixture-only development probe, not a production Codex project binding.",
-        "Call resolve_project_entities first. Pass only its opaque entity_ref to read_project_entity for text or render_project_entity_widget for an inline detail card.",
+        "Call resolve_project_entities first. Pass only its opaque entity_ref to read_project_entity for text. render_context_capsule is an optional fixture rendering diagnostic, not the default Quiet Mode trigger.",
         "Never invent or pass authority locators, provider ids, project ids, or workspace roots."
       ].join(" ")
     }
   );
   server.registerResource(
-    "pointable-context-entity-detail",
+    "pointable-context-capsule",
     POINTABLE_ENTITY_WIDGET_URI,
     {
-      title: "Pointable Context entity detail",
-      description: "Inline, read-only entity detail with a same-conversation follow-up control.",
+      title: "Pointable Context capsule",
+      description: "Inline, read-only development context capsule with local progressive disclosure and no follow-up turn.",
       mimeType: POINTABLE_ENTITY_WIDGET_MIME
     },
     async () => ({
@@ -22435,10 +22459,10 @@ function createFixtureProbeMcpServer(service) {
     }
   );
   server.registerTool(
-    "render_project_entity_widget",
+    "render_context_capsule",
     {
-      title: "Render Pointable Context detail",
-      description: "Render one resolved fixture entity as a compact inline card in the current conversation. First call resolve_project_entities, then pass only its opaque entity_ref. Use this instead of read_project_entity when the user asks to show, inspect, or interact with the detail in place.",
+      title: "Show Context Capsule",
+      description: "Optional fixture diagnostic: render one explicitly resolved development object as a compact, type-specific capsule beside the current conversation. The product-default path is selection-triggered Quiet Context Reveal in Codex Desktop. Expanding and collapsing are local UI operations: they do not call a model, create a chat turn, or open a browser. First call resolve_project_entities, then pass only its opaque entity_ref.",
       inputSchema: readInputSchema,
       outputSchema: readOutputSchema,
       annotations: {
@@ -22452,8 +22476,8 @@ function createFixtureProbeMcpServer(service) {
           resourceUri: POINTABLE_ENTITY_WIDGET_URI,
           visibility: ["model", "app"]
         },
-        "openai/toolInvocation/invoking": "\u6B63\u5728\u8BFB\u53D6\u4E0A\u4E0B\u6587\u5BF9\u8C61\u2026",
-        "openai/toolInvocation/invoked": "\u4E0A\u4E0B\u6587\u5BF9\u8C61\u5DF2\u5C31\u5730\u663E\u793A\u3002"
+        "openai/toolInvocation/invoking": "\u6B63\u5728\u51C6\u5907\u4E0A\u4E0B\u6587\u80F6\u56CA\u2026",
+        "openai/toolInvocation/invoked": "\u4E0A\u4E0B\u6587\u80F6\u56CA\u5DF2\u5728\u5F53\u524D\u5BF9\u8BDD\u4E2D\u663E\u793A\u3002"
       }
     },
     async (args, ctx) => {

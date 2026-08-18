@@ -23,6 +23,10 @@ import {
   LOCAL_WORKSPACE_PROVIDER_ID,
   localWorkspaceScope,
 } from "../host/codex-cdp/task-workspace-binding.js";
+import {
+  extractMarkdownArtifactContext,
+  type MarkdownArtifactContext,
+} from "./markdown-artifact.js";
 
 const DEFAULT_MAX_FILES = 2_048;
 const DEFAULT_MAX_DEPTH = 12;
@@ -94,6 +98,11 @@ function containedRelative(root: string, target: string): string | undefined {
 
 function fileEntityId(relativePath: string): string {
   return `file:${relativePath}`;
+}
+
+function markdownDocument(relativePath: string): boolean {
+  const extension = extname(relativePath).toLocaleLowerCase("en-US");
+  return extension === ".md" || extension === ".mdx";
 }
 
 async function verifiedWorkspaceRoot(binding: TrustedContextBinding): Promise<string> {
@@ -224,7 +233,7 @@ export class LocalWorkspaceContextIndex implements ContextIndexPort {
         schemaVersion: "1.0",
         scope: { ...binding.scope },
         entityId: fileEntityId(file.relativePath),
-        entityType: "file",
+        entityType: markdownDocument(file.relativePath) ? "document" : "file",
         canonicalKey: file.relativePath,
         canonicalName: name,
         aliases: fileAliases(file.relativePath),
@@ -252,6 +261,27 @@ function contentPreview(content: Buffer): string | undefined {
   }
 }
 
+function utf8Content(content: Buffer): string | undefined {
+  if (content.includes(0)) return undefined;
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(content);
+  } catch {
+    return undefined;
+  }
+}
+
+function gitStatusLabel(status: MarkdownArtifactContext["gitStatus"]): string {
+  switch (status) {
+    case "clean": return "clean";
+    case "modified": return "modified";
+    case "staged": return "staged";
+    case "staged_and_modified": return "staged + modified";
+    case "untracked": return "untracked";
+    case "conflicted": return "conflicted";
+    case "unavailable": return "unavailable";
+  }
+}
+
 function stableFileStat(
   before: Stats,
   after: Stats,
@@ -276,7 +306,9 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
     signal?: AbortSignal;
   }): Promise<AuthorityResult> {
     if (request.signal?.aborted) return { kind: "unavailable", retryable: true };
-    if (request.entityType !== "file") return { kind: "not_found" };
+    if (request.entityType !== "file" && request.entityType !== "document") {
+      return { kind: "not_found" };
+    }
     if (
       request.authorityLocator.length < 1 ||
       request.authorityLocator.length > MAX_RELATIVE_PATH_CHARS ||
@@ -301,6 +333,16 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
       if (before.size <= MAX_PREVIEW_FILE_BYTES) {
         content = await handle.readFile();
       }
+      const decoded = content === undefined ? undefined : utf8Content(content);
+      const markdownContext =
+        request.entityType === "document" && decoded !== undefined
+          ? await extractMarkdownArtifactContext({
+              root,
+              relativePath,
+              content: decoded,
+              ...(request.signal === undefined ? {} : { signal: request.signal }),
+            })
+          : undefined;
       const after = await handle.stat();
       if (!stableFileStat(before, after) || request.signal?.aborted) {
         return { kind: "unavailable", retryable: true };
@@ -317,32 +359,57 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
       const contentHash = content === undefined
         ? undefined
         : createHash("sha256").update(content).digest("hex");
+      const detailRevision = createHash("sha256")
+        .update(contentHash ?? statRevision, "utf8")
+        .update("\u0000", "utf8")
+        .update(markdownContext?.contextRevision ?? "file-metadata-v1", "utf8")
+        .digest("hex");
       const extension = extname(relativePath);
       const preview = content === undefined ? undefined : contentPreview(content);
       const observedAt = new Date().toISOString();
+      const markdownFacts = markdownContext === undefined
+        ? undefined
+        : {
+            "用途": markdownContext.purpose ??
+              `${markdownContext.title ?? basename(relativePath)} Markdown 文档`,
+            "本次变化": markdownContext.changeSummary ??
+              (markdownContext.gitAvailable
+                ? "当前工作树未检测到未提交变更"
+                : "Git 上下文不可用"),
+            "影响范围": markdownContext.impactFiles.length > 0
+              ? [...markdownContext.impactFiles]
+              : "未发现已跟踪引用",
+            "Git 状态": gitStatusLabel(markdownContext.gitStatus),
+            "路径": relativePath,
+          };
       return {
         kind: "snapshot",
         snapshot: {
           scope: { ...request.binding.scope },
           entityId: request.entityId,
-          entityType: "file",
-          entityRevision: `sha256:${contentHash ?? statRevision}`,
+          entityType: request.entityType,
+          entityRevision: `sha256:${detailRevision}`,
           observedAt,
           freshness: "current",
-          facts: {
-            path: relativePath,
-            name: basename(relativePath),
-            ...(preview === undefined ? {} : { preview }),
-            extension: extension.length === 0 ? null : extension,
-            size_bytes: after.size,
-            modified_at: after.mtime.toISOString(),
-            ...(contentHash === undefined ? {} : { content_sha256: contentHash }),
-          },
+          facts: markdownFacts ?? {
+              path: relativePath,
+              name: basename(relativePath),
+              ...(preview === undefined ? {} : { preview }),
+              extension: extension.length === 0 ? null : extension,
+              size_bytes: after.size,
+              modified_at: after.mtime.toISOString(),
+              ...(contentHash === undefined ? {} : { content_sha256: contentHash }),
+            },
           relations: [],
-          sourceRefs: [{
-            sourceType: "local_workspace_file",
-            sourceId: relativePath,
-          }],
+          sourceRefs: [
+            {
+              sourceType: "local_workspace_file",
+              sourceId: relativePath,
+            },
+            ...(markdownContext?.gitAvailable === true
+              ? [{ sourceType: "local_git", sourceId: relativePath }]
+              : []),
+          ],
         },
         verification: {
           verifiedAt: observedAt,

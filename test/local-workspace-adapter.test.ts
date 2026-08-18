@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import test from "node:test";
 import type { TrustedContextBinding } from "../src/contracts.js";
 import {
@@ -10,6 +12,12 @@ import {
 } from "../src/adapters/local-workspace.js";
 import { localWorkspaceScope } from "../src/host/codex-cdp/task-workspace-binding.js";
 import { resolveSelection } from "../src/resolver.js";
+
+const execFileAsync = promisify(execFile);
+
+async function git(root: string, ...args: string[]): Promise<void> {
+  await execFileAsync("git", args, { cwd: root, windowsHide: true, timeout: 5_000 });
+}
 
 async function workspaceFixture(): Promise<{
   root: string;
@@ -78,14 +86,106 @@ test("workspace provider performs a fresh bounded read and changes revision with
     if (first.kind !== "snapshot") return;
     assert.equal(first.snapshot.freshness, "current");
     assert.equal(first.verification.method, "live_read");
-    assert.match(String(first.snapshot.facts.preview), /Current project notes/u);
+    assert.match(String(first.snapshot.facts["用途"]), /Current project notes/u);
+    assert.equal(first.snapshot.facts["Git 状态"], "unavailable");
 
     await writeFile(path, "# Second\nUpdated notes.\n", "utf8");
     const second = await read();
     assert.equal(second.kind, "snapshot");
     if (second.kind === "snapshot") {
       assert.notEqual(second.snapshot.entityRevision, first.snapshot.entityRevision);
-      assert.match(String(second.snapshot.facts.preview), /Updated notes/u);
+      assert.match(String(second.snapshot.facts["用途"]), /Updated notes/u);
+    }
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("Markdown artifact detail exposes bounded purpose, changed sections, impact, and Git state", async () => {
+  const fixture = await workspaceFixture();
+  try {
+    await git(fixture.root, "init", "--quiet");
+    await git(fixture.root, "config", "user.email", "pointable@example.invalid");
+    await git(fixture.root, "config", "user.name", "Pointable Test");
+    await mkdir(join(fixture.root, "docs"));
+    await writeFile(
+      join(fixture.root, "README.md"),
+      "# Pointable Context\n\nRestores development context without another Chat Turn.\n\n## Usage\n\nSelect a file name.\n",
+      "utf8",
+    );
+    for (let index = 1; index <= 5; index += 1) {
+      await writeFile(
+        join(fixture.root, "docs", `reference-${index}.md`),
+        `# Reference ${index}\n\nSee README.md for the product contract.\n`,
+        "utf8",
+      );
+    }
+    await git(fixture.root, "add", ".");
+    await git(fixture.root, "commit", "--quiet", "-m", "seed documentation");
+    await writeFile(
+      join(fixture.root, "README.md"),
+      "# Pointable Context\n\nRestores development context without another Chat Turn.\n\n## Usage\n\nSelect an exact file identity, then click 查看上下文.\n",
+      "utf8",
+    );
+
+    const records = await new LocalWorkspaceContextIndex().list(fixture.binding);
+    const record = records.find((candidate) => candidate.canonicalKey === "README.md");
+    assert.ok(record);
+    assert.equal(record.entityType, "document");
+    const result = await new LocalWorkspaceAuthoritativeProvider().getDetail({
+      binding: fixture.binding,
+      entityId: record.entityId,
+      entityType: record.entityType,
+      authorityLocator: record.authorityRef.locator,
+      revisionPolicy: "current-or-explicit-stale",
+    });
+
+    assert.equal(result.kind, "snapshot");
+    if (result.kind !== "snapshot") return;
+    assert.match(String(result.snapshot.facts["用途"]), /Restores development context/u);
+    assert.match(String(result.snapshot.facts["本次变化"]), /Usage/u);
+    assert.equal(result.snapshot.facts["Git 状态"], "modified");
+    assert.equal(result.snapshot.facts["路径"], "README.md");
+    const impact = result.snapshot.facts["影响范围"];
+    assert.ok(Array.isArray(impact));
+    assert.equal(impact.length, 3);
+    assert.ok(impact.every((path) => typeof path === "string" && path.startsWith("docs/reference-")));
+    assert.deepEqual(result.snapshot.sourceRefs.map((source) => source.sourceType), [
+      "local_workspace_file",
+      "local_git",
+    ]);
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("Markdown Git enrichment treats option-like file names as data", async () => {
+  const fixture = await workspaceFixture();
+  try {
+    await git(fixture.root, "init", "--quiet");
+    await git(fixture.root, "config", "user.email", "pointable@example.invalid");
+    await git(fixture.root, "config", "user.name", "Pointable Test");
+    await writeFile(
+      join(fixture.root, "--help.md"),
+      "# Safe Path\n\nOption-like file names must never become Git options.\n",
+      "utf8",
+    );
+    await git(fixture.root, "add", "--", "--help.md");
+    await git(fixture.root, "commit", "--quiet", "-m", "add safe path fixture");
+    const records = await new LocalWorkspaceContextIndex().list(fixture.binding);
+    const record = records.find((candidate) => candidate.canonicalKey === "--help.md");
+    assert.ok(record);
+    const result = await new LocalWorkspaceAuthoritativeProvider().getDetail({
+      binding: fixture.binding,
+      entityId: record.entityId,
+      entityType: record.entityType,
+      authorityLocator: record.authorityRef.locator,
+      revisionPolicy: "current-or-explicit-stale",
+    });
+    assert.equal(result.kind, "snapshot");
+    if (result.kind === "snapshot") {
+      assert.equal(result.snapshot.facts["Git 状态"], "clean");
+      assert.match(String(result.snapshot.facts["用途"]), /Option-like file names/u);
     }
   } finally {
     await rm(fixture.root, { recursive: true, force: true });

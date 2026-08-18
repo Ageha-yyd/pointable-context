@@ -2,7 +2,7 @@
   "name": "pointable-context",
   "version": "0.1.0",
   "private": true,
-  "description": "Explicit Pointable Context lookup with an inline MCP App and text fallback.",
+  "description": "Selection-triggered, zero-turn context reveal for the native Codex Chat Lane.",
   "type": "module",
   "bin": {
     "pointable": "./dist/src/cli.js",

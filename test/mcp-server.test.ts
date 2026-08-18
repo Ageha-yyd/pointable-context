@@ -101,7 +101,7 @@ test("MCP keeps data tools headless and exposes one focused inline render tool",
       listed.tools.map((tool) => tool.name).sort(),
       [
         "read_project_entity",
-        "render_project_entity_widget",
+        "render_context_capsule",
         "resolve_project_entities",
       ],
     );
@@ -114,7 +114,7 @@ test("MCP keeps data tools headless and exposes one focused inline render tool",
     }
     const readTool = listed.tools.find((tool) => tool.name === "read_project_entity");
     const renderTool = listed.tools.find(
-      (tool) => tool.name === "render_project_entity_widget",
+      (tool) => tool.name === "render_context_capsule",
     );
     const resolveTool = listed.tools.find(
       (tool) => tool.name === "resolve_project_entities",
@@ -154,12 +154,18 @@ test("MCP keeps data tools headless and exposes one focused inline render tool",
     assert.match(widgetHtml, /ui\/initialize/u);
     assert.match(widgetHtml, /ui\/notifications\/initialized/u);
     assert.match(widgetHtml, /ui\/notifications\/tool-result/u);
-    assert.match(widgetHtml, /ui\/update-model-context/u);
-    assert.match(widgetHtml, /ui\/message/u);
-    assert.match(widgetHtml, /sendFollowUpMessage/u);
+    assert.match(widgetHtml, /Context Capsule/u);
+    assert.match(widgetHtml, /aria-expanded/u);
+    assert.match(widgetHtml, /更多影响与关系/u);
+    assert.match(widgetHtml, /来源与验证/u);
+    assert.doesNotMatch(widgetHtml, /ui\/update-model-context/u);
+    assert.doesNotMatch(widgetHtml, /ui\/message/u);
+    assert.doesNotMatch(widgetHtml, /sendFollowUpMessage/u);
+    assert.doesNotMatch(widgetHtml, /问 Agent/u);
+    assert.doesNotMatch(widgetHtml, /<form\b/iu);
     assert.match(widgetHtml, /event\.isTrusted/u);
     assert.match(widgetHtml, /textContent/u);
-    assert.match(widgetHtml, /FIXTURE-ONLY/u);
+    assert.match(widgetHtml, /raw\.warning/u);
     assert.doesNotMatch(widgetHtml, /<script\s+[^>]*src=/iu);
     assert.doesNotMatch(widgetHtml, /https?:\/\//iu);
     assert.doesNotMatch(widgetHtml, /\bfetch\s*\(/u);
@@ -246,7 +252,7 @@ test("MCP keeps data tools headless and exposes one focused inline render tool",
     assert.doesNotMatch(JSON.stringify(detailContent), /work-units\/gov-1/u);
 
     const rendered = await client.callTool({
-      name: "render_project_entity_widget",
+      name: "render_context_capsule",
       arguments: { entity_ref: entityRef },
     });
     const renderedContent = structured(rendered);
@@ -262,6 +268,29 @@ test("MCP keeps data tools headless and exposes one focused inline render tool",
   } finally {
     await client.close();
     await server.close();
+  }
+});
+
+test("fixture exposes the P0 development capsule types", async () => {
+  const provider = new CountingProvider();
+  const service = fixtureService(provider);
+  const examples = [
+    ["PRD-inline-pointable-widgets.md", "document", "DOC:CONTEXT-CAPSULE-PRD"],
+    ["ContextScopeRef", "module", "MOD:CONTEXT-SCOPE"],
+    ["ARCH-7", "decision", "DEC:ARCH-7"],
+    ["NATIVE-CAPSULE-P0", "task", "TASK:NATIVE-CAPSULE-P0"],
+  ] as const;
+
+  for (const [selection, expectedType, expectedId] of examples) {
+    const resolved = await service.resolveProjectEntities(selection);
+    assert.equal(resolved.structuredContent.status, "unique");
+    const entityRef = resolved.structuredContent.candidates[0]?.entity_ref;
+    assert.ok(entityRef);
+    const read = await service.readProjectEntity(entityRef);
+    assert.equal(read.isError, false);
+    assert.equal(read.structuredContent.entity?.entityType, expectedType);
+    assert.equal(read.structuredContent.entity?.entityId, expectedId);
+    assert.ok(Object.keys(read.structuredContent.entity?.facts ?? {}).length >= 4);
   }
 });
 

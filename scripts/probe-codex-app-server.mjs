@@ -12,7 +12,7 @@ const marketplacePath =
   process.env.POINTABLE_MARKETPLACE_PATH ??
   "C:\\Users\\UIA\\.agents\\plugins\\marketplace.json";
 const requestTimeoutMs = 20_000;
-const widgetResourceUri = "ui://pointable-context/entity-detail-v1.html";
+const widgetResourceUri = "ui://pointable-context/context-capsule-v2.html";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -100,7 +100,7 @@ async function waitForPointableServer(threadId) {
       status?.serverInfo &&
       toolNames.includes("resolve_project_entities") &&
       toolNames.includes("read_project_entity") &&
-      toolNames.includes("render_project_entity_widget")
+      toolNames.includes("render_context_capsule")
     ) {
       return { status, toolNames };
     }
@@ -149,7 +149,7 @@ async function main() {
     "unexpected MCP server identity",
   );
   assert(
-    JSON.stringify(status.tools?.render_project_entity_widget ?? {}).includes(
+    JSON.stringify(status.tools?.render_context_capsule ?? {}).includes(
       widgetResourceUri,
     ),
     "render tool did not advertise its MCP App resource",
@@ -189,10 +189,10 @@ async function main() {
   const rendered = await request("mcpServer/tool/call", {
     threadId,
     server: "pointable-context",
-    tool: "render_project_entity_widget",
+    tool: "render_context_capsule",
     arguments: { entity_ref: entityRef },
   });
-  assert(rendered.isError !== true, "render_project_entity_widget returned an error");
+  assert(rendered.isError !== true, "render_context_capsule returned an error");
   assert(rendered.structuredContent?.status === "detail", "render detail status missing");
   assert(
     rendered.structuredContent?.entity?.entityId === "WU:GOV-1",

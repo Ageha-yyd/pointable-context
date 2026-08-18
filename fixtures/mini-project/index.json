@@ -39,18 +39,69 @@
     {
       "schema_version": "1.0",
       "project_id": "PRJ-01",
+      "entity_id": "DOC:CONTEXT-CAPSULE-PRD",
+      "entity_type": "document",
+      "canonical_key": "PRD-inline-pointable-widgets.md",
+      "canonical_name": "Native Chat Lane Context Capsules PRD",
+      "aliases": ["Context Capsules PRD", "上下文胶囊 PRD", "原生 Chat Lane PRD"],
+      "summary": "Defines the human-first, zero-turn Context Capsule product direction for long-running development tasks.",
+      "authority_ref": {
+        "provider": "json-fixture",
+        "locator": "documents/context-capsule-prd"
+      },
+      "index_revision": "idx-43",
+      "indexed_at": "2026-08-17T08:20:00Z",
+      "deleted": false
+    },
+    {
+      "schema_version": "1.0",
+      "project_id": "PRJ-01",
+      "entity_id": "MOD:CONTEXT-SCOPE",
+      "entity_type": "module",
+      "canonical_key": "ContextScopeRef",
+      "canonical_name": "Context Scope Boundary",
+      "aliases": ["context scope", "通用上下文范围", "scope boundary"],
+      "summary": "Provides a provider-neutral identity boundary for files, modules, decisions, tasks, and other context objects.",
+      "authority_ref": {
+        "provider": "json-fixture",
+        "locator": "modules/context-scope"
+      },
+      "index_revision": "idx-43",
+      "indexed_at": "2026-08-17T08:20:00Z",
+      "deleted": false
+    },
+    {
+      "schema_version": "1.0",
+      "project_id": "PRJ-01",
+      "entity_id": "TASK:NATIVE-CAPSULE-P0",
+      "entity_type": "task",
+      "canonical_key": "NATIVE-CAPSULE-P0",
+      "canonical_name": "Native Chat Capsule MVP",
+      "aliases": ["胶囊 MVP", "native capsule MVP", "原生胶囊 P0"],
+      "summary": "Align the fixture, plugin, and native Chat Lane interaction with the zero-turn Context Capsule PRD.",
+      "authority_ref": {
+        "provider": "json-fixture",
+        "locator": "tasks/native-capsule-p0"
+      },
+      "index_revision": "idx-43",
+      "indexed_at": "2026-08-17T08:20:00Z",
+      "deleted": false
+    },
+    {
+      "schema_version": "1.0",
+      "project_id": "PRJ-01",
       "entity_id": "DEC:ARCH-7",
       "entity_type": "decision",
       "canonical_key": "ARCH-7",
       "canonical_name": "Selection Query Boundary",
       "aliases": ["query boundary", "selection boundary"],
-      "summary": "Selection remains inert until an explicit lookup action.",
+      "summary": "Agent-known capsules are primary; Selection Quick Look remains an explicit fallback for historical or unmarked text.",
       "authority_ref": {
         "provider": "json-fixture",
         "locator": "decisions/arch-7"
       },
-      "index_revision": "idx-42",
-      "indexed_at": "2026-08-17T08:00:00Z",
+      "index_revision": "idx-43",
+      "indexed_at": "2026-08-17T08:20:00Z",
       "deleted": false
     }
   ]

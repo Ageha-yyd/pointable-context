@@ -1,34 +1,73 @@
 ---
 name: pointable-context
-description: Exercise and inspect the bundled Pointable Context mini-project fixture through deterministic read-only entity resolution, text detail, or an inline MCP App card in the current conversation. Use only when the user explicitly asks to run, validate, inspect, or show this fixture/demo. Do not use it as evidence about the active Codex project, CWA, or a real production authority, and do not trigger merely because text was selected or copied.
+description: Enable, inspect, or validate selection-triggered Quiet Context Reveal beside the current Codex conversation. Use when the user explicitly asks to enable Pointable Context, run its fixture Quiet Mode, inspect its native selection interaction, or perform an optional capsule-rendering diagnostic. Do not trigger merely because text was selected or copied, and never treat fixture data as active-workspace evidence.
 ---
 
-# Pointable Context
+# Pointable Context Quiet Mode
 
-Use the smallest reliable lookup path while keeping the current runtime boundary explicit: the installed MCP server is a fixture-only probe pinned to its bundled mini-project.
+The product-default interaction keeps the Chat Lane unchanged until the user selects a stable development reference. Selection performs only local eligibility. A trusted explicit action then opens bounded, verified context beside the selection without a browser, model call, or additional Chat Turn.
 
-## Workflow
+## Choose the correct mode
 
-1. Require an explicit request to exercise the Pointable Context fixture. Ordinary selection, highlighting, and copying are inert.
-2. Call `resolve_project_entities` with only the selected or supplied text. Do not add a project path, project ID, locator, provider, or guessed entity ID.
-3. Treat every result as fixture data. Preserve its `FIXTURE-ONLY` warning in the answer.
-4. Route by deduplicated candidate count:
-   - 0: report no match and offer Chat clarification.
-   - 1: if the user asks to show, inspect, or interact with the detail in place, call `render_project_entity_widget` with exactly the returned `entity_ref`; otherwise call `read_project_entity` for text-only detail.
-   - 2–3: show compact candidates with name, type, project, and match reason; ask the user to choose, then pass exactly that candidate's `entity_ref`.
-   - More than 3 or mixed results: ask the user to narrow the text or use project search.
-5. Never invent, edit, persist, or reuse an expired `entity_ref`. Re-resolve after an invalid, stale, or context-changed reference.
-6. Return a read-only fixture snapshot with stable entity identity, useful facts, source, revision, observed time, verification method, and freshness. Preserve the model-readable text fallback even when the host renders the Widget.
-7. Keep stale, partial, unavailable, ambiguous, and access-denied states explicit. Never fill missing facts or imply that fixture data came from the user's active project.
-8. Preserve the self-contained model-readable text projection. Mark bounded source/fact omissions explicitly; do not imply that the projection contains every field.
+1. For the active local workspace, prefer the companion workflow in `$pointable-context-workspace` and require an explicit workspace binding.
+2. For a self-contained demonstration, use the bundled fixture companion. Preserve its `FIXTURE-ONLY` status.
+3. Use MCP `render_context_capsule` only when the user explicitly asks to diagnose the optional inline renderer. Do not use it as the default product surface.
+4. Never route an ordinary request to the browser App Server harness or a Dashboard.
+
+## Fixture Quiet Mode workflow
+
+1. Require an explicit request to enable or validate the Pointable Context fixture.
+2. Locate this Skill's absolute catalog path and resolve the plugin root two directories above the skill folder.
+3. Use `host/fixture-companion.mjs` from that plugin root. Run `status --json` first; reuse a healthy process and do not start a duplicate.
+4. Run `start --json` only after the explicit request.
+5. Ask the user to select an exact visible fixture identity, such as:
+   - `PRD-inline-pointable-widgets.md`;
+   - `ContextScopeRef`;
+   - `ARCH-7`;
+   - `NATIVE-CAPSULE-P0`;
+   - `GOV-1` or `DEV-54A`.
+6. The expected UI is a small `查看上下文（fixture）` action. Selection alone must not query data. A trusted click opens detail directly for one exact match or a bounded candidate menu for 2–3 matches.
+7. Run `stop --json` only when requested or when cleaning up a failed start.
+
+```powershell
+$skillFile = 'ABSOLUTE_PATH_TO_THIS_SKILL.md'
+$pluginRoot = (Resolve-Path -LiteralPath (Join-Path (Split-Path -Parent $skillFile) '..\..')).Path
+$companion = Join-Path $pluginRoot 'host\fixture-companion.mjs'
+node $companion status --json
+node $companion start --json
+node $companion stop --json
+```
+
+## Deterministic routing contract
+
+- Match only exact canonical keys, exact stable names/paths, and scope-local deterministic aliases.
+- 0 matches: stay quiet; do not invent an entity.
+- 1 match: a trusted action may read and display detail directly.
+- 2–3 matches: show compact candidates with name, type, scope, and match reason; wait for the user's choice before reading detail.
+- More than 3 or mixed results: ask the user to narrow the selected text.
+- Candidate resolution must not prefetch detail.
+
+## No semantic recognition branch
+
+- Do not offer `识别更多概念`, semantic expansion, embeddings, or an LLM-generated candidate list.
+- Do not send selected prose to a model through this product.
+- Codex Chat already handles open-ended semantic questions. Pointable Context is only the faster deterministic point-lookup path.
+
+## Optional MCP rendering diagnostic
+
+When the user explicitly asks to test the optional MCP capsule renderer:
+
+1. Call `resolve_project_entities` with only the stable fixture name or exact key.
+2. For one match, call `render_context_capsule` with exactly the returned `entity_ref`.
+3. Preserve the `FIXTURE-ONLY` warning and text/structured fallback.
+4. State clearly that this validates the optional renderer, not the selection-triggered default interaction.
 
 ## Boundaries
 
-- Do not use this fixture MCP server for a real project lookup.
-- Do not call a model for deterministic matching or to manufacture a missing entity.
-- Do not search outside the bundled mini-project after it returns no match.
-- Do not treat an index timestamp as authoritative detail freshness.
-- Do not execute writes, deployment, sending, purchasing, or other side effects.
-- Do not claim selection capture or the private anchored-selection companion merely because the inline Widget renders; they are separate paths.
-- If the inline render tool or host UI is unavailable, use `read_project_entity` and state that the text fallback was used. Do not simulate a successful Widget.
-- If the Pointable Context tools are unavailable, state that the fixture runtime is unavailable and use only user-provided facts; do not simulate a successful lookup.
+- The product target is the current Codex Desktop Chat Lane, not a browser client or Dashboard.
+- Agent-known objects populate the data/index layer; they do not automatically create visible capsules.
+- Never call a model for deterministic matching or missing facts.
+- Do not add an Ask Agent action, send `ui/message`, or treat follow-up messaging as product success.
+- Do not reuse expired references or bypass scope, task, route, revision, freshness, or authority checks.
+- Do not execute writes or claim a read-only card changes workspace state.
+- If the host does not mount UI, report the text fallback rather than simulating success.

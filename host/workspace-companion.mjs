@@ -5,7 +5,7 @@ import { randomBytes as randomBytes4, randomUUID as randomUUID4, timingSafeEqual
 import { closeSync, existsSync, openSync } from "node:fs";
 import { mkdir as mkdir2, open as open2, readFile as readFile2, rename as rename2, rm, writeFile as writeFile2 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname as dirname3, isAbsolute as isAbsolute3, join, resolve as resolve3 } from "node:path";
+import { dirname as dirname3, isAbsolute as isAbsolute3, join, resolve as resolve4 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer, request as httpRequest } from "node:http";
 import { spawn } from "node:child_process";
@@ -2036,7 +2036,7 @@ async function readBoundedResponseText(response, maximumBytes, signal) {
 }
 function awaitWithAbort(promise, signal) {
   if (signal.aborted) return Promise.reject(signal.reason);
-  return new Promise((resolve4, reject) => {
+  return new Promise((resolve5, reject) => {
     const aborted = () => {
       cleanup();
       reject(signal.reason);
@@ -2046,7 +2046,7 @@ function awaitWithAbort(promise, signal) {
     promise.then(
       (value) => {
         cleanup();
-        resolve4(value);
+        resolve5(value);
       },
       (error) => {
         cleanup();
@@ -2199,7 +2199,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
   } catch {
     throw new CdpTransportError("cdp_connect_failed", "CDP websocket failed");
   }
-  await new Promise((resolve4, reject) => {
+  await new Promise((resolve5, reject) => {
     const timer = setTimeout(() => {
       cleanup();
       socket.close();
@@ -2213,7 +2213,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
     };
     const opened = () => {
       cleanup();
-      resolve4();
+      resolve5();
     };
     const failed = () => {
       cleanup();
@@ -2336,7 +2336,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
         closeForProtocolError(error, 1009);
         return Promise.reject(error);
       }
-      return new Promise((resolve4, reject) => {
+      return new Promise((resolve5, reject) => {
         const timer = setTimeout(() => {
           pending.delete(id);
           reject(
@@ -2346,7 +2346,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
             )
           );
         }, timeoutMs);
-        pending.set(id, { resolve: resolve4, reject, timer });
+        pending.set(id, { resolve: resolve5, reject, timer });
         try {
           socket.send(serialized);
         } catch (error) {
@@ -2496,7 +2496,7 @@ function lookupError(code, message, retryable) {
   return { kind: "error", code, message, retryable };
 }
 function boundedLookup(callback, timeoutMs, controller) {
-  return new Promise((resolve4, reject) => {
+  return new Promise((resolve5, reject) => {
     let settled = false;
     const timer = setTimeout(() => {
       if (settled) return;
@@ -2509,7 +2509,7 @@ function boundedLookup(callback, timeoutMs, controller) {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        resolve4(value);
+        resolve5(value);
       },
       (error) => {
         if (settled) return;
@@ -2524,7 +2524,7 @@ function waitForMainContext(attachment, signal, timeoutMs = 2e3) {
   if (attachment.mainExecutionContextId !== void 0) {
     return Promise.resolve(attachment.mainExecutionContextId);
   }
-  return new Promise((resolve4, reject) => {
+  return new Promise((resolve5, reject) => {
     let settled = false;
     let timer;
     const cleanup = () => {
@@ -2536,7 +2536,7 @@ function waitForMainContext(attachment, signal, timeoutMs = 2e3) {
       if (settled) return;
       settled = true;
       cleanup();
-      resolve4(contextId);
+      resolve5(contextId);
     };
     const aborted = () => {
       if (settled) return;
@@ -2560,7 +2560,7 @@ function connectWithAbort(connectionPromise, signal) {
     connectionPromise.then((connection) => connection.close(), () => void 0);
     return Promise.reject(signal.reason);
   }
-  return new Promise((resolve4, reject) => {
+  return new Promise((resolve5, reject) => {
     let settled = false;
     const aborted = () => {
       if (settled) return;
@@ -2577,7 +2577,7 @@ function connectWithAbort(connectionPromise, signal) {
         }
         settled = true;
         signal.removeEventListener("abort", aborted);
-        resolve4(connection);
+        resolve5(connection);
       },
       (error) => {
         if (settled) return;
@@ -3074,10 +3074,10 @@ var CodexCdpHostAdapter = class {
 };
 
 // src/host/codex-cdp/workspace-lookup.ts
-import { createHash as createHash4, randomBytes as randomBytes3 } from "node:crypto";
+import { createHash as createHash5, randomBytes as randomBytes3 } from "node:crypto";
 
 // src/adapters/local-workspace.ts
-import { createHash as createHash3 } from "node:crypto";
+import { createHash as createHash4 } from "node:crypto";
 import { open, readdir, realpath as realpath2, stat as stat2 } from "node:fs/promises";
 import {
   basename,
@@ -3085,9 +3085,237 @@ import {
   extname,
   isAbsolute as isAbsolute2,
   relative,
-  resolve as resolve2,
+  resolve as resolve3,
   sep
 } from "node:path";
+
+// src/adapters/markdown-artifact.ts
+import { execFile } from "node:child_process";
+import { createHash as createHash3 } from "node:crypto";
+import { resolve as resolve2 } from "node:path";
+var GIT_TIMEOUT_MS = 750;
+var MAX_GIT_OUTPUT_BYTES = 256 * 1024;
+var MAX_PURPOSE_CHARS = 360;
+var MAX_HEADING_CHARS = 160;
+var MAX_IMPACT_FILES = 3;
+function boundedText(value, maximum) {
+  const compact = value.replace(/[\p{Cc}\p{Cf}]+/gu, " ").replace(/\s+/gu, " ").trim();
+  if (compact.length === 0) return void 0;
+  return compact.length <= maximum ? compact : `${compact.slice(0, maximum - 1)}\u2026`;
+}
+function inlineMarkdown(value) {
+  return boundedText(
+    value.replace(/!\[([^\]]*)\]\([^)]*\)/gu, "$1").replace(/\[([^\]]+)\]\([^)]*\)/gu, "$1").replace(/[`*_~]+/gu, "").replace(/\s+#+\s*$/u, ""),
+    MAX_HEADING_CHARS
+  );
+}
+function paragraphCandidate(line) {
+  const trimmed = line.trim();
+  return trimmed.length > 0 && !/^(?:#{1,6}\s|[-*+]\s|\d+[.)]\s|>|\||```|~~~|<|!\[|\[!)/u.test(trimmed) && !/^[-:=]{3,}$/u.test(trimmed);
+}
+function extractMarkdownStructure(content) {
+  const lines = content.replace(/\r\n?/gu, "\n").split("\n");
+  const headings = [];
+  let title;
+  let purpose;
+  let inFence = false;
+  let inFrontmatter = lines[0]?.trim() === "---";
+  let paragraph = [];
+  const commitParagraph = () => {
+    if (purpose !== void 0 || paragraph.length === 0) {
+      paragraph = [];
+      return;
+    }
+    purpose = boundedText(paragraph.join(" "), MAX_PURPOSE_CHARS);
+    paragraph = [];
+  };
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? "";
+    const trimmed = line.trim();
+    if (inFrontmatter) {
+      if (index > 0 && trimmed === "---") inFrontmatter = false;
+      continue;
+    }
+    if (/^(?:```|~~~)/u.test(trimmed)) {
+      commitParagraph();
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const heading = /^(#{1,6})[ \t]+(.+?)\s*$/u.exec(line);
+    if (heading) {
+      commitParagraph();
+      const label = inlineMarkdown(heading[2] ?? "");
+      if (label !== void 0) {
+        headings.push({ line: index + 1, label });
+        if (heading[1]?.length === 1 && title === void 0) title = label;
+      }
+      continue;
+    }
+    if (paragraphCandidate(line)) {
+      paragraph.push(trimmed);
+      continue;
+    }
+    commitParagraph();
+  }
+  commitParagraph();
+  return Object.freeze({
+    ...title === void 0 ? {} : { title },
+    ...purpose === void 0 ? {} : { purpose },
+    headings: Object.freeze(headings.map((heading) => Object.freeze({ ...heading })))
+  });
+}
+function runGit(root, args, signal) {
+  if (signal?.aborted) return Promise.reject(signal.reason ?? new Error("git operation aborted"));
+  return new Promise((resolveResult, rejectResult) => {
+    execFile("git", [...args], {
+      cwd: root,
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: GIT_TIMEOUT_MS,
+      maxBuffer: MAX_GIT_OUTPUT_BYTES,
+      ...signal === void 0 ? {} : { signal }
+    }, (error, stdout) => {
+      if (signal?.aborted) {
+        rejectResult(signal.reason ?? new Error("git operation aborted"));
+        return;
+      }
+      const output = typeof stdout === "string" ? stdout : "";
+      if (error === null) {
+        resolveResult({ kind: "ok", stdout: output });
+        return;
+      }
+      const code = error.code;
+      resolveResult(code === 1 || code === "1" ? { kind: "no_match", stdout: output } : { kind: "unavailable", stdout: "" });
+    });
+  });
+}
+function samePath(left, right) {
+  const normalize = (value) => {
+    const absolute = resolve2(value);
+    return process.platform === "win32" ? absolute.toLocaleLowerCase("en-US") : absolute;
+  };
+  return normalize(left) === normalize(right);
+}
+function gitStatus(value) {
+  if (value.length === 0) return "clean";
+  const code = value.slice(0, 2);
+  if (code === "??") return "untracked";
+  if (/U|AA|DD/u.test(code)) return "conflicted";
+  const staged = code[0] !== " ";
+  const modified = code[1] !== " ";
+  if (staged && modified) return "staged_and_modified";
+  if (staged) return "staged";
+  return modified ? "modified" : "clean";
+}
+function changedSections(diff, structure, state) {
+  if (state === "untracked") return ["\u65B0\u6587\u4EF6"];
+  const result = [];
+  const add = (label) => {
+    if (label !== void 0 && !result.includes(label) && result.length < 3) result.push(label);
+  };
+  for (const line of diff.replace(/\r\n?/gu, "\n").split("\n")) {
+    if (/^[+-]#{1,6}[ \t]/u.test(line) && !/^(?:\+\+\+|---)/u.test(line)) {
+      const label = inlineMarkdown(line.replace(/^[+-]#{1,6}[ \t]+/u, ""));
+      if (line.startsWith("+") || structure.headings.some((heading) => heading.label === label)) {
+        add(label);
+      }
+      continue;
+    }
+    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/u.exec(line);
+    if (!hunk) continue;
+    const currentLine = Number(hunk[1]);
+    let section;
+    for (const heading of structure.headings) {
+      if (heading.line > currentLine) break;
+      section = heading.label;
+    }
+    add(section ?? structure.title ?? "\u6587\u6863\u5F00\u5934");
+  }
+  if (result.length === 0 && state !== "clean" && state !== "unavailable") {
+    add(structure.title ?? "\u6587\u6863\u5F00\u5934");
+  }
+  return result;
+}
+function parseLastCommit(value) {
+  const [hash, , subject] = value.trim().split("\0");
+  const safeHash = typeof hash === "string" && /^[0-9a-f]{7,64}$/u.test(hash) ? hash.slice(0, 8) : void 0;
+  const safeSubject = typeof subject === "string" ? boundedText(subject, 220) : void 0;
+  return safeHash === void 0 || safeSubject === void 0 ? void 0 : `${safeHash} \xB7 ${safeSubject}`;
+}
+function parseImpactFiles(value, relativePath) {
+  const results = [];
+  for (const raw of value.split("\0")) {
+    const path = boundedText(raw.replace(/\\/gu, "/"), 512);
+    if (path === void 0 || path === relativePath || results.includes(path)) continue;
+    results.push(path);
+    if (results.length >= MAX_IMPACT_FILES) break;
+  }
+  return results;
+}
+async function extractMarkdownArtifactContext(options) {
+  const structure = extractMarkdownStructure(options.content);
+  const rootResult = await runGit(options.root, ["rev-parse", "--show-toplevel"], options.signal);
+  if (rootResult.kind !== "ok" || !samePath(rootResult.stdout.trim(), options.root)) {
+    const base2 = {
+      ...structure.title === void 0 ? {} : { title: structure.title },
+      ...structure.purpose === void 0 ? {} : { purpose: structure.purpose },
+      gitAvailable: false,
+      gitStatus: "unavailable",
+      changedSections: Object.freeze([]),
+      impactFiles: Object.freeze([])
+    };
+    return Object.freeze({
+      ...base2,
+      contextRevision: createHash3("sha256").update(JSON.stringify(base2), "utf8").digest("hex")
+    });
+  }
+  const [statusResult, unstaged, staged, references, lastCommit] = await Promise.all([
+    runGit(options.root, [
+      "status",
+      "--porcelain=v1",
+      "-z",
+      "--untracked-files=all",
+      "--",
+      options.relativePath
+    ], options.signal),
+    runGit(options.root, ["diff", "--no-ext-diff", "--unified=0", "--", options.relativePath], options.signal),
+    runGit(options.root, ["diff", "--cached", "--no-ext-diff", "--unified=0", "--", options.relativePath], options.signal),
+    runGit(options.root, [
+      "grep",
+      "-l",
+      "-F",
+      "-z",
+      "-e",
+      options.relativePath.split("/").at(-1) ?? options.relativePath,
+      "--",
+      "."
+    ], options.signal),
+    runGit(options.root, ["log", "-1", "--format=%H%x00%aI%x00%s", "--", options.relativePath], options.signal)
+  ]);
+  const state = statusResult.kind === "ok" ? gitStatus(statusResult.stdout) : "unavailable";
+  const diff = `${unstaged.kind === "ok" ? unstaged.stdout : ""}
+${staged.kind === "ok" ? staged.stdout : ""}`;
+  const sections = changedSections(diff, structure, state);
+  const impactFiles = references.kind === "ok" ? parseImpactFiles(references.stdout, options.relativePath) : [];
+  const recentCommit = lastCommit.kind === "ok" ? parseLastCommit(lastCommit.stdout) : void 0;
+  const changeSummary = sections.length > 0 ? `\u6D89\u53CA\uFF1A${sections.join("\u3001")}` : recentCommit;
+  const base = {
+    ...structure.title === void 0 ? {} : { title: structure.title },
+    ...structure.purpose === void 0 ? {} : { purpose: structure.purpose },
+    gitAvailable: state !== "unavailable",
+    gitStatus: state,
+    ...changeSummary === void 0 ? {} : { changeSummary },
+    changedSections: Object.freeze([...sections]),
+    impactFiles: Object.freeze([...impactFiles])
+  };
+  return Object.freeze({
+    ...base,
+    contextRevision: createHash3("sha256").update(JSON.stringify(base), "utf8").digest("hex")
+  });
+}
+
+// src/adapters/local-workspace.ts
 var DEFAULT_MAX_FILES = 2048;
 var DEFAULT_MAX_DEPTH = 12;
 var MAX_RELATIVE_PATH_CHARS = 512;
@@ -3129,6 +3357,10 @@ function containedRelative(root, target) {
 function fileEntityId(relativePath) {
   return `file:${relativePath}`;
 }
+function markdownDocument(relativePath) {
+  const extension = extname(relativePath).toLocaleLowerCase("en-US");
+  return extension === ".md" || extension === ".mdx";
+}
 async function verifiedWorkspaceRoot(binding) {
   if (!binding.workspaceRoot || !isAbsolute2(binding.workspaceRoot)) {
     throw new ContractError("local workspace provider requires a bound workspace root");
@@ -3167,7 +3399,7 @@ async function scanWorkspace(root, maxFiles, maxDepth, ignoredDirectories, signa
     for (const entry of entries) {
       if (signal?.aborted) throw signal.reason ?? new Error("workspace scan aborted");
       if (entry.isSymbolicLink()) continue;
-      const absolutePath = resolve2(directory, entry.name);
+      const absolutePath = resolve3(directory, entry.name);
       if (entry.isDirectory()) {
         if (!ignoredDirectories.has(entry.name)) {
           await visit(absolutePath, depth + 1);
@@ -3195,7 +3427,7 @@ async function scanWorkspace(root, maxFiles, maxDepth, ignoredDirectories, signa
   return files;
 }
 function indexRevision(files) {
-  const hash = createHash3("sha256");
+  const hash = createHash4("sha256");
   for (const file of files) {
     hash.update(file.relativePath, "utf8");
     hash.update("\0", "utf8");
@@ -3241,7 +3473,7 @@ var LocalWorkspaceContextIndex = class {
         schemaVersion: "1.0",
         scope: { ...binding.scope },
         entityId: fileEntityId(file.relativePath),
-        entityType: "file",
+        entityType: markdownDocument(file.relativePath) ? "document" : "file",
         canonicalKey: file.relativePath,
         canonicalName: name,
         aliases: fileAliases(file.relativePath),
@@ -3267,6 +3499,32 @@ function contentPreview(content) {
     return void 0;
   }
 }
+function utf8Content(content) {
+  if (content.includes(0)) return void 0;
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(content);
+  } catch {
+    return void 0;
+  }
+}
+function gitStatusLabel(status) {
+  switch (status) {
+    case "clean":
+      return "clean";
+    case "modified":
+      return "modified";
+    case "staged":
+      return "staged";
+    case "staged_and_modified":
+      return "staged + modified";
+    case "untracked":
+      return "untracked";
+    case "conflicted":
+      return "conflicted";
+    case "unavailable":
+      return "unavailable";
+  }
+}
 function stableFileStat(before, after) {
   return before.size === after.size && before.mtimeMs === after.mtimeMs && before.ctimeMs === after.ctimeMs && before.ino === after.ino;
 }
@@ -3274,14 +3532,16 @@ var LocalWorkspaceAuthoritativeProvider = class {
   providerId = LOCAL_WORKSPACE_PROVIDER_ID;
   async getDetail(request) {
     if (request.signal?.aborted) return { kind: "unavailable", retryable: true };
-    if (request.entityType !== "file") return { kind: "not_found" };
+    if (request.entityType !== "file" && request.entityType !== "document") {
+      return { kind: "not_found" };
+    }
     if (request.authorityLocator.length < 1 || request.authorityLocator.length > MAX_RELATIVE_PATH_CHARS || request.authorityLocator.includes("\\") || request.authorityLocator.startsWith("/") || request.authorityLocator.split("/").includes("..") || request.entityId !== fileEntityId(request.authorityLocator)) {
       return { kind: "not_found" };
     }
     let handle;
     try {
       const root = await verifiedWorkspaceRoot(request.binding);
-      const requestedPath = resolve2(root, ...request.authorityLocator.split("/"));
+      const requestedPath = resolve3(root, ...request.authorityLocator.split("/"));
       const canonicalFile = await realpath2(requestedPath);
       const relativePath = containedRelative(root, canonicalFile);
       if (relativePath !== request.authorityLocator) return { kind: "not_found" };
@@ -3292,31 +3552,46 @@ var LocalWorkspaceAuthoritativeProvider = class {
       if (before.size <= MAX_PREVIEW_FILE_BYTES) {
         content = await handle.readFile();
       }
+      const decoded = content === void 0 ? void 0 : utf8Content(content);
+      const markdownContext = request.entityType === "document" && decoded !== void 0 ? await extractMarkdownArtifactContext({
+        root,
+        relativePath,
+        content: decoded,
+        ...request.signal === void 0 ? {} : { signal: request.signal }
+      }) : void 0;
       const after = await handle.stat();
       if (!stableFileStat(before, after) || request.signal?.aborted) {
         return { kind: "unavailable", retryable: true };
       }
-      const statRevision = createHash3("sha256").update(JSON.stringify({
+      const statRevision = createHash4("sha256").update(JSON.stringify({
         path: relativePath,
         size: after.size,
         modifiedMs: after.mtimeMs,
         changedMs: after.ctimeMs,
         inode: after.ino
       }), "utf8").digest("hex");
-      const contentHash = content === void 0 ? void 0 : createHash3("sha256").update(content).digest("hex");
+      const contentHash = content === void 0 ? void 0 : createHash4("sha256").update(content).digest("hex");
+      const detailRevision = createHash4("sha256").update(contentHash ?? statRevision, "utf8").update("\0", "utf8").update(markdownContext?.contextRevision ?? "file-metadata-v1", "utf8").digest("hex");
       const extension = extname(relativePath);
       const preview = content === void 0 ? void 0 : contentPreview(content);
       const observedAt = (/* @__PURE__ */ new Date()).toISOString();
+      const markdownFacts = markdownContext === void 0 ? void 0 : {
+        "\u7528\u9014": markdownContext.purpose ?? `${markdownContext.title ?? basename(relativePath)} Markdown \u6587\u6863`,
+        "\u672C\u6B21\u53D8\u5316": markdownContext.changeSummary ?? (markdownContext.gitAvailable ? "\u5F53\u524D\u5DE5\u4F5C\u6811\u672A\u68C0\u6D4B\u5230\u672A\u63D0\u4EA4\u53D8\u66F4" : "Git \u4E0A\u4E0B\u6587\u4E0D\u53EF\u7528"),
+        "\u5F71\u54CD\u8303\u56F4": markdownContext.impactFiles.length > 0 ? [...markdownContext.impactFiles] : "\u672A\u53D1\u73B0\u5DF2\u8DDF\u8E2A\u5F15\u7528",
+        "Git \u72B6\u6001": gitStatusLabel(markdownContext.gitStatus),
+        "\u8DEF\u5F84": relativePath
+      };
       return {
         kind: "snapshot",
         snapshot: {
           scope: { ...request.binding.scope },
           entityId: request.entityId,
-          entityType: "file",
-          entityRevision: `sha256:${contentHash ?? statRevision}`,
+          entityType: request.entityType,
+          entityRevision: `sha256:${detailRevision}`,
           observedAt,
           freshness: "current",
-          facts: {
+          facts: markdownFacts ?? {
             path: relativePath,
             name: basename(relativePath),
             ...preview === void 0 ? {} : { preview },
@@ -3326,10 +3601,13 @@ var LocalWorkspaceAuthoritativeProvider = class {
             ...contentHash === void 0 ? {} : { content_sha256: contentHash }
           },
           relations: [],
-          sourceRefs: [{
-            sourceType: "local_workspace_file",
-            sourceId: relativePath
-          }]
+          sourceRefs: [
+            {
+              sourceType: "local_workspace_file",
+              sourceId: relativePath
+            },
+            ...markdownContext?.gitAvailable === true ? [{ sourceType: "local_git", sourceId: relativePath }] : []
+          ]
         },
         verification: {
           verifiedAt: observedAt,
@@ -3672,7 +3950,7 @@ function interruptionOutcome(error) {
   return void 0;
 }
 function runBounded(operationName, operation, callerSignal, timeoutMs) {
-  return new Promise((resolve4, reject) => {
+  return new Promise((resolve5, reject) => {
     const controller = new AbortController();
     const deadlineAt = performance.now() + timeoutMs;
     let settled = false;
@@ -3689,7 +3967,7 @@ function runBounded(operationName, operation, callerSignal, timeoutMs) {
       }
       settled = true;
       cleanup();
-      resolve4(value);
+      resolve5(value);
     };
     const settleFailure = (error) => {
       if (settled) return;
@@ -3743,11 +4021,11 @@ function bindingFailure(kind) {
 function sameBinding(left, right) {
   return sameContextScope(left.scope, right.scope) && left.bindingRevision === right.bindingRevision && left.evidence === right.evidence && left.selectionGeneration === right.selectionGeneration && left.threadRef === right.threadRef && left.routeRef === right.routeRef && left.workspaceRoot === right.workspaceRoot;
 }
-function boundedText(value) {
+function boundedText2(value) {
   return typeof value === "string" && value.trim().length > 0 && value.length <= 4096;
 }
 function optionalBoundedText(value) {
-  return value === void 0 || boundedText(value);
+  return value === void 0 || boundedText2(value);
 }
 function parseContextScope(value) {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -3758,7 +4036,7 @@ function parseContextScope(value) {
     const kind = raw.kind;
     const namespace = raw.namespace;
     const id = raw.id;
-    if (!isContextScopeKind(kind) || !boundedText(namespace) || !boundedText(id)) {
+    if (!isContextScopeKind(kind) || !boundedText2(namespace) || !boundedText2(id)) {
       return void 0;
     }
     return Object.freeze({ kind, namespace, id });
@@ -3797,7 +4075,7 @@ function parseBindingResult(value) {
     const threadRef = raw.threadRef;
     const routeRef = raw.routeRef;
     const workspaceRoot = raw.workspaceRoot;
-    if (!scope || !boundedText(bindingRevision) || evidence !== "verified_thread" && evidence !== "verified_workspace" && evidence !== "explicit_user" && evidence !== "fixture_manifest" || !Number.isSafeInteger(selectionGeneration) || Number(selectionGeneration) < 0 || !optionalBoundedText(threadRef) || !optionalBoundedText(routeRef) || !optionalBoundedText(workspaceRoot) || evidence === "verified_thread" && threadRef === void 0 || (evidence === "verified_workspace" || evidence === "fixture_manifest") && workspaceRoot === void 0) {
+    if (!scope || !boundedText2(bindingRevision) || evidence !== "verified_thread" && evidence !== "verified_workspace" && evidence !== "explicit_user" && evidence !== "fixture_manifest" || !Number.isSafeInteger(selectionGeneration) || Number(selectionGeneration) < 0 || !optionalBoundedText(threadRef) || !optionalBoundedText(routeRef) || !optionalBoundedText(workspaceRoot) || evidence === "verified_thread" && threadRef === void 0 || (evidence === "verified_workspace" || evidence === "fixture_manifest") && workspaceRoot === void 0) {
       return void 0;
     }
     const binding = {
@@ -4156,7 +4434,7 @@ function truncate(value, maximum) {
   return value.length <= maximum ? value : `${value.slice(0, maximum - 1)}\u2026`;
 }
 function sha2562(value) {
-  return createHash4("sha256").update(value, "utf8").digest("hex");
+  return createHash5("sha256").update(value, "utf8").digest("hex");
 }
 function scopeKey(entry) {
   return `${entry.scope.kind}\0${entry.scope.namespace}\0${entry.scope.id}`;
@@ -4182,11 +4460,13 @@ function candidateView(candidate, candidateRef) {
   };
 }
 function detailView(outcome) {
+  const purpose = outcome.detail.facts["\u7528\u9014"];
+  const summary = typeof purpose === "string" ? truncate(purpose, 1024) : truncate(outcome.candidate.summary, 1024);
   return {
     entityId: truncate(outcome.detail.entityId, 256),
     entityType: truncate(outcome.detail.entityType, 128),
     label: truncate(outcome.candidate.label, 256),
-    summary: truncate(outcome.candidate.summary, 1024),
+    summary,
     revision: outcome.detail.entityRevision,
     observedAt: outcome.detail.observedAt,
     freshness: outcome.detail.freshness,
@@ -4401,7 +4681,7 @@ function createWorkspaceCompanion(options) {
     ...options.discoveryTimeoutMs === void 0 ? {} : { discoveryTimeoutMs: options.discoveryTimeoutMs },
     ...options.lookupTimeoutMs === void 0 ? {} : { lookupTimeoutMs: options.lookupTimeoutMs },
     ...options.maxConcurrentLookupsPerTarget === void 0 ? {} : { maxConcurrentLookupsPerTarget: options.maxConcurrentLookupsPerTarget },
-    actionLabel: options.actionLabel ?? "\u67E5\u770B\u5DE5\u4F5C\u533A\u4E0A\u4E0B\u6587"
+    actionLabel: options.actionLabel ?? "\u67E5\u770B\u4E0A\u4E0B\u6587"
   };
   const adapter = new CodexCdpHostAdapter(adapterOptions);
   let state = "idle";
@@ -4535,9 +4815,11 @@ function record7(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function packageRoot(start) {
-  let current = resolve3(start);
+  let current = resolve4(start);
   for (let depth = 0; depth < 10; depth += 1) {
-    if (existsSync(join(current, "package.json")) && existsSync(join(current, "src"))) {
+    const developmentLayout = existsSync(join(current, "src"));
+    const packagedLayout = existsSync(join(current, "host", "workspace-companion.mjs"));
+    if (existsSync(join(current, "package.json")) && (developmentLayout || packagedLayout)) {
       return current;
     }
     const parent = dirname3(current);
@@ -4548,7 +4830,7 @@ function packageRoot(start) {
 }
 function localStateRoot() {
   const local = process.env.LOCALAPPDATA;
-  return resolve3(local && isAbsolute3(local) ? local : homedir(), "PointableContext");
+  return resolve4(local && isAbsolute3(local) ? local : homedir(), "PointableContext");
 }
 function boundedInteger2(value, name) {
   if (!/^\d+$/u.test(value)) fail(`${name} must be an integer`);
@@ -4583,17 +4865,17 @@ function parseArguments(argv) {
     index += 1;
     if (argument === "--state-dir") {
       if (!isAbsolute3(value)) fail("--state-dir must be absolute");
-      stateDir = resolve3(value);
+      stateDir = resolve4(value);
     } else if (argument === "--registry") {
       if (!isAbsolute3(value)) fail("--registry must be absolute");
-      registryPath = resolve3(value);
+      registryPath = resolve4(value);
     } else if (argument === "--endpoint") {
       endpoint = value;
     } else if (argument === "--refresh-ms") {
       refreshIntervalMs = boundedInteger2(value, "--refresh-ms");
     } else if (argument === "--workspace-root") {
       if (!isAbsolute3(value)) fail("--workspace-root must be absolute");
-      workspaceRoot = resolve3(value);
+      workspaceRoot = resolve4(value);
     } else {
       fail(`unknown option: ${argument}`);
     }
@@ -4831,7 +5113,7 @@ async function runServer(arguments_) {
         if (typeof body.workspaceRoot !== "string" || !isAbsolute3(body.workspaceRoot)) {
           throw new Error("workspace_root_invalid");
         }
-        return await companion.bindCurrentTask(resolve3(body.workspaceRoot));
+        return await companion.bindCurrentTask(resolve4(body.workspaceRoot));
       }).then(
         (result) => sendJson(response, 200, { ok: true, ...result }),
         (error) => sendJson(response, 409, {

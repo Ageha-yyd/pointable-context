@@ -54,19 +54,103 @@
         "project_id": "PRJ-01",
         "entity_id": "DEC:ARCH-7",
         "entity_type": "decision",
-        "entity_revision": "r4",
-        "observed_at": "2026-08-17T08:15:00Z",
+        "entity_revision": "r5",
+        "observed_at": "2026-08-17T08:25:00Z",
         "freshness": "stale",
         "facts": {
-          "decision": "explicit-click-only",
+          "decision": "agent-known-capsules-primary",
+          "rationale": "The Agent already knows which files, modules, decisions, and task states it changed; making the user select them again adds avoidable work.",
+          "consequence": "Selection Quick Look remains available only for historical messages, third-party output, and missed references.",
+          "rejected_alternatives": ["selection-first for every lookup", "browser dashboard as the default surface", "ask-Agent form inside every card"],
           "status": "accepted",
           "model_before_click": false
         },
-        "relations": [],
+        "relations": ["DOC:CONTEXT-CAPSULE-PRD", "TASK:NATIVE-CAPSULE-P0"],
         "source_refs": [
           {
             "source_type": "decision_log",
             "source_id": "arch-7"
+          }
+        ]
+      }
+    },
+    {
+      "authority_locator": "documents/context-capsule-prd",
+      "snapshot": {
+        "project_id": "PRJ-01",
+        "entity_id": "DOC:CONTEXT-CAPSULE-PRD",
+        "entity_type": "document",
+        "entity_revision": "v1.0",
+        "observed_at": "2026-08-17T08:23:00Z",
+        "freshness": "stale",
+        "facts": {
+          "purpose": "Freeze the product around human comprehension and zero-turn fact lookup in the native Codex Chat Lane.",
+          "change_summary": ["Agent-known capsules become the primary entry", "Selection becomes a fallback", "Ask Agent and browser routes leave P0"],
+          "impact": ["MCP capsule UI", "fixture narrative", "Plugin skill", "acceptance metrics"],
+          "status": "direction-frozen",
+          "key_sections": ["North-star outcome", "development scenarios", "P0 requirements", "acceptance gates"],
+          "path": "docs/PRD-inline-pointable-widgets.md"
+        },
+        "relations": ["MOD:CONTEXT-SCOPE", "DEC:ARCH-7", "TASK:NATIVE-CAPSULE-P0"],
+        "source_refs": [
+          {
+            "source_type": "repository_document",
+            "source_id": "docs/PRD-inline-pointable-widgets.md"
+          }
+        ]
+      }
+    },
+    {
+      "authority_locator": "modules/context-scope",
+      "snapshot": {
+        "project_id": "PRJ-01",
+        "entity_id": "MOD:CONTEXT-SCOPE",
+        "entity_type": "module",
+        "entity_revision": "r2",
+        "observed_at": "2026-08-17T08:24:00Z",
+        "freshness": "stale",
+        "facts": {
+          "definition": "A provider-neutral scope identity used to bind context objects to the correct task and authority.",
+          "responsibility": "Prevent file, module, decision, and task references from crossing workspace or task boundaries.",
+          "introduced_because": "The original projectId field was too narrow for general development context.",
+          "replaces": "project-specific identity assumptions in the core domain",
+          "interfaces": ["ContextScopeRef", "TrustedContextBinding", "ContextBindingPort"],
+          "dependencies": ["lookup-service", "validation", "provider adapters"],
+          "maturity": "core contract implemented",
+          "risk": "production Host adapters must still provide a trusted live binding"
+        },
+        "relations": ["DOC:CONTEXT-CAPSULE-PRD"],
+        "source_refs": [
+          {
+            "source_type": "source_module",
+            "source_id": "src/context-scope.ts"
+          }
+        ]
+      }
+    },
+    {
+      "authority_locator": "tasks/native-capsule-p0",
+      "snapshot": {
+        "project_id": "PRJ-01",
+        "entity_id": "TASK:NATIVE-CAPSULE-P0",
+        "entity_type": "task",
+        "entity_revision": "r1",
+        "observed_at": "2026-08-17T08:26:00Z",
+        "freshness": "stale",
+        "facts": {
+          "goal": "Make development context understandable from the native Chat Lane with one click and zero additional turns.",
+          "completed": ["PRD direction reset", "trusted lookup core", "native selection fallback"],
+          "current_state": "type-specific capsule implementation in progress",
+          "next_step": "Qualify the zero-turn capsule in a fresh Codex Desktop task",
+          "blocker": "real module, decision, and task Providers are not yet connected",
+          "owner": "Pointable Context",
+          "evidence": "automated protocol, browser, and host lifecycle tests"
+        },
+        "relations": ["DOC:CONTEXT-CAPSULE-PRD", "DEC:ARCH-7"],
+        "source_refs": [
+          {
+            "source_type": "task_snapshot",
+            "source_id": "native-capsule-p0"
           }
         ]
       }

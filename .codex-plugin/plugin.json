@@ -1,7 +1,7 @@
 {
   "name": "pointable-context",
-  "version": "0.1.0",
-  "description": "Pointable Context fixture lookup with an inline Codex conversation widget and text fallback.",
+  "version": "0.1.0+codex.20260818071103",
+  "description": "Selection-triggered, zero-turn development context reveal in the native Codex Chat Lane.",
   "author": {
     "name": "Local developer"
   },
@@ -14,19 +14,19 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Pointable Context",
-    "shortDescription": "Inline point lookup in the current Codex task.",
-    "longDescription": "Resolve a fixture entity, inspect its bounded source/revision/freshness detail in an inline MCP App beside the current Codex conversation, and explicitly ask the Agent about that exact referent without opening a browser. Text-only fallback remains available. Desktop selection companions and the separate App Server browser client are opt-in research harnesses, not the default product path or a DCPM/CWA dependency.",
+    "shortDescription": "Select a reference and reveal verified context in place.",
+    "longDescription": "Keep the Codex Chat Lane quiet until the user selects a stable file, module, decision, or task reference. A trusted explicit action then reveals bounded, type-specific detail beside the selection without opening a browser, calling a model, or creating another chat turn. Deterministic identity matching and text fallback remain available; semantic concept recognition, App Server browser clients, and DCPM/CWA are not product dependencies.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
       "Read"
     ],
     "defaultPrompt": [
-      "Run the Pointable Context fixture probe for GOV-1.",
-      "Resolve GOV-1 and show its detail as an inline Pointable Context Widget in this task.",
-      "Resolve ARCH-7 inside the bundled mini-project without reading detail yet.",
-      "Show the fixture source, revision, and freshness for a returned entity reference.",
-      "Use the Pointable Context Workspace skill to bind this task to an explicit local workspace."
+      "Enable Pointable Context Quiet Mode for this Codex task.",
+      "Bind Pointable Context Quiet Mode to my current local workspace.",
+      "Start the fixture Quiet Mode so I can select ARCH-7 in this task.",
+      "Check whether the Pointable Context selection companion is running.",
+      "Use the optional capsule renderer only as an explicit fixture diagnostic."
     ]
   }
 }

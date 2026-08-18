@@ -50,12 +50,12 @@ for (const scenario of scenarios) test(`official v2 client completes a real stdi
       tools.tools.map((tool) => tool.name).sort(),
       [
         "read_project_entity",
-        "render_project_entity_widget",
+        "render_context_capsule",
         "resolve_project_entities",
       ],
     );
     const renderTool = tools.tools.find(
-      (tool) => tool.name === "render_project_entity_widget",
+      (tool) => tool.name === "render_context_capsule",
     );
     assert.equal(
       (renderTool?._meta?.ui as Record<string, unknown>)?.resourceUri,
@@ -68,8 +68,12 @@ for (const scenario of scenarios) test(`official v2 client completes a real stdi
       resource.contents[0] && "text" in resource.contents[0]
         ? resource.contents[0].text
         : "",
-      /ui\/message/u,
+      /aria-expanded/u,
     );
+    const html = resource.contents[0] && "text" in resource.contents[0]
+      ? resource.contents[0].text
+      : "";
+    assert.doesNotMatch(html, /ui\/message|sendFollowUpMessage|<form\b/iu);
     const result = await client.callTool({
       name: "resolve_project_entities",
       arguments: { selection: "ARCH-7" },
@@ -85,7 +89,7 @@ for (const scenario of scenarios) test(`official v2 client completes a real stdi
       result.structuredContent as Record<string, unknown>
     ).candidates as Array<Record<string, unknown>>;
     const rendered = await client.callTool({
-      name: "render_project_entity_widget",
+      name: "render_context_capsule",
       arguments: { entity_ref: candidates[0]?.entity_ref },
     });
     assert.equal(rendered.isError, false);

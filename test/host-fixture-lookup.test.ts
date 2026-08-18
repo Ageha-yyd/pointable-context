@@ -80,7 +80,7 @@ test("fixture lookup resolves unique ARCH-7 directly with bounded authority fiel
   assert.equal(result.detail.entityId, "DEC:ARCH-7");
   assert.equal(result.detail.entityType, "decision");
   assert.equal(result.detail.label, "Selection Query Boundary");
-  assert.equal(result.detail.revision, "r4");
+  assert.equal(result.detail.revision, "r5");
   assert.equal(result.detail.freshness, "stale");
   assert.ok(result.detail.facts.length <= 5);
   assert.ok(result.detail.sources.length <= 5);

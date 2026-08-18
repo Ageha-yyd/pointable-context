@@ -1,4 +1,4 @@
 interface:
   display_name: "Pointable Context"
-  short_description: "Resolve project entities with verified freshness"
-  default_prompt: "Use $pointable-context to look up a project entity with verified source and freshness."
+  short_description: "Select a reference and reveal verified context"
+  default_prompt: "Use $pointable-context to enable Quiet Context Reveal for this Codex task."

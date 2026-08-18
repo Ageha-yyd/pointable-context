@@ -144,19 +144,19 @@ export function createFixtureProbeMcpServer(
       instructions: [
         FIXTURE_WARNING,
         "This server is a fixture-only development probe, not a production Codex project binding.",
-        "Call resolve_project_entities first. Pass only its opaque entity_ref to read_project_entity for text or render_project_entity_widget for an inline detail card.",
+        "Call resolve_project_entities first. Pass only its opaque entity_ref to read_project_entity for text. render_context_capsule is an optional fixture rendering diagnostic, not the default Quiet Mode trigger.",
         "Never invent or pass authority locators, provider ids, project ids, or workspace roots.",
       ].join(" "),
     },
   );
 
   server.registerResource(
-    "pointable-context-entity-detail",
+    "pointable-context-capsule",
     POINTABLE_ENTITY_WIDGET_URI,
     {
-      title: "Pointable Context entity detail",
+      title: "Pointable Context capsule",
       description:
-        "Inline, read-only entity detail with a same-conversation follow-up control.",
+        "Inline, read-only development context capsule with local progressive disclosure and no follow-up turn.",
       mimeType: POINTABLE_ENTITY_WIDGET_MIME,
     },
     async () => ({
@@ -240,11 +240,11 @@ export function createFixtureProbeMcpServer(
   );
 
   server.registerTool(
-    "render_project_entity_widget",
+    "render_context_capsule",
     {
-      title: "Render Pointable Context detail",
+      title: "Show Context Capsule",
       description:
-        "Render one resolved fixture entity as a compact inline card in the current conversation. First call resolve_project_entities, then pass only its opaque entity_ref. Use this instead of read_project_entity when the user asks to show, inspect, or interact with the detail in place.",
+        "Optional fixture diagnostic: render one explicitly resolved development object as a compact, type-specific capsule beside the current conversation. The product-default path is selection-triggered Quiet Context Reveal in Codex Desktop. Expanding and collapsing are local UI operations: they do not call a model, create a chat turn, or open a browser. First call resolve_project_entities, then pass only its opaque entity_ref.",
       inputSchema: readInputSchema,
       outputSchema: readOutputSchema,
       annotations: {
@@ -258,8 +258,8 @@ export function createFixtureProbeMcpServer(
           resourceUri: POINTABLE_ENTITY_WIDGET_URI,
           visibility: ["model", "app"],
         },
-        "openai/toolInvocation/invoking": "正在读取上下文对象…",
-        "openai/toolInvocation/invoked": "上下文对象已就地显示。",
+        "openai/toolInvocation/invoking": "正在准备上下文胶囊…",
+        "openai/toolInvocation/invoked": "上下文胶囊已在当前对话中显示。",
       },
     },
     async (args, ctx) => {

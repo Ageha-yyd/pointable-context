@@ -89,8 +89,10 @@ test("workspace lookup returns current detail only after explicit task binding",
     assert.equal(after.kind, "detail");
     if (after.kind === "detail") {
       assert.equal(after.detail.entityId, "file:README.md");
+      assert.equal(after.detail.entityType, "document");
       assert.equal(after.detail.freshness, "current");
-      assert.equal(after.detail.facts.some((fact) => fact.label === "preview"), true);
+      assert.equal(after.detail.facts.some((fact) => fact.label === "用途"), true);
+      assert.match(after.detail.summary, /Live workspace context/u);
       assert.equal(after.detail.sources[0]?.label, "local_workspace_file / README.md");
     }
   } finally {

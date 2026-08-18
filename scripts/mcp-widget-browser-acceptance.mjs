@@ -7,7 +7,7 @@ import { connectCdpWebSocket } from "../dist/src/host/codex-cdp/index.js";
 import { POINTABLE_ENTITY_WIDGET_HTML } from "../dist/src/mcp/entity-widget.js";
 
 const edgePath = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
-const profile = await mkdtemp(join(tmpdir(), "pointable-widget-edge-"));
+const profile = await mkdtemp(join(tmpdir(), "pointable-capsule-edge-"));
 const pageServer = createServer((_request, response) => {
   response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
   response.end("<!doctype html><html><body></body></html>");
@@ -15,9 +15,7 @@ const pageServer = createServer((_request, response) => {
 pageServer.listen({ host: "127.0.0.1", port: 0 });
 await new Promise((resolveListen) => pageServer.once("listening", resolveListen));
 const address = pageServer.address();
-if (address === null || typeof address === "string") {
-  throw new Error("widget acceptance server did not bind TCP");
-}
+if (address === null || typeof address === "string") throw new Error("capsule acceptance server did not bind TCP");
 
 const child = spawn(edgePath, [
   "--headless=new",
@@ -29,9 +27,7 @@ const child = spawn(edgePath, [
   `http://127.0.0.1:${address.port}/`,
 ], { stdio: "ignore", windowsHide: true });
 
-function delay(ms) {
-  return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
-}
+const delay = (ms) => new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
 
 async function debuggerPort() {
   const path = join(profile, "DevToolsActivePort");
@@ -40,9 +36,7 @@ async function debuggerPort() {
     try {
       const port = Number((await readFile(path, "utf8")).split(/\r?\n/u)[0]);
       if (Number.isSafeInteger(port) && port > 0 && port <= 65_535) return port;
-    } catch {
-      // Edge has not published the endpoint yet.
-    }
+    } catch {}
     await delay(50);
   }
   throw new Error("headless Edge did not publish DevToolsActivePort");
@@ -70,7 +64,7 @@ async function waitFor(connection, expression, timeoutMs = 7_000) {
     if (value) return value;
     await delay(25);
   }
-  throw new Error("widget browser acceptance timed out");
+  throw new Error("capsule browser acceptance timed out");
 }
 
 const toolResult = {
@@ -81,18 +75,24 @@ const toolResult = {
   status: "detail",
   projectId: "PRJ-01",
   entity: {
-    entityId: "WU:GOV-1",
-    entityType: "work_unit",
-    label: "GOV-1",
-    summary: "建立 AEN harness 基础及入口约束",
-    entityRevision: "r18",
-    observedAt: "2026-08-17T08:10:00Z",
+    entityId: "DOC:CONTEXT-CAPSULE-PRD",
+    entityType: "document",
+    label: "Native Chat Lane Context Capsules PRD",
+    summary: "以人的项目理解为中心的零 turn 原生上下文胶囊定义。",
+    entityRevision: "v1.0",
+    observedAt: "2026-08-18T04:03:00Z",
     freshness: "stale",
-    facts: { status: "completed", remaining: "deferred" },
-    relations: [],
-    sources: [{ sourceType: "query_model", sourceId: "wu_gov_1" }],
+    facts: {
+      purpose: "Freeze the native Chat Lane product direction.",
+      change_summary: ["Agent-known first", "Selection fallback", "No Ask Agent form"],
+      impact: ["MCP capsule", "fixture", "Skill"],
+      status: "direction-frozen",
+      path: "docs/PRD-inline-pointable-widgets.md",
+    },
+    relations: ["MOD:CONTEXT-SCOPE", "DEC:ARCH-7"],
+    sources: [{ sourceType: "repository_document", sourceId: "docs/PRD-inline-pointable-widgets.md" }],
   },
-  verification: { method: "fixture_read", verifiedAt: "2026-08-17T08:10:01Z" },
+  verification: { method: "fixture_read", verifiedAt: "2026-08-18T04:03:01Z" },
   error: null,
 };
 
@@ -122,7 +122,7 @@ try {
           jsonrpc: '2.0', id: message.id, result: {
             protocolVersion: '2026-01-26',
             hostInfo: { name: 'pointable-headless-host', version: '1' },
-            hostCapabilities: { message: {}, updateModelContext: {} },
+            hostCapabilities: {},
             hostContext: { theme: 'dark', displayMode: 'inline', platform: 'desktop' }
           }
         }, '*');
@@ -132,9 +132,6 @@ try {
           jsonrpc: '2.0', method: 'ui/notifications/tool-result',
           params: { structuredContent: ${JSON.stringify(toolResult)} }
         }, '*');
-      }
-      if ((message.method === 'ui/update-model-context' || message.method === 'ui/message') && message.id !== undefined) {
-        iframe.contentWindow.postMessage({ jsonrpc: '2.0', id: message.id, result: {} }, '*');
       }
     });
     document.body.style.margin = '0';
@@ -146,57 +143,59 @@ try {
   const control = await waitFor(connection, `(() => {
     const frame = document.getElementById('widget');
     const doc = frame?.contentDocument;
-    const heading = doc?.querySelector('h1');
-    const input = doc?.querySelector('input[name="question"]');
-    const button = doc?.querySelector('button[type="submit"]');
-    if (!heading || heading.textContent !== 'GOV-1' || !input || !button) return null;
-    input.focus();
+    const button = doc?.querySelector('button.trigger');
+    const detail = doc?.querySelector('#pointable-capsule-detail');
+    const title = doc?.querySelector('.title')?.textContent;
+    if (!button || !detail || title !== 'Native Chat Lane Context Capsules PRD') return null;
+    if (button.getAttribute('aria-expanded') !== 'false' || detail.hidden !== true) return null;
     const frameRect = frame.getBoundingClientRect();
-    const buttonRect = button.getBoundingClientRect();
-    return {
-      x: frameRect.left + buttonRect.left + buttonRect.width / 2,
-      y: frameRect.top + buttonRect.top + buttonRect.height / 2,
-    };
-  })()`);
-  await connection.send("Input.insertText", { text: "为什么是 stale？" });
-  await connection.send("Input.dispatchMouseEvent", {
-    type: "mousePressed", x: control.x, y: control.y, button: "left", clickCount: 1,
-  });
-  await connection.send("Input.dispatchMouseEvent", {
-    type: "mouseReleased", x: control.x, y: control.y, button: "left", clickCount: 1,
-  });
-
-  const evidence = await waitFor(connection, `(() => {
-    const messages = window.__widgetMessages ?? [];
-    const context = messages.find((message) => message.method === 'ui/update-model-context');
-    const followup = messages.find((message) => message.method === 'ui/message');
-    if (!context || !followup) return null;
-    const status = document.getElementById('widget')?.contentDocument?.querySelector('.status')?.textContent ?? '';
-    if (status !== '已发送到当前任务。') return null;
-    return { context: context.params, followup: followup.params, status };
+    const rect = button.getBoundingClientRect();
+    return { x: frameRect.left + rect.left + rect.width / 2, y: frameRect.top + rect.top + rect.height / 2 };
   })()`);
 
-  const followupText = evidence.followup?.content?.text ?? "";
-  if (
-    evidence.followup?.role !== "user" ||
-    !followupText.includes("WU:GOV-1") ||
-    !followupText.includes("r18") ||
-    !followupText.includes("为什么是 stale？") ||
-    !followupText.includes("FIXTURE-ONLY") ||
-    evidence.context?.structuredContent?.entityId !== "WU:GOV-1" ||
-    evidence.context?.structuredContent?.revision !== "r18"
-  ) {
-    throw new Error(`widget bridge evidence mismatch: ${JSON.stringify(evidence)}`);
+  for (const type of ["mousePressed", "mouseReleased"]) {
+    await connection.send("Input.dispatchMouseEvent", {
+      type, x: control.x, y: control.y, button: "left", clickCount: 1,
+    });
+  }
+
+  const expanded = await waitFor(connection, `(() => {
+    const doc = document.getElementById('widget')?.contentDocument;
+    const button = doc?.querySelector('button.trigger');
+    const detail = doc?.querySelector('#pointable-capsule-detail');
+    const text = detail?.textContent ?? '';
+    if (button?.getAttribute('aria-expanded') !== 'true' || detail?.hidden !== false) return null;
+    if (!text.includes('本次变化') || !text.includes('来源与验证') || !text.includes('v1.0')) return null;
+    return { text };
+  })()`);
+
+  for (const type of ["mousePressed", "mouseReleased"]) {
+    await connection.send("Input.dispatchMouseEvent", {
+      type, x: control.x, y: control.y, button: "left", clickCount: 1,
+    });
+  }
+
+  await waitFor(connection, `(() => {
+    const doc = document.getElementById('widget')?.contentDocument;
+    const button = doc?.querySelector('button.trigger');
+    const detail = doc?.querySelector('#pointable-capsule-detail');
+    return button?.getAttribute('aria-expanded') === 'false' && detail?.hidden === true;
+  })()`);
+
+  const bridgeMethods = await evaluate(connection, `(window.__widgetMessages ?? []).map((message) => message.method).filter(Boolean)`);
+  if (bridgeMethods.includes("ui/message") || bridgeMethods.includes("ui/update-model-context")) {
+    throw new Error(`zero-turn capsule emitted a conversation mutation: ${JSON.stringify(bridgeMethods)}`);
   }
 
   process.stdout.write(`${JSON.stringify({
     ok: true,
     browser: "Microsoft Edge headless",
-    renderedEntity: "WU:GOV-1",
-    trustedSubmit: true,
-    modelContextBound: true,
-    sameConversationMessageRequested: true,
-    fixtureWarningPreserved: true,
+    renderedEntity: "DOC:CONTEXT-CAPSULE-PRD",
+    typeSpecificFactsVisible: expanded.text.includes("本次变化"),
+    expandedAndCollapsedLocally: true,
+    conversationMutationRequested: false,
+    browserNavigationRequested: false,
+    fixtureWarningPreserved: expanded.text.includes("FIXTURE-ONLY"),
   }, null, 2)}\n`);
 } finally {
   if (connection) connection.close();

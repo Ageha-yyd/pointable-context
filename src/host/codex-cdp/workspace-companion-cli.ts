@@ -50,7 +50,12 @@ function record(value: unknown): value is Record<string, unknown> {
 function packageRoot(start: string): string {
   let current = resolve(start);
   for (let depth = 0; depth < 10; depth += 1) {
-    if (existsSync(join(current, "package.json")) && existsSync(join(current, "src"))) {
+    const developmentLayout = existsSync(join(current, "src"));
+    const packagedLayout = existsSync(join(current, "host", "workspace-companion.mjs"));
+    if (
+      existsSync(join(current, "package.json")) &&
+      (developmentLayout || packagedLayout)
+    ) {
       return current;
     }
     const parent = dirname(current);
