@@ -3318,9 +3318,9 @@ import { createHash as createHash6, randomBytes as randomBytes3 } from "node:cry
 import { createHash as createHash5 } from "node:crypto";
 import { open, readdir, realpath as realpath2, stat as stat2 } from "node:fs/promises";
 import {
-  basename as basename2,
+  basename as basename3,
   dirname as dirname2,
-  extname as extname2,
+  extname as extname3,
   isAbsolute as isAbsolute2,
   relative,
   resolve as resolve4,
@@ -3337,9 +3337,9 @@ var MAX_PURPOSE_CHARS = 360;
 var MAX_HEADING_CHARS = 160;
 var MAX_IMPACT_FILES = 3;
 function boundedText(value, maximum) {
-  const compact = value.replace(/[\p{Cc}\p{Cf}]+/gu, " ").replace(/\s+/gu, " ").trim();
-  if (compact.length === 0) return void 0;
-  return compact.length <= maximum ? compact : `${compact.slice(0, maximum - 1)}\u2026`;
+  const compact2 = value.replace(/[\p{Cc}\p{Cf}]+/gu, " ").replace(/\s+/gu, " ").trim();
+  if (compact2.length === 0) return void 0;
+  return compact2.length <= maximum ? compact2 : `${compact2.slice(0, maximum - 1)}\u2026`;
 }
 function inlineMarkdown(value) {
   return boundedText(
@@ -3463,12 +3463,12 @@ function changedSections(diff, structure, state) {
     const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/u.exec(line);
     if (!hunk) continue;
     const currentLine = Number(hunk[1]);
-    let section;
+    let section2;
     for (const heading of structure.headings) {
       if (heading.line > currentLine) break;
-      section = heading.label;
+      section2 = heading.label;
     }
-    add(section ?? structure.title ?? "\u6587\u6863\u5F00\u5934");
+    add(section2 ?? structure.title ?? "\u6587\u6863\u5F00\u5934");
   }
   if (result.length === 0 && state !== "clean" && state !== "unavailable") {
     add(structure.title ?? "\u6587\u6863\u5F00\u5934");
@@ -3578,9 +3578,9 @@ function sourceModulePath(relativePath) {
   return SOURCE_EXTENSIONS.has(extname(relativePath).toLocaleLowerCase("en-US"));
 }
 function boundedText2(value, maximum) {
-  const compact = value.replace(/[\p{Cc}\p{Cf}]+/gu, " ").replace(/\s+/gu, " ").trim();
-  if (compact.length === 0) return void 0;
-  return compact.length <= maximum ? compact : `${compact.slice(0, maximum - 1)}\u2026`;
+  const compact2 = value.replace(/[\p{Cc}\p{Cf}]+/gu, " ").replace(/\s+/gu, " ").trim();
+  if (compact2.length === 0) return void 0;
+  return compact2.length <= maximum ? compact2 : `${compact2.slice(0, maximum - 1)}\u2026`;
 }
 function addBounded(target, value, maximum) {
   const safe = value === void 0 ? void 0 : boundedText2(value, MAX_SYMBOL_CHARS);
@@ -3882,6 +3882,134 @@ ${staged.kind === "ok" ? staged.stdout : ""}`;
   });
 }
 
+// src/adapters/workspace-scenario.ts
+import { basename as basename2, extname as extname2 } from "node:path";
+var SOURCE_EXTENSIONS2 = /* @__PURE__ */ new Set([
+  ".ts",
+  ".tsx",
+  ".mts",
+  ".cts",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs"
+]);
+function portable(value) {
+  return value.replaceAll("\\", "/");
+}
+function compact(value, maximum = 500) {
+  const result = value.replace(/[`*_>#]/gu, " ").replace(/\s+/gu, " ").trim();
+  return result.length === 0 ? void 0 : result.slice(0, maximum);
+}
+function testSourcePath(relativePath) {
+  const path = portable(relativePath).toLocaleLowerCase("en-US");
+  if (!SOURCE_EXTENSIONS2.has(extname2(path))) return false;
+  const name = basename2(path);
+  return /(?:^|\/)(?:test|tests|__tests__)\//u.test(path) || /\.(?:test|spec)\.(?:[cm]?[jt]sx?)$/u.test(name);
+}
+function decisionDocumentPath(relativePath) {
+  const path = portable(relativePath).toLocaleLowerCase("en-US");
+  const name = basename2(path);
+  if (extname2(name) !== ".md" && extname2(name) !== ".mdx") return false;
+  return /(?:^|\/)(?:adr|adrs|decision|decisions)\//u.test(path) || /^(?:adr|decision)[-_]\d+/u.test(name);
+}
+function jsonConfigurationPath(relativePath) {
+  const path = portable(relativePath).toLocaleLowerCase("en-US");
+  const name = basename2(path);
+  if (extname2(name) !== ".json") return false;
+  return name === "package.json" || name === "jsconfig.json" || name === ".mcp.json" || /^tsconfig(?:\.[a-z0-9_-]+)?\.json$/u.test(name) || /\.config\.json$/u.test(name) || /(?:^|\/)\.codex-plugin\/plugin\.json$/u.test(path);
+}
+function extractStaticTestDefinitionContext(content) {
+  const titles = [];
+  const pattern = /\b(?:it|test)\s*\(\s*(["'`])([^\r\n]{1,240}?)\1/gu;
+  for (const match of content.matchAll(pattern)) {
+    const title = compact(match[2] ?? "", 160);
+    if (title !== void 0 && !titles.includes(title)) titles.push(title);
+    if (titles.length >= 20) break;
+  }
+  const visible = titles.slice(0, 3);
+  const summary = visible.length === 0 ? "\u672A\u63D0\u53D6\u5230\u9759\u6001 test/it \u6807\u9898\uFF1B\u8BE5\u5361\u7247\u4E0D\u6267\u884C\u6D4B\u8BD5" : `\u68C0\u6D4B\u5230 ${titles.length} \u4E2A\u9759\u6001 test/it \u6807\u9898\uFF1A${visible.join("\uFF1B")}${titles.length > 3 ? `\uFF1B\u53E6 ${titles.length - 3} \u9879` : ""}`;
+  return { summary, titles: visible, titleCount: titles.length };
+}
+function configurationPurpose(relativePath) {
+  const path = portable(relativePath);
+  const name = basename2(path).toLocaleLowerCase("en-US");
+  if (name === "package.json") return "Node package \u8FB9\u754C\u3001\u811A\u672C\u4E0E\u4F9D\u8D56\u58F0\u660E";
+  if (name.startsWith("tsconfig")) return "TypeScript \u7F16\u8BD1\u8FB9\u754C\u4E0E\u9009\u9879\u58F0\u660E";
+  if (name === "jsconfig.json") return "JavaScript \u5DE5\u7A0B\u8FB9\u754C\u4E0E\u7F16\u8F91\u5668\u9009\u9879\u58F0\u660E";
+  if (name === ".mcp.json") return "MCP server \u6CE8\u518C\u4E0E\u542F\u52A8\u58F0\u660E";
+  if (path.toLocaleLowerCase("en-US").endsWith("/.codex-plugin/plugin.json")) {
+    return "Codex Plugin \u5143\u6570\u636E\u4E0E\u80FD\u529B\u58F0\u660E";
+  }
+  return "JSON \u914D\u7F6E\u8FB9\u754C";
+}
+function extractJsonConfigurationContext(relativePath, content) {
+  let parsed;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return {
+      purpose: configurationPurpose(relativePath),
+      topLevelKeys: [],
+      keyCount: 0,
+      parsed: false
+    };
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return {
+      purpose: configurationPurpose(relativePath),
+      topLevelKeys: [],
+      keyCount: 0,
+      parsed: false
+    };
+  }
+  const keys = Object.keys(parsed).filter((key) => compact(key, 80) === key).slice(0, 100);
+  return {
+    purpose: configurationPurpose(relativePath),
+    topLevelKeys: keys.slice(0, 5),
+    keyCount: keys.length,
+    parsed: true
+  };
+}
+function section(content, accepted) {
+  const lines = content.split(/\r?\n/u).slice(0, 2e3);
+  let collecting = false;
+  let fenced = false;
+  const values = [];
+  for (const line of lines) {
+    const candidate = line.trimStart();
+    if (/^```/u.test(candidate)) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced) continue;
+    const heading = /^#{1,6}\s+(.+?)\s*#*\s*$/u.exec(candidate);
+    if (heading !== null) {
+      const normalized = compact(heading[1] ?? "", 80)?.toLocaleLowerCase("en-US");
+      if (collecting && !accepted.has(normalized ?? "")) break;
+      collecting = accepted.has(normalized ?? "");
+      continue;
+    }
+    if (!collecting) continue;
+    const value = compact(line);
+    if (value !== void 0) values.push(value);
+    if (values.join(" ").length >= 500) break;
+  }
+  return compact(values.join(" "));
+}
+function extractDecisionDocumentContext(content) {
+  const decision = section(content, /* @__PURE__ */ new Set(["decision", "\u51B3\u7B56", "\u51B3\u5B9A"]));
+  const status = section(content, /* @__PURE__ */ new Set(["status", "\u72B6\u6001"]));
+  const rationale = section(content, /* @__PURE__ */ new Set(["context", "rationale", "\u80CC\u666F", "\u539F\u56E0"]));
+  const consequences = section(content, /* @__PURE__ */ new Set(["consequences", "consequence", "\u540E\u679C", "\u5F71\u54CD"]));
+  return {
+    ...decision === void 0 ? {} : { decision },
+    ...status === void 0 ? {} : { status },
+    ...rationale === void 0 ? {} : { rationale },
+    ...consequences === void 0 ? {} : { consequences }
+  };
+}
+
 // src/adapters/local-workspace.ts
 var DEFAULT_MAX_FILES = 2048;
 var DEFAULT_MAX_DEPTH = 12;
@@ -3925,8 +4053,16 @@ function fileEntityId(relativePath) {
   return `file:${relativePath}`;
 }
 function markdownDocument(relativePath) {
-  const extension = extname2(relativePath).toLocaleLowerCase("en-US");
+  const extension = extname3(relativePath).toLocaleLowerCase("en-US");
   return extension === ".md" || extension === ".mdx";
+}
+function workspaceEntityType(relativePath) {
+  if (decisionDocumentPath(relativePath)) return "decision";
+  if (markdownDocument(relativePath)) return "document";
+  if (testSourcePath(relativePath)) return "verification";
+  if (sourceModulePath(relativePath)) return "module";
+  if (jsonConfigurationPath(relativePath)) return "configuration";
+  return "file";
 }
 async function verifiedWorkspaceRoot(binding) {
   if (!binding.workspaceRoot || !isAbsolute2(binding.workspaceRoot)) {
@@ -3947,8 +4083,8 @@ function safeAlias(value) {
   return trimmed.length >= 2 && trimmed.length <= 512 ? trimmed : void 0;
 }
 function fileAliases(relativePath) {
-  const name = basename2(relativePath);
-  const extension = extname2(name);
+  const name = basename3(relativePath);
+  const extension = extname3(name);
   const stem = extension.length === 0 ? name : name.slice(0, -extension.length);
   return [...new Set([
     safeAlias(stem)
@@ -4034,13 +4170,13 @@ var LocalWorkspaceContextIndex = class {
     const revision = indexRevision(files);
     const indexedAt = (/* @__PURE__ */ new Date()).toISOString();
     return files.map((file) => {
-      const name = basename2(file.relativePath);
+      const name = basename3(file.relativePath);
       const parent = portablePath(dirname2(file.relativePath));
       return {
         schemaVersion: "1.0",
         scope: { ...binding.scope },
         entityId: fileEntityId(file.relativePath),
-        entityType: markdownDocument(file.relativePath) ? "document" : sourceModulePath(file.relativePath) ? "module" : "file",
+        entityType: workspaceEntityType(file.relativePath),
         canonicalKey: file.relativePath,
         canonicalName: name,
         aliases: fileAliases(file.relativePath),
@@ -4060,8 +4196,8 @@ function contentPreview(content) {
   if (content.includes(0)) return void 0;
   try {
     const decoded = new TextDecoder("utf-8", { fatal: true }).decode(content);
-    const compact = decoded.replace(/\s+/gu, " ").trim();
-    return compact.length === 0 ? void 0 : compact.slice(0, 800);
+    const compact2 = decoded.replace(/\s+/gu, " ").trim();
+    return compact2.length === 0 ? void 0 : compact2.slice(0, 800);
   } catch {
     return void 0;
   }
@@ -4101,7 +4237,7 @@ var LocalWorkspaceRevisionProbe = class {
     if (request.signal?.aborted) {
       return { kind: "unavailable", observedAt, retryable: true };
     }
-    if (request.entityType !== "file" && request.entityType !== "document" && request.entityType !== "module") {
+    if (request.entityType !== "file" && request.entityType !== "document" && request.entityType !== "module" && request.entityType !== "verification" && request.entityType !== "configuration" && request.entityType !== "decision") {
       return { kind: "not_found", observedAt };
     }
     if (!request.entityId.startsWith("file:")) {
@@ -4109,6 +4245,9 @@ var LocalWorkspaceRevisionProbe = class {
     }
     const locator = request.entityId.slice("file:".length);
     if (locator.length < 1 || locator.length > MAX_RELATIVE_PATH_CHARS || locator.includes("\\") || locator.startsWith("/") || locator.split("/").includes("..")) {
+      return { kind: "not_found", observedAt };
+    }
+    if (workspaceEntityType(locator) !== request.entityType) {
       return { kind: "not_found", observedAt };
     }
     try {
@@ -4152,10 +4291,10 @@ var LocalWorkspaceAuthoritativeProvider = class {
   providerId = LOCAL_WORKSPACE_PROVIDER_ID;
   async getDetail(request) {
     if (request.signal?.aborted) return { kind: "unavailable", retryable: true };
-    if (request.entityType !== "file" && request.entityType !== "document" && request.entityType !== "module") {
+    if (request.entityType !== "file" && request.entityType !== "document" && request.entityType !== "module" && request.entityType !== "verification" && request.entityType !== "configuration" && request.entityType !== "decision") {
       return { kind: "not_found" };
     }
-    if (request.authorityLocator.length < 1 || request.authorityLocator.length > MAX_RELATIVE_PATH_CHARS || request.authorityLocator.includes("\\") || request.authorityLocator.startsWith("/") || request.authorityLocator.split("/").includes("..") || request.entityId !== fileEntityId(request.authorityLocator)) {
+    if (request.authorityLocator.length < 1 || request.authorityLocator.length > MAX_RELATIVE_PATH_CHARS || request.authorityLocator.includes("\\") || request.authorityLocator.startsWith("/") || request.authorityLocator.split("/").includes("..") || request.entityId !== fileEntityId(request.authorityLocator) || workspaceEntityType(request.authorityLocator) !== request.entityType) {
       return { kind: "not_found" };
     }
     let handle;
@@ -4173,13 +4312,13 @@ var LocalWorkspaceAuthoritativeProvider = class {
         content = await handle.readFile();
       }
       const decoded = content === void 0 ? void 0 : utf8Content(content);
-      const markdownContext = request.entityType === "document" && decoded !== void 0 ? await extractMarkdownArtifactContext({
+      const markdownContext = (request.entityType === "document" || request.entityType === "decision") && decoded !== void 0 ? await extractMarkdownArtifactContext({
         root,
         relativePath,
         content: decoded,
         ...request.signal === void 0 ? {} : { signal: request.signal }
       }) : void 0;
-      const sourceModuleContext = request.entityType === "module" && decoded !== void 0 ? await extractSourceModuleArtifactContext({
+      const sourceModuleContext = (request.entityType === "module" || request.entityType === "verification") && decoded !== void 0 ? await extractSourceModuleArtifactContext({
         root,
         relativePath,
         content: decoded,
@@ -4201,11 +4340,14 @@ var LocalWorkspaceAuthoritativeProvider = class {
         markdownContext?.contextRevision ?? sourceModuleContext?.contextRevision ?? "file-metadata-v1",
         "utf8"
       ).digest("hex");
-      const extension = extname2(relativePath);
+      const extension = extname3(relativePath);
       const preview = content === void 0 ? void 0 : contentPreview(content);
       const observedAt = (/* @__PURE__ */ new Date()).toISOString();
+      const testContext = request.entityType === "verification" && decoded !== void 0 ? extractStaticTestDefinitionContext(decoded) : void 0;
+      const configurationContext = request.entityType === "configuration" && decoded !== void 0 ? extractJsonConfigurationContext(relativePath, decoded) : void 0;
+      const decisionContext = request.entityType === "decision" && decoded !== void 0 ? extractDecisionDocumentContext(decoded) : void 0;
       const markdownFacts = markdownContext === void 0 ? void 0 : {
-        "\u7528\u9014": markdownContext.purpose ?? `${markdownContext.title ?? basename2(relativePath)} Markdown \u6587\u6863`,
+        "\u7528\u9014": markdownContext.purpose ?? `${markdownContext.title ?? basename3(relativePath)} Markdown \u6587\u6863`,
         "\u672C\u6B21\u53D8\u5316": markdownContext.changeSummary ?? (markdownContext.gitAvailable ? "\u5F53\u524D\u5DE5\u4F5C\u6811\u672A\u68C0\u6D4B\u5230\u672A\u63D0\u4EA4\u53D8\u66F4" : "Git \u4E0A\u4E0B\u6587\u4E0D\u53EF\u7528"),
         "\u5F71\u54CD\u8303\u56F4": markdownContext.impactFiles.length > 0 ? [...markdownContext.impactFiles] : "\u672A\u53D1\u73B0\u5DF2\u8DDF\u8E2A\u5F15\u7528",
         "Git \u72B6\u6001": gitStatusLabel(markdownContext.gitStatus),
@@ -4226,6 +4368,30 @@ var LocalWorkspaceAuthoritativeProvider = class {
         "\u4F9D\u8D56\u4E0E\u5F71\u54CD": dependencyAndImpact.length > 0 ? dependencyAndImpact : "\u672A\u53D1\u73B0\u6709\u754C\u7684\u76F4\u63A5\u4F9D\u8D56\u6216\u5F15\u7528",
         "\u8DEF\u5F84": relativePath
       };
+      const verificationFacts = testContext === void 0 || sourceModuleContext === void 0 ? void 0 : {
+        "\u9A8C\u8BC1\u8303\u56F4": testContext.summary,
+        "\u6267\u884C\u72B6\u6001": "\u672A\u6267\u884C\uFF1B\u8BE5\u5361\u7247\u53EA\u8BFB\u53D6\u6D4B\u8BD5\u5B9A\u4E49\uFF0C\u4E0D\u80FD\u636E\u6B64\u5224\u5B9A PASS/FAIL",
+        "\u672C\u6B21\u53D8\u5316": sourceModuleContext.changeSummary,
+        "\u4F9D\u8D56\u4E0E\u5F71\u54CD": dependencyAndImpact.length > 0 ? dependencyAndImpact : "\u672A\u53D1\u73B0\u6709\u754C\u7684\u76F4\u63A5\u4F9D\u8D56\u6216\u5F15\u7528",
+        "\u8DEF\u5F84": relativePath
+      };
+      const configurationFacts = configurationContext === void 0 ? void 0 : {
+        "\u914D\u7F6E\u7528\u9014": configurationContext.purpose,
+        "\u9876\u5C42\u952E": configurationContext.parsed ? configurationContext.topLevelKeys.length > 0 ? [
+          ...configurationContext.topLevelKeys,
+          ...configurationContext.keyCount > configurationContext.topLevelKeys.length ? [`\u53E6 ${configurationContext.keyCount - configurationContext.topLevelKeys.length} \u9879`] : []
+        ] : "\u672A\u58F0\u660E\u9876\u5C42\u952E" : "JSON \u65E0\u6CD5\u5B89\u5168\u89E3\u6790",
+        "\u62AB\u9732\u8FB9\u754C": "\u53EA\u663E\u793A\u952E\u540D\uFF1B\u914D\u7F6E\u503C\u548C\u6F5C\u5728\u5BC6\u94A5\u4E0D\u8FDB\u5165\u5361\u7247",
+        "\u683C\u5F0F": "JSON",
+        "\u8DEF\u5F84": relativePath
+      };
+      const decisionFacts = decisionContext === void 0 ? void 0 : {
+        "\u51B3\u7B56": decisionContext.decision ?? markdownContext?.purpose ?? "\u672A\u63D0\u4F9B\u53EF\u63D0\u53D6\u7684 Decision \u6BB5\u843D",
+        "\u72B6\u6001": decisionContext.status ?? "\u672A\u660E\u786E",
+        "\u539F\u56E0": decisionContext.rationale ?? "\u672A\u63D0\u4F9B\u53EF\u63D0\u53D6\u7684 Context/Rationale \u6BB5\u843D",
+        "\u540E\u679C": decisionContext.consequences ?? "\u672A\u63D0\u4F9B\u53EF\u63D0\u53D6\u7684 Consequences \u6BB5\u843D",
+        "\u8DEF\u5F84": relativePath
+      };
       return {
         kind: "snapshot",
         snapshot: {
@@ -4235,9 +4401,9 @@ var LocalWorkspaceAuthoritativeProvider = class {
           entityRevision: `sha256:${detailRevision}`,
           observedAt,
           freshness: "current",
-          facts: markdownFacts ?? moduleFacts ?? {
+          facts: decisionFacts ?? verificationFacts ?? configurationFacts ?? markdownFacts ?? moduleFacts ?? {
             path: relativePath,
-            name: basename2(relativePath),
+            name: basename3(relativePath),
             ...preview === void 0 ? {} : { preview },
             extension: extension.length === 0 ? null : extension,
             size_bytes: after.size,
@@ -5108,9 +5274,10 @@ function candidateView(candidate, candidateRef) {
 }
 function detailView(outcome, options = {}) {
   const purpose = outcome.detail.facts["\u7528\u9014"] ?? outcome.detail.facts["\u804C\u8D23"];
+  const scenarioSummary = outcome.detail.entityType === "verification" ? outcome.detail.facts["\u9A8C\u8BC1\u8303\u56F4"] : outcome.detail.entityType === "configuration" ? outcome.detail.facts["\u914D\u7F6E\u7528\u9014"] : outcome.detail.entityType === "decision" ? outcome.detail.facts["\u51B3\u7B56"] : void 0;
   const change = outcome.detail.facts["\u672C\u6B21\u53D8\u5316"];
   const activeChange = typeof change === "string" && /^(?:涉及：|modified\b|staged\b|untracked\b|conflicted\b)/u.test(change);
-  const summaryValue = activeChange ? change : purpose;
+  const summaryValue = scenarioSummary ?? (activeChange ? change : purpose);
   const summary = typeof summaryValue === "string" ? truncate(summaryValue, 1024) : truncate(outcome.candidate.summary, 1024);
   return {
     entityId: truncate(outcome.detail.entityId, 256),

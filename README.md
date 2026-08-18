@@ -46,6 +46,16 @@ An open workspace detail card now pins the snapshot the user is reading. A bound
 
 If the file is deleted or the probe becomes unavailable, the prior snapshot stays visible with an explicit warning. Task rebinding, expired references, context drift, or capacity exhaustion disable refresh rather than widening authority. The first probe intentionally detects source-file stat changes only; relation-only or Git-only changes may require reopening the detail until a broader lightweight revision contract is qualified.
 
+## Scenario-specific safe projections
+
+The workspace Provider now classifies three additional high-value development artifacts without adding model inference:
+
+- test/spec source files show detected static `test`/`it` titles, current source change evidence, bounded dependencies, and an explicit `not executed` warning. Reading the file never claims PASS or FAIL;
+- known JSON configuration files such as `package.json`, `tsconfig*.json`, `.mcp.json`, and Plugin manifests show their purpose and bounded top-level key names. Configuration values and potential secrets never enter the card;
+- ADR/decision Markdown paths show only explicit Status, Decision, Context/Rationale, and Consequences sections.
+
+These are conservative projections of readable artifacts, not substitutes for an actual test-run result, runtime configuration resolution, or a semantic decision graph.
+
 ## Current fixture
 
 The installed MCP server is deliberately pinned to `fixtures/mini-project`. Every result is marked `FIXTURE-ONLY`; it is not evidence about the active workspace.
@@ -100,7 +110,7 @@ These foundations are implementation assets. Selection is the visual trigger; it
 - The standard MCP App path renders beside a tool result; it does not provide the required ordinary-prose selection hook.
 - The private Desktop selection companion is currently the primary interaction prototype, but remains host/build-specific and must be qualified per Codex build.
 - Further object/Extractor expansion is paused while cross-build native-host compatibility and scenario-specific summary quality are qualified.
-- Markdown artifact and TypeScript/JavaScript source-module context are implemented; decision, task, abstract-concept, and verification Providers remain later stages.
+- Markdown artifact, TypeScript/JavaScript module, static test-definition, known JSON configuration, and path-qualified ADR context are implemented. Actual test-run results, task state, and Agent-known abstract concepts remain later stages.
 - Real Agent work results do not yet systematically emit context references.
 - Source files have a real local module Provider; Agent-known abstract concepts, decisions, tasks, and verification results are not yet connected.
 - A persistent multi-object capsule strip is no longer a default product goal.
@@ -155,6 +165,7 @@ P0 is successful only when Quiet Context Reveal:
 - creates zero additional Chat Turns;
 - does not call a model to reveal existing facts;
 - uses type-specific information priorities;
+- never infers PASS/FAIL from a test source file and never projects JSON configuration values;
 - exposes identity, source, revision, observed time, and freshness;
 - pins an opened snapshot, signals detected file revision drift, and refreshes the same card only after a trusted action;
 - preserves the old snapshot with an explicit warning when the object is deleted or revision status is unavailable;

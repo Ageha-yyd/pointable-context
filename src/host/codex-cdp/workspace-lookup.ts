@@ -144,10 +144,17 @@ function detailView(
   options: { detailRef?: string; changes?: PointableChangeView[] } = {},
 ): PointableDetailView {
   const purpose = outcome.detail.facts["用途"] ?? outcome.detail.facts["职责"];
+  const scenarioSummary = outcome.detail.entityType === "verification"
+    ? outcome.detail.facts["验证范围"]
+    : outcome.detail.entityType === "configuration"
+      ? outcome.detail.facts["配置用途"]
+      : outcome.detail.entityType === "decision"
+        ? outcome.detail.facts["决策"]
+        : undefined;
   const change = outcome.detail.facts["本次变化"];
   const activeChange = typeof change === "string" &&
     /^(?:涉及：|modified\b|staged\b|untracked\b|conflicted\b)/u.test(change);
-  const summaryValue = activeChange ? change : purpose;
+  const summaryValue = scenarioSummary ?? (activeChange ? change : purpose);
   const summary = typeof summaryValue === "string"
     ? truncate(summaryValue, 1_024)
     : truncate(outcome.candidate.summary, 1_024);

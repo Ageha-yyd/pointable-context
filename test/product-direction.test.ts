@@ -7,7 +7,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v1.6 keeps Quiet Context Reveal and adds explicit zero-turn revision refresh", async () => {
+test("v1.7 keeps Quiet Context Reveal and adds safe scenario-specific summaries", async () => {
   const [prd, readme, mainSkill, workspaceSkill] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -15,7 +15,7 @@ test("v1.6 keeps Quiet Context Reveal and adds explicit zero-turn revision refre
     text("skills/pointable-context-workspace/SKILL.md"),
   ]);
 
-  assert.match(prd, /版本：v1\.6/u);
+  assert.match(prd, /版本：v1\.7/u);
   assert.match(prd, /默认可视入口是用户选区后的轻量按钮/u);
   assert.match(prd, /selection 本身不读取详情、不调用模型/u);
   assert.match(prd, /产品不存在“识别更多概念”模型分支/u);
@@ -34,6 +34,8 @@ test("v1.6 keeps Quiet Context Reveal and adds explicit zero-turn revision refre
   assert.match(readme, /no "identify more concepts" or semantic-model branch/u);
   assert.match(readme, /Only `qualified` permits the current runtime to be described as attached/u);
   assert.match(readme, /same card shows a quiet `内容已更新` notice/u);
+  assert.match(readme, /Reading the file never claims PASS or FAIL/u);
+  assert.match(readme, /Configuration values and potential secrets never enter the card/u);
   assert.match(mainSkill, /Use MCP `render_context_capsule` only when the user explicitly asks/u);
   assert.match(mainSkill, /Do not offer `识别更多概念`/u);
   assert.match(workspaceSkill, /Selection alone is inert/u);
@@ -41,6 +43,8 @@ test("v1.6 keeps Quiet Context Reveal and adds explicit zero-turn revision refre
   assert.match(workspaceSkill, /source is never executed/u);
   assert.match(workspaceSkill, /summary-first/u);
   assert.match(workspaceSkill, /trusted `刷新内容` click/u);
+  assert.match(workspaceSkill, /Never translate source presence into PASS\/FAIL/u);
+  assert.match(workspaceSkill, /Never expose configuration values/u);
   assert.match(workspaceSkill, /`compatibility\.state` is `qualified`/u);
 });
 

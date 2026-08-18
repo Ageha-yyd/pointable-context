@@ -136,6 +136,64 @@ test("workspace revision probe detects source drift without projecting full deta
   }
 });
 
+test("workspace scenario cards prioritize verification, configuration, and decision facts", async () => {
+  const fixture = await workspaceFixture();
+  try {
+    await mkdir(join(fixture.root, "test"));
+    await mkdir(join(fixture.root, "docs", "adr"), { recursive: true });
+    await writeFile(
+      join(fixture.root, "test", "refresh.test.ts"),
+      'test("refreshes the same card", () => {});\n',
+      "utf8",
+    );
+    await writeFile(
+      join(fixture.root, "package.json"),
+      JSON.stringify({ name: "never-display-this", scripts: { test: "secret-command" }, private: true }),
+      "utf8",
+    );
+    await writeFile(
+      join(fixture.root, "docs", "adr", "ADR-007-refresh.md"),
+      "# ADR-007\n## Status\nAccepted\n## Context\nKeep the current reading snapshot.\n## Decision\nRefresh only after an explicit action.\n## Consequences\nNo silent replacement.\n",
+      "utf8",
+    );
+    const records = await new LocalWorkspaceContextIndex().list(fixture.binding);
+    const provider = new LocalWorkspaceAuthoritativeProvider();
+    const read = async (key: string) => {
+      const record = records.find((candidate) => candidate.canonicalKey === key);
+      assert.ok(record);
+      const result = await provider.getDetail({
+        binding: fixture.binding,
+        entityId: record.entityId,
+        entityType: record.entityType,
+        authorityLocator: record.authorityRef.locator,
+        revisionPolicy: "current-or-explicit-stale",
+      });
+      assert.equal(result.kind, "snapshot");
+      if (result.kind !== "snapshot") throw new Error("scenario detail unavailable");
+      return result.snapshot;
+    };
+
+    const verification = await read("test/refresh.test.ts");
+    assert.equal(verification.entityType, "verification");
+    assert.match(String(verification.facts["验证范围"]), /refreshes the same card/u);
+    assert.match(String(verification.facts["执行状态"]), /不能据此判定 PASS\/FAIL/u);
+
+    const configuration = await read("package.json");
+    assert.equal(configuration.entityType, "configuration");
+    assert.match(String(configuration.facts["配置用途"]), /Node package/u);
+    assert.match(String(configuration.facts["披露边界"]), /潜在密钥不进入卡片/u);
+    assert.doesNotMatch(JSON.stringify(configuration.facts), /never-display-this|secret-command/u);
+
+    const decision = await read("docs/adr/ADR-007-refresh.md");
+    assert.equal(decision.entityType, "decision");
+    assert.equal(decision.facts["状态"], "Accepted");
+    assert.match(String(decision.facts["决策"]), /explicit action/u);
+    assert.match(String(decision.facts["后果"]), /No silent replacement/u);
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
 test("Markdown artifact detail exposes bounded purpose, changed sections, impact, and Git state", async () => {
   const fixture = await workspaceFixture();
   try {

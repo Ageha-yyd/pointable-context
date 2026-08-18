@@ -32,6 +32,14 @@ import {
   sourceModulePath,
   type SourceModuleArtifactContext,
 } from "./source-module-artifact.js";
+import {
+  decisionDocumentPath,
+  extractDecisionDocumentContext,
+  extractJsonConfigurationContext,
+  extractStaticTestDefinitionContext,
+  jsonConfigurationPath,
+  testSourcePath,
+} from "./workspace-scenario.js";
 
 const DEFAULT_MAX_FILES = 2_048;
 const DEFAULT_MAX_DEPTH = 12;
@@ -108,6 +116,15 @@ function fileEntityId(relativePath: string): string {
 function markdownDocument(relativePath: string): boolean {
   const extension = extname(relativePath).toLocaleLowerCase("en-US");
   return extension === ".md" || extension === ".mdx";
+}
+
+function workspaceEntityType(relativePath: string): string {
+  if (decisionDocumentPath(relativePath)) return "decision";
+  if (markdownDocument(relativePath)) return "document";
+  if (testSourcePath(relativePath)) return "verification";
+  if (sourceModulePath(relativePath)) return "module";
+  if (jsonConfigurationPath(relativePath)) return "configuration";
+  return "file";
 }
 
 async function verifiedWorkspaceRoot(binding: TrustedContextBinding): Promise<string> {
@@ -238,11 +255,7 @@ export class LocalWorkspaceContextIndex implements ContextIndexPort {
         schemaVersion: "1.0",
         scope: { ...binding.scope },
         entityId: fileEntityId(file.relativePath),
-        entityType: markdownDocument(file.relativePath)
-          ? "document"
-          : sourceModulePath(file.relativePath)
-            ? "module"
-            : "file",
+        entityType: workspaceEntityType(file.relativePath),
         canonicalKey: file.relativePath,
         canonicalName: name,
         aliases: fileAliases(file.relativePath),
@@ -324,7 +337,10 @@ export class LocalWorkspaceRevisionProbe {
     if (
       request.entityType !== "file" &&
       request.entityType !== "document" &&
-      request.entityType !== "module"
+      request.entityType !== "module" &&
+      request.entityType !== "verification" &&
+      request.entityType !== "configuration" &&
+      request.entityType !== "decision"
     ) {
       return { kind: "not_found", observedAt };
     }
@@ -339,6 +355,9 @@ export class LocalWorkspaceRevisionProbe {
       locator.startsWith("/") ||
       locator.split("/").includes("..")
     ) {
+      return { kind: "not_found", observedAt };
+    }
+    if (workspaceEntityType(locator) !== request.entityType) {
       return { kind: "not_found", observedAt };
     }
     try {
@@ -396,7 +415,10 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
     if (
       request.entityType !== "file" &&
       request.entityType !== "document" &&
-      request.entityType !== "module"
+      request.entityType !== "module" &&
+      request.entityType !== "verification" &&
+      request.entityType !== "configuration" &&
+      request.entityType !== "decision"
     ) {
       return { kind: "not_found" };
     }
@@ -406,7 +428,8 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
       request.authorityLocator.includes("\\") ||
       request.authorityLocator.startsWith("/") ||
       request.authorityLocator.split("/").includes("..") ||
-      request.entityId !== fileEntityId(request.authorityLocator)
+      request.entityId !== fileEntityId(request.authorityLocator) ||
+      workspaceEntityType(request.authorityLocator) !== request.entityType
     ) {
       return { kind: "not_found" };
     }
@@ -426,7 +449,8 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
       }
       const decoded = content === undefined ? undefined : utf8Content(content);
       const markdownContext =
-        request.entityType === "document" && decoded !== undefined
+        (request.entityType === "document" || request.entityType === "decision") &&
+          decoded !== undefined
           ? await extractMarkdownArtifactContext({
               root,
               relativePath,
@@ -435,7 +459,8 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
             })
           : undefined;
       const sourceModuleContext =
-        request.entityType === "module" && decoded !== undefined
+        (request.entityType === "module" || request.entityType === "verification") &&
+          decoded !== undefined
           ? await extractSourceModuleArtifactContext({
               root,
               relativePath,
@@ -472,6 +497,15 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
       const extension = extname(relativePath);
       const preview = content === undefined ? undefined : contentPreview(content);
       const observedAt = new Date().toISOString();
+      const testContext = request.entityType === "verification" && decoded !== undefined
+        ? extractStaticTestDefinitionContext(decoded)
+        : undefined;
+      const configurationContext = request.entityType === "configuration" && decoded !== undefined
+        ? extractJsonConfigurationContext(relativePath, decoded)
+        : undefined;
+      const decisionContext = request.entityType === "decision" && decoded !== undefined
+        ? extractDecisionDocumentContext(decoded)
+        : undefined;
       const markdownFacts = markdownContext === undefined
         ? undefined
         : {
@@ -513,6 +547,44 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
               : "未发现有界的直接依赖或引用",
             "路径": relativePath,
           };
+      const verificationFacts = testContext === undefined || sourceModuleContext === undefined
+        ? undefined
+        : {
+            "验证范围": testContext.summary,
+            "执行状态": "未执行；该卡片只读取测试定义，不能据此判定 PASS/FAIL",
+            "本次变化": sourceModuleContext.changeSummary,
+            "依赖与影响": dependencyAndImpact.length > 0
+              ? dependencyAndImpact
+              : "未发现有界的直接依赖或引用",
+            "路径": relativePath,
+          };
+      const configurationFacts = configurationContext === undefined
+        ? undefined
+        : {
+            "配置用途": configurationContext.purpose,
+            "顶层键": configurationContext.parsed
+              ? configurationContext.topLevelKeys.length > 0
+                ? [
+                    ...configurationContext.topLevelKeys,
+                    ...(configurationContext.keyCount > configurationContext.topLevelKeys.length
+                      ? [`另 ${configurationContext.keyCount - configurationContext.topLevelKeys.length} 项`]
+                      : []),
+                  ]
+                : "未声明顶层键"
+              : "JSON 无法安全解析",
+            "披露边界": "只显示键名；配置值和潜在密钥不进入卡片",
+            "格式": "JSON",
+            "路径": relativePath,
+          };
+      const decisionFacts = decisionContext === undefined
+        ? undefined
+        : {
+            "决策": decisionContext.decision ?? markdownContext?.purpose ?? "未提供可提取的 Decision 段落",
+            "状态": decisionContext.status ?? "未明确",
+            "原因": decisionContext.rationale ?? "未提供可提取的 Context/Rationale 段落",
+            "后果": decisionContext.consequences ?? "未提供可提取的 Consequences 段落",
+            "路径": relativePath,
+          };
       return {
         kind: "snapshot",
         snapshot: {
@@ -522,7 +594,7 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
           entityRevision: `sha256:${detailRevision}`,
           observedAt,
           freshness: "current",
-          facts: markdownFacts ?? moduleFacts ?? {
+          facts: decisionFacts ?? verificationFacts ?? configurationFacts ?? markdownFacts ?? moduleFacts ?? {
               path: relativePath,
               name: basename(relativePath),
               ...(preview === undefined ? {} : { preview }),

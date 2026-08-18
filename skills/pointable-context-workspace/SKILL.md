@@ -16,6 +16,9 @@ Manage the private Codex Desktop companion that keeps normal Chat visually uncha
 - Detail is read-only, current, type-specific, and displayed beside the selection.
 - A Markdown document detail prioritizes `用途`, `本次变化`, `影响范围`, `Git 状态`, and `路径`. These fields come from bounded file structure, Git, and literal references, never a model.
 - A TypeScript/JavaScript module detail prioritizes `职责`, `公开入口`, `本次变化`, `依赖与影响`, and `路径`. These fields come from bounded source declarations, static imports, Git, and literal test/importer references; source is never executed.
+- A test/spec source detail prioritizes detected static test titles and always states that the card did not execute the tests. Never translate source presence into PASS/FAIL.
+- A known JSON configuration detail shows purpose and bounded top-level key names only. Never expose configuration values or potential secrets in the card.
+- A path-qualified ADR/decision Markdown detail reads only explicit Status, Decision, Context/Rationale, and Consequences sections.
 - The card is summary-first: facts, revision, observed time, and sources remain inside a collapsed in-card `查看详情` disclosure. Keep type and freshness visible even while collapsed.
 - An open card pins its snapshot. A lightweight file-stat revision probe may show `内容已更新`; only a trusted `刷新内容` click may re-read full detail, update the same card, and expose at most three changed fields. This creates no model call or Chat Turn.
 - If the selected file is deleted or revision status is unavailable, keep the old snapshot visible with an explicit warning. Never silently replace, hide, or relabel it as current.

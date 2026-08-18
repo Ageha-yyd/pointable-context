@@ -255,6 +255,63 @@ test("workspace lookup projects a source module into the five-field code card", 
   }
 });
 
+test("workspace lookup uses scenario-specific summaries without inventing test results or config values", async () => {
+  const item = await fixture();
+  try {
+    await mkdir(join(item.workspace, "test"));
+    await mkdir(join(item.workspace, "docs", "adr"), { recursive: true });
+    await writeFile(
+      join(item.workspace, "test", "refresh.test.ts"),
+      'test("refreshes after a trusted action", () => {});\n',
+      "utf8",
+    );
+    await writeFile(
+      join(item.workspace, "package.json"),
+      JSON.stringify({ name: "hidden-name", scripts: { test: "hidden-command" }, private: true }),
+      "utf8",
+    );
+    await writeFile(
+      join(item.workspace, "docs", "adr", "ADR-007-refresh.md"),
+      "# ADR-007\n## Status\nAccepted\n## Decision\nRefresh only after a trusted action.\n",
+      "utf8",
+    );
+    const activeTask = task();
+    await item.registry.bind(activeTask, item.workspace);
+    const callback = createWorkspaceLookupCallback({ registry: item.registry });
+
+    const verification = await invoke(callback, request(activeTask, "test/refresh.test.ts", {
+      requestId: "request-workspace-verification",
+    }));
+    assert.equal(verification.kind, "detail");
+    if (verification.kind === "detail") {
+      assert.equal(verification.detail.entityType, "verification");
+      assert.match(verification.detail.summary, /refreshes after a trusted action/u);
+      assert.doesNotMatch(verification.detail.summary, /PASS|通过/u);
+    }
+
+    const configuration = await invoke(callback, request(activeTask, "package.json", {
+      requestId: "request-workspace-configuration",
+    }));
+    assert.equal(configuration.kind, "detail");
+    if (configuration.kind === "detail") {
+      assert.equal(configuration.detail.entityType, "configuration");
+      assert.match(configuration.detail.summary, /Node package/u);
+      assert.doesNotMatch(JSON.stringify(configuration.detail), /hidden-name|hidden-command/u);
+    }
+
+    const decision = await invoke(callback, request(activeTask, "docs/adr/ADR-007-refresh.md", {
+      requestId: "request-workspace-decision",
+    }));
+    assert.equal(decision.kind, "detail");
+    if (decision.kind === "detail") {
+      assert.equal(decision.detail.entityType, "decision");
+      assert.equal(decision.detail.summary, "Refresh only after a trusted action.");
+    }
+  } finally {
+    await rm(item.root, { recursive: true, force: true });
+  }
+});
+
 test("workspace candidate references are one-shot and bound to task plus registry revision", async () => {
   const item = await fixture();
   try {

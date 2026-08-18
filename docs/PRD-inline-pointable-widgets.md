@@ -1,7 +1,7 @@
 # PRD：Quiet Context Reveal（选区式上下文速览）
 
-- 版本：v1.6
-- 状态：摘要优先、当前 build 启动兼容性自检与文件 revision 原位刷新切片完成；进入场景摘要验证阶段
+- 版本：v1.7
+- 状态：摘要优先、当前 build 兼容性、文件 revision 原位刷新与首批场景安全投影完成；进入 revision signal 扩展与效率测量准备阶段
 - 日期：2026-08-18
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
@@ -137,7 +137,7 @@ P0 不提供“识别更多概念”、自然语言语义扩展、LLM 候选生�
 
 ### 6.3 架构或产品决策
 
-选中 `ARCH-7` 后，卡片显示：最终决策、原因、替代方案、约束、后果、决定时间和证据。
+选中 path-qualified ADR/Decision Markdown 后，卡片显示：显式 Status、Decision、Context/Rationale、Consequences 和路径。P0 不用模型从普通文档推断“隐含决策”；尚无独立决策文件身份的 `ARCH-7` 仍由 fixture 或未来 Agent-known Provider 承载。
 
 ### 6.4 任务状态
 
@@ -145,9 +145,13 @@ P0 不提供“识别更多概念”、自然语言语义扩展、LLM 候选生�
 
 ### 6.5 验证结果
 
-选中一个稳定验证标识后，卡片显示：验证范围、通过/失败、未覆盖边界、执行时间、代码修订和证据位置，避免把单元测试误读成生产资格化。
+选中 `.test/.spec` 或测试目录下的源码时，当前卡片只显示静态检测到的 `test/it` 标题、源码变化、有限依赖和路径，并固定声明“未执行，不能据此判定 PASS/FAIL”。只有未来接入真实测试运行证据后，稳定验证标识才能显示通过/失败、未覆盖边界、执行时间、代码修订和证据位置。
 
-### 6.6 历史消息漂移
+### 6.6 配置边界
+
+选中 `package.json`、`tsconfig*.json`、`.mcp.json`、Plugin manifest 或显式 `*.config.json` 时，卡片显示配置用途、有限顶层键名、格式和路径。P0 不显示任何配置值，也不解析任意 JSON 数据文件为配置，避免把密钥或业务数据带入 Chat Lane。
+
+### 6.7 历史消息漂移
 
 若消息当时的事实与当前 Provider 快照不同，卡片必须同时表达历史引用身份与当前 revision/freshness，不能静默改写历史含义。
 
@@ -265,6 +269,8 @@ v1.6 首个实现切片把上述原则收窄为可验证的文件语义：
 | 未来测试结果 | PASS/FAIL 与未覆盖边界 | 命令、修订、失败项、证据 |
 | 未来决策/配置 | 决策结果或变化键 | 原因、约束、影响、证据 |
 
+v1.7 已把其中三类收窄为安全、可执行合同：测试源码默认摘要是静态验证范围且明确未执行；已知 JSON 配置默认摘要是用途且永不投影值；path-qualified ADR 默认摘要是显式 Decision 段落。它们不冒充运行结果、解析后有效配置或语义决策图。
+
 场景策略是投影优先级，不是新增 Provider 的理由。没有可靠数据时宁可少显示，也不填充通用字段凑满卡片。
 
 ## 9. P0 功能需求
@@ -295,7 +301,7 @@ v1.6 首个实现切片把上述原则收窄为可验证的文件语义：
 
 ### P0-7 Type-specific projection
 
-Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知类型使用保守通用投影。
+Artifact、Module、Verification Source、Configuration、Decision 使用不同字段优先级。测试源码不得推断 PASS/FAIL，配置不得投影值，Decision 只消费 path-qualified Markdown 的显式章节。未知类型使用保守通用投影。
 
 ### P0-8 Zero-turn native detail
 
@@ -402,6 +408,9 @@ Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知�
 - [ ] 产品不存在“识别更多概念”模型分支；
 - [ ] Markdown 用途、变化章节和引用位置均来自有界本地解析/Git，不调用模型；
 - [ ] Source Module 的职责、exports、diff 声明、imports 和测试/引用位置均来自有界本地解析/Git，不执行源码、不调用模型；
+- [ ] Test/Spec 源码只显示静态标题和“未执行”边界，不推断 PASS/FAIL；
+- [ ] 已知 JSON 配置只显示用途与有限键名，配置值和潜在密钥不进入卡片；
+- [ ] ADR/Decision 只从 path-qualified Markdown 的显式章节读取；
 - [ ] opaque ref 绑定完整 context 和对象身份；
 - [ ] 点击后读取当前 authoritative snapshot；
 - [ ] index/provider/context 漂移 fail closed；
@@ -444,6 +453,9 @@ Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知�
 - fixture 与显式绑定 workspace 的只读 Provider；
 - Markdown Artifact Context Extractor：用途、变化章节、确定性引用、Git 状态和路径；
 - Source Module Context Extractor：职责、公开入口、变化声明、直接依赖、测试/引用关联和路径；
+- Test Definition 投影：静态 `test/it` 标题、未执行边界、源码变化和有限依赖；
+- Known JSON Configuration 投影：用途、有限顶层键名、零值披露和路径；
+- Path-qualified ADR 投影：显式状态、决策、原因、后果和路径；
 - 摘要优先的卡内 progressive disclosure：默认隐藏事实/元数据/来源，保留类型与 freshness；
 - Artifact、Module/Concept、Decision/Task 类型化详情；
 - 来源、修订、新鲜度、观察时间和文本 fallback；
@@ -454,7 +466,8 @@ Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知�
 
 仍缺：
 
-- 让当前 workspace 文件之外的 Module/Decision/Task 获得可靠 Provider；
+- 让当前 workspace 文件之外的 Agent-known Module/Decision/Task 获得可靠 Provider；
+- 接入真实测试运行证据；测试源码卡本身永远不能替代运行结果；
 - 把 Agent 工作结果增量写入轻量 Context Index；
 - 证明不同 Codex Desktop 版本中的 Host Adapter 兼容性；
 - 扩展 revision contract 以覆盖只有 Git 状态或外部引用关系变化、而源文件 stat 未变化的场景；
@@ -465,8 +478,8 @@ Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知�
 1. 已完成摘要态、卡内展开/收起和关闭的当前 Codex Desktop 人工验收；
 2. 已完成当前 build 的四层启动兼容性自检与失败降级；
 3. 已完成首个文件 revision 失效提示、显式零-turn 刷新、有限差异和真实 Edge 零-turn 验收；
-4. 下一步用模块、文档、测试、决策/配置场景验证默认摘要是否命中重点；
-5. 随后扩展必要的 revision signal，再开展 A/B 效率研究并决定是否扩展 Provider。
+4. 已完成文档、模块、测试源码、已知 JSON 配置与 path-qualified ADR 的摘要策略和真实仓库 Provider 验证；
+5. 下一步扩展必要的 revision signal，再准备 A/B 效率研究并决定是否接入真实测试运行与 Agent-known Provider。
 
 ## 17. 已冻结决策
 
@@ -483,6 +496,7 @@ Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知�
 
 ## 18. 变更记录
 
+- v1.7：加入安全的场景摘要切片：测试源码只显示静态测试标题并明确未执行，已知 JSON 配置只显示用途和键名，path-qualified ADR 只读取显式决策章节；用当前仓库文档、模块、测试和配置做 Provider 实测，避免通用五字段堆叠。
 - v1.6：为打开的文件卡片增加绑定上下文的短期 detail ref、轻量 stat revision 探测、`内容已更新` 提示、可信显式原位刷新与最多 3 项差异；删除/不可用保留旧快照，过期、重绑定和容量耗尽 fail closed；真实 Edge 验收确认该路径零 Chat Turn。
 - v1.5：为 workspace companion 增加 `qualified/unavailable/incompatible/unchecked` 四态兼容性自检；按精确主目标、主 frame、默认主 execution context 与 renderer lifecycle fail closed，并明确启动检查不替代人工交互门禁。
 - v1.4：把五项事实从默认首屏改为卡内渐进披露；默认只保留场景摘要、类型和 freshness；冻结新增 Extractor，优先解决动态 revision 语义、场景信息优先级和 Codex Desktop 兼容性。
