@@ -27,7 +27,7 @@ Inline MCP App work is tracked as a separate host gate. It must not be inferred 
 ## Qualification evidence
 
 - `pnpm run check`: pass.
-- `pnpm test`: `204 / 204 PASS` after the v1.7 scenario-summary increment, including packaged-layout start, deterministic Markdown/source/test/config/ADR parsing, Git enrichment, bounded revision probes, pinned detail references, finite diffs, product-direction freeze, renderer contracts, and compatibility-state classification.
+- `pnpm test`: `205 / 205 PASS` after the v1.8 evaluation-boundary increment, including packaged-layout start, deterministic Markdown/source/test/config/ADR parsing, Git enrichment, bounded revision probes, pinned detail references, finite diffs, evaluation overclaim guards, renderer contracts, and compatibility-state classification.
 - `pnpm run test:host-browser`: three consecutive real Edge headless passes; trusted drag → compact detail; background file revision drift → `内容已更新`; trusted refresh → same-card replacement with a finite diff and zero Chat Turn; detail body initially has zero layout height; trusted in-card disclosure expands in place; close clears native selection and prevents remount after 250 ms. The script waits for card reposition paint boundaries so trusted pointer coordinates cannot race layout.
 - Real repository Artifact probe: `docs/PRD-inline-pointable-widgets.md` returned purpose, current changed sections, three bounded literal references, Git status, and relative path in 128 ms total on the qualified machine (16 ms index + 112 ms detail). This is one local probe, not a population latency claim.
 - Real repository Source Module probe: `src/adapters/local-workspace.ts` returned responsibility, public exports, changed declarations, prioritized local dependencies, test/importer references, and relative path in 140 ms total on the qualified machine (14 ms index + 126 ms detail). This is one local probe, not a population latency claim.
@@ -61,6 +61,12 @@ This first revision gate covers selected source-file stat changes. It does not y
 The current repository was read through the live local-workspace Provider for one document, module, test source, and JSON configuration. The document prioritized product purpose, the module prioritized responsibility and callers/tests, the test source prioritized eight detected static test titles with an explicit `not executed` boundary, and `package.json` exposed only purpose plus bounded key names. A path-qualified ADR fixture separately verified explicit Status/Decision/Context/Consequences extraction. No model ran, no source executed, and configuration values were absent from the projection.
 
 This gate validates card relevance and disclosure boundaries, not semantic completeness. Test source is not test-run evidence, JSON keys are not resolved runtime configuration, literal references are not a call graph, and ADR extraction does not infer decisions from arbitrary prose.
+
+## Technical latency baseline (v1.8)
+
+The isolated workspace benchmark ran 20 exact lookups for each of document, module, test source, configuration, and ADR. The recorded baseline medians ranged from 3.22 ms to 40.71 ms, unchanged revision checks had a 1.74 ms median, and one explicit refresh took 43.47 ms. The repeat run also stayed below the 500 ms median component target. The harness invokes no model and creates no Chat Turn.
+
+These are `technical_latency_only` results. They do not demonstrate lower human `time_to_verified_fact`, higher comprehension, or statistical significance; those claims remain gated on the counterbalanced participant protocol in `docs/evaluation-protocol.md`.
 
 ## Unsupported or unqualified
 

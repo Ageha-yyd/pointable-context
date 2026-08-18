@@ -7,7 +7,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v1.7 keeps Quiet Context Reveal and adds safe scenario-specific summaries", async () => {
+test("v1.8 keeps Quiet Context Reveal and freezes the measurement boundary", async () => {
   const [prd, readme, mainSkill, workspaceSkill] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -15,7 +15,7 @@ test("v1.7 keeps Quiet Context Reveal and adds safe scenario-specific summaries"
     text("skills/pointable-context-workspace/SKILL.md"),
   ]);
 
-  assert.match(prd, /版本：v1\.7/u);
+  assert.match(prd, /版本：v1\.8/u);
   assert.match(prd, /默认可视入口是用户选区后的轻量按钮/u);
   assert.match(prd, /selection 本身不读取详情、不调用模型/u);
   assert.match(prd, /产品不存在“识别更多概念”模型分支/u);
@@ -29,6 +29,8 @@ test("v1.7 keeps Quiet Context Reveal and adds safe scenario-specific summaries"
   assert.match(prd, /私有 Host Adapter 的兼容性优先级高于继续增加对象类型/u);
   assert.match(prd, /`qualified`：四层全部通过/u);
   assert.match(prd, /启动自检只能证明可安装性，不能替代每个 build 的真实 selection/u);
+  assert.match(prd, /自动延迟基准始终标记 `technical_latency_only`/u);
+  assert.match(prd, /不证明人的 `time_to_verified_fact` 已下降/u);
 
   assert.match(readme, /primary interaction is \*\*Quiet Context Reveal\*\*/u);
   assert.match(readme, /no "identify more concepts" or semantic-model branch/u);

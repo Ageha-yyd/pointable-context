@@ -1,7 +1,7 @@
 # PRD：Quiet Context Reveal（选区式上下文速览）
 
-- 版本：v1.7
-- 状态：摘要优先、当前 build 兼容性、文件 revision 原位刷新与首批场景安全投影完成；进入 revision signal 扩展与效率测量准备阶段
+- 版本：v1.8
+- 状态：摘要优先、当前 build 兼容性、文件 revision 原位刷新、首批场景安全投影与技术基准/人工实验协议完成；正式用户效率实验待执行
 - 日期：2026-08-18
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
@@ -387,6 +387,14 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 
 这些是实验目标，正式用户研究前不得写成已证明结果。
 
+### 12.4 技术延迟基准不是用户效率
+
+自动基准只测 trusted action 之后的确定性 resolution、Provider read、revision check 和 explicit refresh，固定输出 `technical_latency_only`。它不调用模型、不创建 Chat Turn，也不把点击卡片当作任务完成。
+
+2026-08-18 首个隔离工作区基准对 document/module/test-source/configuration/decision 各运行 20 次，exact-detail median 为 3.22–40.71 ms，unchanged revision check median 为 1.74 ms，explicit refresh 为 43.47 ms，达到本机 `<500 ms median` 技术目标。这只证明当前机器和 fixture 的组件延迟，不证明人的 `time_to_verified_fact` 已下降。
+
+人工 A/B 必须采用相同 transcript、相同项目状态和冻结答案键，以最终正确事实提交为终点，同时记录 accuracy、Chat Turn、lane leave、wrong entity、card sufficiency 和 selection interference。协议见 `docs/evaluation-protocol.md`。
+
 ## 13. P0 验收门禁
 
 ### 13.1 交互门禁
@@ -425,6 +433,8 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 - [ ] 分开测试事实点查和开放式解释；
 - [ ] 同时报告速度、正确率、误触和 stale/error；
 - [ ] 未完成正式实验前不声称“显著提升”。
+- [ ] 自动延迟基准始终标记 `technical_latency_only`，不冒充 `time_to_verified_fact`；
+- [ ] A/B 两条件使用相同 transcript、项目状态和事实答案键；
 
 ## 14. 现有实现复用矩阵
 
@@ -463,6 +473,7 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 - 现有 MCP App 胶囊零 `ui/message`、零浏览器导航。
 - 文件卡片的 pinned snapshot、轻量 stat revision 探测、`内容已更新` 提示、显式原位刷新和最多 3 项差异；
 - revision detail ref 的过期、task 重绑定、context 与容量 fail-closed 约束；
+- 无后台遥测的可重复技术延迟基准，以及 counterbalanced 人工 A/B 协议；
 
 仍缺：
 
@@ -479,7 +490,7 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 2. 已完成当前 build 的四层启动兼容性自检与失败降级；
 3. 已完成首个文件 revision 失效提示、显式零-turn 刷新、有限差异和真实 Edge 零-turn 验收；
 4. 已完成文档、模块、测试源码、已知 JSON 配置与 path-qualified ADR 的摘要策略和真实仓库 Provider 验证；
-5. 下一步扩展必要的 revision signal，再准备 A/B 效率研究并决定是否接入真实测试运行与 Agent-known Provider。
+5. 已完成隔离技术延迟基准和人工 A/B 协议；下一步先做非推断性的可用性 pilot，再基于真实错误与方差决定 revision signal、测试运行证据或 Agent-known Provider 的扩展优先级。
 
 ## 17. 已冻结决策
 
@@ -496,6 +507,7 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 
 ## 18. 变更记录
 
+- v1.8：把技术响应速度与人的信息获取效率拆开；加入无模型、零 Chat Turn 的可重复 workspace latency benchmark、首个本机基线和 counterbalanced A/B 协议，明确自动 benchmark 不得冒充 `time_to_verified_fact` 或显著性证据。
 - v1.7：加入安全的场景摘要切片：测试源码只显示静态测试标题并明确未执行，已知 JSON 配置只显示用途和键名，path-qualified ADR 只读取显式决策章节；用当前仓库文档、模块、测试和配置做 Provider 实测，避免通用五字段堆叠。
 - v1.6：为打开的文件卡片增加绑定上下文的短期 detail ref、轻量 stat revision 探测、`内容已更新` 提示、可信显式原位刷新与最多 3 项差异；删除/不可用保留旧快照，过期、重绑定和容量耗尽 fail closed；真实 Edge 验收确认该路径零 Chat Turn。
 - v1.5：为 workspace companion 增加 `qualified/unavailable/incompatible/unchecked` 四态兼容性自检；按精确主目标、主 frame、默认主 execution context 与 renderer lifecycle fail closed，并明确启动检查不替代人工交互门禁。

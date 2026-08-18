@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "kind": "technical_latency_only",
+  "machineTime": "2026-08-18T10:12:29.759Z",
+  "runsPerExactScenario": 20,
+  "target": {
+    "exactDetailMedianMs": 500
+  },
+  "targetMet": true,
+  "results": {
+    "document": { "runs": 20, "medianMs": 40.71, "p95Ms": 54.82, "minMs": 37.31, "maxMs": 83.67 },
+    "module": { "runs": 20, "medianMs": 40.1, "p95Ms": 48.72, "minMs": 34.98, "maxMs": 60.76 },
+    "verification_source": { "runs": 20, "medianMs": 37.53, "p95Ms": 45.62, "minMs": 35.36, "maxMs": 54.01 },
+    "configuration": { "runs": 20, "medianMs": 3.22, "p95Ms": 3.6, "minMs": 2.68, "maxMs": 3.76 },
+    "decision": { "runs": 20, "medianMs": 39.38, "p95Ms": 47.9, "minMs": 37.19, "maxMs": 48.4 },
+    "revision_check_unchanged": { "runs": 20, "medianMs": 1.74, "p95Ms": 2.26, "minMs": 1.32, "maxMs": 2.53 }
+  },
+  "changedRevisionCheckMs": 2.28,
+  "explicitRefreshMs": 43.47,
+  "refreshDiffCount": 2,
+  "modelCalls": 0,
+  "chatTurnsCreated": 0,
+  "caveat": "This is component latency, not human time_to_verified_fact."
+}

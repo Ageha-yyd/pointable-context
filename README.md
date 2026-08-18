@@ -91,6 +91,10 @@ The workspace companion now reports one explicit private-host compatibility stat
 
 Only `qualified` permits the current runtime to be described as attached. `unavailable` and `incompatible` leave the Chat Lane unchanged and expose a bounded diagnostic code. This startup check does not replace the per-build manual selection, disclosure, close, focus, navigation, and virtualization gate.
 
+## Evaluation boundary
+
+`pnpm run benchmark:workspace` measures deterministic component latency in an isolated temporary workspace. It explicitly reports `technical_latency_only`, invokes no model, and creates no Chat Turn. The first recorded local medians were below the 500 ms component target, but this is not evidence that people understand a project faster. Human `time_to_verified_fact`, answer accuracy, lane-leave rate, and Chat Turn reduction must be measured with the counterbalanced protocol in [docs/evaluation-protocol.md](docs/evaluation-protocol.md).
+
 ## Reused foundations
 
 - Pure pre-click eligibility with no project-data request.

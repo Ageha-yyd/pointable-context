@@ -23,6 +23,7 @@
     "test:host-browser": "node scripts/renderer-close-headless-acceptance.mjs",
     "test:widget-browser": "node scripts/mcp-widget-browser-acceptance.mjs",
     "test:conversation-browser": "node scripts/conversation-client-browser-acceptance.mjs",
+    "benchmark:workspace": "pnpm run build:ts && node scripts/workspace-lookup-benchmark.mjs",
     "probe:app-server-referent": "node scripts/probe-app-server-referent.mjs",
     "probe:app-server-conversation": "node scripts/probe-app-server-conversation.mjs",
     "client:app-server": "node dist/src/app-server/conversation-cli.js --workspace-root .",
