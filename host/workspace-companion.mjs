@@ -965,6 +965,8 @@ function validateDetail(value) {
     "freshness",
     "facts",
     "sources",
+    "humanSummary",
+    "comprehension",
     "detailRef",
     "changes"
   ])) {
@@ -979,7 +981,7 @@ function validateDetail(value) {
       "detail freshness is invalid"
     );
   }
-  if (!boundedString(value.observedAt, 20, 64) || !Number.isFinite(Date.parse(value.observedAt)) || !Array.isArray(value.facts) || value.facts.length > 5 || !Array.isArray(value.sources) || value.sources.length > 5 || value.detailRef !== void 0 && !boundedString(value.detailRef, 8, 256) || value.changes !== void 0 && (!Array.isArray(value.changes) || value.changes.length > 3)) {
+  if (!boundedString(value.observedAt, 20, 64) || !Number.isFinite(Date.parse(value.observedAt)) || !Array.isArray(value.facts) || value.facts.length > 5 || !Array.isArray(value.sources) || value.sources.length > 5 || value.humanSummary !== void 0 && !boundedString(value.humanSummary, 1, 1024) || value.detailRef !== void 0 && !boundedString(value.detailRef, 8, 256) || value.changes !== void 0 && (!Array.isArray(value.changes) || value.changes.length > 3)) {
     throw new PointableProtocolError(
       "invalid_lookup_result",
       "detail metadata exceeds its contract"
@@ -1006,6 +1008,42 @@ function validateDetail(value) {
     }
     return { label: requiredString(source.label, "source label", 512) };
   });
+  let comprehension;
+  if (value.comprehension !== void 0) {
+    const view = value.comprehension;
+    if (!record2(view) || !exactKeys2(view, [
+      "kind",
+      "meaning",
+      "context",
+      "boundary",
+      "sequence",
+      "currentStep",
+      "evidence"
+    ]) || view.kind !== "concept" || !boundedString(view.meaning, 1, 1024) || !boundedString(view.context, 1, 1024) || !boundedString(view.boundary, 1, 1024) || !Array.isArray(view.sequence) || view.sequence.length < 2 || view.sequence.length > 4 || !view.sequence.every((item) => boundedString(item, 1, 256)) || !Number.isSafeInteger(view.currentStep) || Number(view.currentStep) < 0 || Number(view.currentStep) >= view.sequence.length || !Array.isArray(view.evidence) || view.evidence.length < 1 || view.evidence.length > 3) {
+      throw new PointableProtocolError(
+        "invalid_lookup_result",
+        "detail comprehension view is invalid"
+      );
+    }
+    const evidence = view.evidence.map((item) => {
+      if (!record2(item) || !exactKeys2(item, ["excerpt", "source"]) || !boundedString(item.excerpt, 1, 1024) || !boundedString(item.source, 1, 512)) {
+        throw new PointableProtocolError(
+          "invalid_lookup_result",
+          "detail evidence is invalid"
+        );
+      }
+      return { excerpt: item.excerpt, source: item.source };
+    });
+    comprehension = {
+      kind: "concept",
+      meaning: view.meaning,
+      context: view.context,
+      boundary: view.boundary,
+      sequence: [...view.sequence],
+      currentStep: Number(view.currentStep),
+      evidence
+    };
+  }
   const changes = value.changes === void 0 ? void 0 : value.changes.map((change) => {
     if (!record2(change) || !exactKeys2(change, ["label", "before", "after"])) {
       throw new PointableProtocolError(
@@ -1029,6 +1067,8 @@ function validateDetail(value) {
     freshness: value.freshness,
     facts,
     sources,
+    ...typeof value.humanSummary === "string" ? { humanSummary: value.humanSummary } : {},
+    ...comprehension === void 0 ? {} : { comprehension },
     ...typeof value.detailRef === "string" ? { detailRef: value.detailRef } : {},
     ...changes === void 0 ? {} : { changes }
   };
@@ -1143,6 +1183,16 @@ function validatePointableRendererResponse(value) {
   const factView = (candidate) => isRecord(candidate) && exact(candidate, ["label", "value"]) && bounded(candidate.label, 1, 128) && bounded(candidate.value, 1, 1024);
   const sourceView = (candidate) => isRecord(candidate) && exact(candidate, ["label"]) && bounded(candidate.label, 1, 512);
   const changeView = (candidate) => isRecord(candidate) && exact(candidate, ["label", "before", "after"]) && bounded(candidate.label, 1, 128) && bounded(candidate.before, 1, 1024) && bounded(candidate.after, 1, 1024);
+  const evidenceView = (candidate) => isRecord(candidate) && exact(candidate, ["excerpt", "source"]) && bounded(candidate.excerpt, 1, 1024) && bounded(candidate.source, 1, 512);
+  const comprehensionView = (candidate) => isRecord(candidate) && exact(candidate, [
+    "kind",
+    "meaning",
+    "context",
+    "boundary",
+    "sequence",
+    "currentStep",
+    "evidence"
+  ]) && candidate.kind === "concept" && bounded(candidate.meaning, 1, 1024) && bounded(candidate.context, 1, 1024) && bounded(candidate.boundary, 1, 1024) && Array.isArray(candidate.sequence) && candidate.sequence.length >= 2 && candidate.sequence.length <= 4 && candidate.sequence.every((item) => bounded(item, 1, 256)) && Number.isSafeInteger(candidate.currentStep) && Number(candidate.currentStep) >= 0 && Number(candidate.currentStep) < candidate.sequence.length && Array.isArray(candidate.evidence) && candidate.evidence.length >= 1 && candidate.evidence.length <= 3 && candidate.evidence.every(evidenceView);
   if (!isRecord(value) || !exact(value, [
     "schemaVersion",
     "kind",
@@ -1171,9 +1221,11 @@ function validatePointableRendererResponse(value) {
       "freshness",
       "facts",
       "sources",
+      "humanSummary",
+      "comprehension",
       "detailRef",
       "changes"
-    ]) || !bounded(detail.entityId, 1, 256) || !bounded(detail.entityType, 1, 128) || !bounded(detail.label, 1, 256) || !bounded(detail.summary, 1, 1024) || !bounded(detail.revision, 1, 512) || !bounded(detail.observedAt, 20, 64) || !Number.isFinite(Date.parse(detail.observedAt)) || detail.freshness !== "current" && detail.freshness !== "stale" && detail.freshness !== "partial" && detail.freshness !== "unknown" || !Array.isArray(detail.facts) || detail.facts.length > 5 || !detail.facts.every(factView) || !Array.isArray(detail.sources) || detail.sources.length > 5 || !detail.sources.every(sourceView) || detail.detailRef !== void 0 && !bounded(detail.detailRef, 8, 256) || detail.changes !== void 0 && (!Array.isArray(detail.changes) || detail.changes.length > 3 || !detail.changes.every(changeView))) {
+    ]) || !bounded(detail.entityId, 1, 256) || !bounded(detail.entityType, 1, 128) || !bounded(detail.label, 1, 256) || !bounded(detail.summary, 1, 1024) || !bounded(detail.revision, 1, 512) || !bounded(detail.observedAt, 20, 64) || !Number.isFinite(Date.parse(detail.observedAt)) || detail.freshness !== "current" && detail.freshness !== "stale" && detail.freshness !== "partial" && detail.freshness !== "unknown" || !Array.isArray(detail.facts) || detail.facts.length > 5 || !detail.facts.every(factView) || !Array.isArray(detail.sources) || detail.sources.length > 5 || !detail.sources.every(sourceView) || detail.humanSummary !== void 0 && !bounded(detail.humanSummary, 1, 1024) || detail.comprehension !== void 0 && !comprehensionView(detail.comprehension) || detail.detailRef !== void 0 && !bounded(detail.detailRef, 8, 256) || detail.changes !== void 0 && (!Array.isArray(detail.changes) || detail.changes.length > 3 || !detail.changes.every(changeView))) {
       return void 0;
     }
   } else if (presentation.kind === "revision") {
@@ -1205,6 +1257,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     throw new Error("pointable_renderer_revision_interval_invalid");
   }
   const actionLabel = typeof config.actionLabel === "string" && config.actionLabel.trim().length > 0 && config.actionLabel.length <= 64 ? config.actionLabel.trim() : "\u67E5\u770B\u4E0A\u4E0B\u6587";
+  const presentationMode = config.presentationMode === "narrative" || config.presentationMode === "mental-model" || config.presentationMode === "record" ? config.presentationMode : "record";
   const existing = window[namespace];
   if (typeof existing === "object" && existing !== null && "status" in existing && typeof existing.status === "function") {
     const existingApi = existing;
@@ -1596,6 +1649,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     shell.setAttribute("aria-labelledby", `${shell.id}-title`);
     shell.setAttribute("data-pointable-context-owned", lifecycleId);
     shell.setAttribute("data-pointable-context-role", "card");
+    shell.setAttribute("data-pointable-context-presentation", presentationMode);
     Object.assign(shell.style, {
       position: "fixed",
       zIndex: "2147482999",
@@ -1811,11 +1865,151 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     else shell.insertBefore(notice, header?.nextSibling ?? shell.firstChild);
     reposition();
   }
+  function mountConceptComprehension(body, model) {
+    const surface = document.createElement("div");
+    surface.setAttribute("data-pointable-context-role", "comprehension-model");
+    surface.setAttribute("data-pointable-context-kind", model.kind);
+    surface.append(paragraph(model.meaning));
+    const context = document.createElement("div");
+    context.setAttribute("data-pointable-context-role", "comprehension-context");
+    Object.assign(context.style, {
+      marginTop: "10px",
+      padding: "8px 10px",
+      borderLeft: "3px solid #8ba8ff",
+      borderRadius: "0 8px 8px 0",
+      background: "#f7f9ff"
+    });
+    const contextLabel = document.createElement("strong");
+    contextLabel.textContent = "\u4E3A\u4EC0\u4E48\u73B0\u5728\u51FA\u73B0";
+    Object.assign(contextLabel.style, {
+      display: "block",
+      marginBottom: "3px",
+      color: "#334155",
+      fontSize: "12px"
+    });
+    const contextText = paragraph(model.context, true);
+    context.append(contextLabel, contextText);
+    surface.append(context);
+    const flow = document.createElement("div");
+    flow.setAttribute("data-pointable-context-role", "comprehension-flow");
+    Object.assign(flow.style, { marginTop: "12px" });
+    const flowLabel = document.createElement("strong");
+    flowLabel.textContent = "\u4F60\u73B0\u5728\u4F4D\u4E8E\u8FD9\u91CC";
+    Object.assign(flowLabel.style, {
+      display: "block",
+      marginBottom: "6px",
+      color: "#334155",
+      fontSize: "12px"
+    });
+    flow.append(flowLabel);
+    for (let index = 0; index < model.sequence.length; index += 1) {
+      const step = document.createElement("div");
+      const current = index === model.currentStep;
+      step.setAttribute("data-pointable-context-role", "comprehension-step");
+      step.setAttribute("data-pointable-context-current", String(current));
+      step.textContent = `${current ? "\u5F53\u524D \xB7 " : ""}${model.sequence[index] ?? ""}`;
+      Object.assign(step.style, {
+        padding: "6px 9px",
+        border: current ? "1px solid #7798ff" : "1px solid #dce3ee",
+        borderRadius: "8px",
+        background: current ? "#edf2ff" : "#ffffff",
+        color: current ? "#1746c7" : "#52627a",
+        fontWeight: current ? "700" : "500",
+        fontSize: "12px"
+      });
+      flow.append(step);
+      if (index < model.sequence.length - 1) {
+        const arrow = document.createElement("div");
+        arrow.textContent = "\u2193";
+        arrow.setAttribute("aria-hidden", "true");
+        Object.assign(arrow.style, {
+          height: "16px",
+          color: "#94a3b8",
+          textAlign: "center",
+          lineHeight: "16px"
+        });
+        flow.append(arrow);
+      }
+    }
+    surface.append(flow);
+    const boundary = document.createElement("div");
+    boundary.setAttribute("data-pointable-context-role", "comprehension-boundary");
+    Object.assign(boundary.style, {
+      marginTop: "12px",
+      padding: "8px 10px",
+      borderRadius: "8px",
+      background: "#fff7ed",
+      color: "#8a4b00",
+      fontSize: "12px"
+    });
+    const boundaryLabel = document.createElement("strong");
+    boundaryLabel.textContent = "\u4E0D\u4F1A\u8BC1\u660E\uFF1A";
+    const boundaryText = document.createElement("span");
+    boundaryText.textContent = model.boundary;
+    boundary.append(boundaryLabel, boundaryText);
+    surface.append(boundary);
+    const evidenceDisclosure = document.createElement("div");
+    evidenceDisclosure.setAttribute("data-pointable-context-role", "evidence-disclosure");
+    Object.assign(evidenceDisclosure.style, { marginTop: "8px" });
+    const evidenceToggle = document.createElement("button");
+    evidenceToggle.type = "button";
+    evidenceToggle.textContent = "\u4E3A\u4EC0\u4E48\u8FD9\u6837\u8BF4";
+    evidenceToggle.setAttribute("aria-expanded", "false");
+    evidenceToggle.setAttribute("data-pointable-context-role", "evidence-toggle");
+    Object.assign(evidenceToggle.style, {
+      border: "0",
+      background: "transparent",
+      color: "#52627a",
+      cursor: "pointer",
+      padding: "2px 0",
+      fontSize: "12px",
+      fontWeight: "600"
+    });
+    const evidenceBody = document.createElement("div");
+    evidenceBody.id = `${cardElement?.id ?? cardIdBase}-evidence-body`;
+    evidenceBody.hidden = true;
+    evidenceBody.style.display = "none";
+    evidenceBody.setAttribute("data-pointable-context-role", "evidence-body");
+    evidenceToggle.setAttribute("aria-controls", evidenceBody.id);
+    for (const item of model.evidence) {
+      const quote = document.createElement("blockquote");
+      quote.textContent = item.excerpt;
+      Object.assign(quote.style, {
+        margin: "8px 0 0",
+        padding: "7px 9px",
+        borderLeft: "3px solid #cbd5e1",
+        color: "#475569",
+        fontSize: "11px"
+      });
+      const source = paragraph(item.source, true);
+      Object.assign(source.style, { marginTop: "4px", fontSize: "11px" });
+      evidenceBody.append(quote, source);
+    }
+    evidenceToggle.addEventListener("click", (event) => {
+      if (!event.isTrusted) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const expanded = evidenceToggle.getAttribute("aria-expanded") !== "true";
+      evidenceToggle.setAttribute("aria-expanded", String(expanded));
+      evidenceBody.hidden = !expanded;
+      evidenceBody.style.display = expanded ? "block" : "none";
+      evidenceToggle.textContent = expanded ? "\u6536\u8D77\u4F9D\u636E" : "\u4E3A\u4EC0\u4E48\u8FD9\u6837\u8BF4";
+      reposition();
+    });
+    evidenceDisclosure.append(evidenceToggle, evidenceBody);
+    surface.append(evidenceDisclosure);
+    body.append(surface);
+  }
   function mountDetail(detail) {
     clearRevisionTimer();
     state = "detail";
     const { body } = createShell(detail.label);
-    body.append(paragraph(detail.summary));
+    if (presentationMode === "mental-model" && detail.comprehension !== void 0) {
+      mountConceptComprehension(body, detail.comprehension);
+    } else {
+      const summary = presentationMode === "record" ? detail.summary : detail.humanSummary ?? detail.summary;
+      body.append(paragraph(summary));
+    }
     if (detail.changes !== void 0 && detail.changes.length > 0) {
       const changeSummary = document.createElement("div");
       changeSummary.setAttribute("data-pointable-context-role", "revision-changes");
@@ -2834,6 +3028,7 @@ var CodexCdpHostAdapter = class {
   #lookupTimeoutMs;
   #maxConcurrentLookupsPerTarget;
   #actionLabel;
+  #presentationMode;
   #attachments = /* @__PURE__ */ new Map();
   #attaching = /* @__PURE__ */ new Set();
   #recoveries = /* @__PURE__ */ new Set();
@@ -2851,6 +3046,10 @@ var CodexCdpHostAdapter = class {
     this.#lookupTimeoutMs = options.lookupTimeoutMs ?? 5e3;
     this.#maxConcurrentLookupsPerTarget = options.maxConcurrentLookupsPerTarget ?? 8;
     this.#actionLabel = options.actionLabel;
+    this.#presentationMode = options.presentationMode;
+    if (this.#presentationMode !== void 0 && this.#presentationMode !== "record" && this.#presentationMode !== "narrative" && this.#presentationMode !== "mental-model") {
+      throw new RangeError("presentationMode is invalid");
+    }
     if (!Number.isSafeInteger(this.#lookupTimeoutMs) || this.#lookupTimeoutMs < 100 || this.#lookupTimeoutMs > 3e4) {
       throw new RangeError("lookupTimeoutMs must be an integer from 100 to 30000");
     }
@@ -3039,7 +3238,8 @@ var CodexCdpHostAdapter = class {
       const rendererConfig = {
         bindingName,
         requestTimeoutMs: this.#lookupTimeoutMs,
-        ...this.#actionLabel === void 0 ? {} : { actionLabel: this.#actionLabel }
+        ...this.#actionLabel === void 0 ? {} : { actionLabel: this.#actionLabel },
+        ...this.#presentationMode === void 0 ? {} : { presentationMode: this.#presentationMode }
       };
       const installed = await connection.send("Runtime.evaluate", {
         expression: createInstallPointableRendererExpression(rendererConfig),
@@ -3312,10 +3512,10 @@ var CodexCdpHostAdapter = class {
 };
 
 // src/host/codex-cdp/workspace-lookup.ts
-import { createHash as createHash6, randomBytes as randomBytes3 } from "node:crypto";
+import { createHash as createHash7, randomBytes as randomBytes3 } from "node:crypto";
 
 // src/adapters/local-workspace.ts
-import { createHash as createHash5 } from "node:crypto";
+import { createHash as createHash6 } from "node:crypto";
 import { open, readdir, realpath as realpath2, stat as stat2 } from "node:fs/promises";
 import {
   basename as basename3,
@@ -3553,9 +3753,100 @@ ${staged.kind === "ok" ? staged.stdout : ""}`;
   });
 }
 
+// src/adapters/context-concept.ts
+import { createHash as createHash4 } from "node:crypto";
+var MAX_FIELD_CHARS = 1024;
+var MAX_SEQUENCE_ITEMS = 4;
+var MAX_SOURCE_PATH_CHARS = 480;
+function boundedText2(value, maximum = MAX_FIELD_CHARS) {
+  const compact2 = value.replace(/[\p{Cc}\p{Cf}]+/gu, " ").replace(/\s+/gu, " ").trim();
+  if (compact2.length === 0) return void 0;
+  return compact2.length <= maximum ? compact2 : `${compact2.slice(0, maximum - 1)}\u2026`;
+}
+function sectionText(lines) {
+  return boundedText2(
+    lines.filter((line) => line.trim().length > 0).map((line) => line.replace(/^>\s?/u, "").trim()).join(" ")
+  );
+}
+function sourceReference(value) {
+  const compact2 = value.trim().replace(/\\/gu, "/");
+  const match = /^([^:\r\n]{1,480}):(\d{1,6})$/u.exec(compact2);
+  if (match === null) return void 0;
+  const sourcePath = match[1];
+  const sourceLine = Number(match[2]);
+  if (sourcePath === void 0 || sourcePath.length > MAX_SOURCE_PATH_CHARS || sourcePath.startsWith("/") || sourcePath.split("/").includes("..") || !Number.isSafeInteger(sourceLine) || sourceLine < 1) {
+    return void 0;
+  }
+  return { sourcePath, sourceLine };
+}
+function contextConceptDocumentPath(relativePath) {
+  const portable2 = relativePath.replace(/\\/gu, "/");
+  return /(?:^|\/)docs\/concepts\/[^/]+\.md$/iu.test(portable2);
+}
+function extractContextConceptArtifact(content) {
+  const lines = content.replace(/\r\n?/gu, "\n").split("\n");
+  const sections = /* @__PURE__ */ new Map();
+  let title;
+  let activeSection;
+  let inFence = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (/^(?:```|~~~)/u.test(trimmed)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const heading = /^(#{1,2})[ \t]+(.+?)\s*$/u.exec(line);
+    if (heading !== null) {
+      const label = boundedText2(heading[2] ?? "", 128);
+      if (heading[1] === "#" && title === void 0) title = label;
+      activeSection = heading[1] === "##" ? label : void 0;
+      if (activeSection !== void 0 && !sections.has(activeSection)) {
+        sections.set(activeSection, []);
+      }
+      continue;
+    }
+    if (activeSection !== void 0) sections.get(activeSection)?.push(line);
+  }
+  const meaning = sectionText(sections.get("\u5B83\u662F\u4EC0\u4E48\u610F\u601D") ?? []);
+  const currentContext = sectionText(sections.get("\u4E3A\u4EC0\u4E48\u73B0\u5728\u51FA\u73B0") ?? []);
+  const boundary = sectionText(sections.get("\u5B83\u4E0D\u662F\u4EC0\u4E48") ?? []);
+  const evidenceExcerpt = sectionText(sections.get("\u8BC1\u636E") ?? []);
+  const source = sourceReference(sectionText(sections.get("\u6765\u6E90") ?? []) ?? "");
+  const flowLines = sections.get("\u6240\u5904\u6D41\u7A0B") ?? [];
+  const sequence = [];
+  let currentStep;
+  for (const line of flowLines) {
+    const match = /^[-*+]\s+(.+?)\s*$/u.exec(line.trim());
+    if (match === null || sequence.length >= MAX_SEQUENCE_ITEMS) continue;
+    const raw = match[1] ?? "";
+    const current = /^当前[：:]\s*/u.test(raw);
+    const value = boundedText2(raw.replace(/^当前[：:]\s*/u, ""), 256);
+    if (value === void 0) continue;
+    if (current && currentStep === void 0) currentStep = sequence.length;
+    sequence.push(value);
+  }
+  if (title === void 0 || meaning === void 0 || currentContext === void 0 || boundary === void 0 || sequence.length < 2 || currentStep === void 0 || evidenceExcerpt === void 0 || source === void 0) {
+    return void 0;
+  }
+  const base = {
+    title,
+    meaning,
+    currentContext,
+    boundary,
+    sequence: Object.freeze([...sequence]),
+    currentStep,
+    evidence: Object.freeze({ excerpt: evidenceExcerpt, ...source })
+  };
+  return Object.freeze({
+    ...base,
+    contextRevision: createHash4("sha256").update(JSON.stringify(base), "utf8").digest("hex")
+  });
+}
+
 // src/adapters/source-module-artifact.ts
 import { execFile as execFile2 } from "node:child_process";
-import { createHash as createHash4 } from "node:crypto";
+import { createHash as createHash5 } from "node:crypto";
 import { basename, extname, resolve as resolve3 } from "node:path";
 var GIT_TIMEOUT_MS2 = 750;
 var MAX_GIT_OUTPUT_BYTES2 = 256 * 1024;
@@ -3577,13 +3868,13 @@ var SOURCE_EXTENSIONS = /* @__PURE__ */ new Set([
 function sourceModulePath(relativePath) {
   return SOURCE_EXTENSIONS.has(extname(relativePath).toLocaleLowerCase("en-US"));
 }
-function boundedText2(value, maximum) {
+function boundedText3(value, maximum) {
   const compact2 = value.replace(/[\p{Cc}\p{Cf}]+/gu, " ").replace(/\s+/gu, " ").trim();
   if (compact2.length === 0) return void 0;
   return compact2.length <= maximum ? compact2 : `${compact2.slice(0, maximum - 1)}\u2026`;
 }
 function addBounded(target, value, maximum) {
-  const safe = value === void 0 ? void 0 : boundedText2(value, MAX_SYMBOL_CHARS);
+  const safe = value === void 0 ? void 0 : boundedText3(value, MAX_SYMBOL_CHARS);
   if (safe !== void 0 && !target.includes(safe) && target.length < maximum) target.push(safe);
 }
 function maskCommentsAndStrings(content) {
@@ -3660,7 +3951,7 @@ function leadingRole(content) {
   const prose = raw.split("\n").map((value) => value.replace(/^\s*(?:\/\/|\*)?\s?/u, "").trim()).filter(
     (value) => value.length > 0 && !/^(?:@|eslint|prettier|tslint|copyright|spdx-)/iu.test(value)
   ).join(" ");
-  return boundedText2(prose, MAX_ROLE_CHARS);
+  return boundedText3(prose, MAX_ROLE_CHARS);
 }
 function declarationName(value) {
   return /^(?:export\s+)?(?:declare\s+)?(?:default\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/u.exec(value)?.[1] ?? /^(?:export\s+)?(?:declare\s+)?(?:default\s+)?class\s+([A-Za-z_$][\w$]*)\b/u.exec(value)?.[1] ?? /^(?:export\s+)?(?:declare\s+)?interface\s+([A-Za-z_$][\w$]*)\b/u.exec(value)?.[1] ?? /^(?:export\s+)?(?:declare\s+)?type\s+([A-Za-z_$][\w$]*)\s*=/u.exec(value)?.[1] ?? /^(?:export\s+)?(?:declare\s+)?(?:enum|namespace)\s+([A-Za-z_$][\w$]*)\b/u.exec(value)?.[1] ?? /^(?:export\s+)?(?:declare\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=/u.exec(value)?.[1];
@@ -3686,7 +3977,7 @@ function extractDeclarations(masked) {
   const declarations = [];
   const lines = masked.split("\n");
   for (let index = 0; index < lines.length && declarations.length < 256; index += 1) {
-    const name = boundedText2(declarationName(lines[index] ?? "") ?? "", MAX_SYMBOL_CHARS);
+    const name = boundedText3(declarationName(lines[index] ?? "") ?? "", MAX_SYMBOL_CHARS);
     if (name !== void 0 && declarations.length < 256) {
       declarations.push({ line: index + 1, name });
     }
@@ -3708,7 +3999,7 @@ function extractSourceModuleStructure(content, relativePath) {
   const dependencies = extractDependencies(content);
   const declarations = extractDeclarations(masked);
   const entry = /^(?:app|cli|index|main|mod|server)(?:\.[^.]+)+$/iu.test(basename(relativePath));
-  const role = leadingRole(content) ?? boundedText2(
+  const role = leadingRole(content) ?? boundedText3(
     exports.length > 0 ? `${entry ? "\u5165\u53E3\u6A21\u5757" : "\u6E90\u4EE3\u7801\u6A21\u5757"}\uFF1B\u516C\u5F00\u5BFC\u51FA ${exports.join("\u3001")}` : `${entry ? "\u5165\u53E3\u6A21\u5757" : "\u5185\u90E8\u6E90\u4EE3\u7801\u6A21\u5757"}\uFF1B\u672A\u68C0\u6D4B\u5230\u516C\u5F00\u5BFC\u51FA`,
     MAX_ROLE_CHARS
   ) ?? "\u6E90\u4EE3\u7801\u6A21\u5757";
@@ -3785,7 +4076,7 @@ function changedSymbols(diff, structure) {
 function parseLastCommit2(value) {
   const [hash, , subject] = value.trim().split("\0");
   const safeHash = typeof hash === "string" && /^[0-9a-f]{7,64}$/u.test(hash) ? hash.slice(0, 8) : void 0;
-  const safeSubject = typeof subject === "string" ? boundedText2(subject, 220) : void 0;
+  const safeSubject = typeof subject === "string" ? boundedText3(subject, 220) : void 0;
   return safeHash === void 0 || safeSubject === void 0 ? void 0 : `${safeHash} \xB7 ${safeSubject}`;
 }
 function testPath(value) {
@@ -3795,7 +4086,7 @@ function parseImpactFiles2(value, relativePath) {
   const tests = [];
   const importers = [];
   for (const raw of value.split("\0")) {
-    const path = boundedText2(raw.replace(/\\/gu, "/"), 512);
+    const path = boundedText3(raw.replace(/\\/gu, "/"), 512);
     if (path === void 0 || path === relativePath || !sourceModulePath(path) || /^(?:dist|host|mcp|node_modules)\//u.test(path) || /\.min\.[^/]+$/iu.test(path) || tests.includes(path) || importers.includes(path)) continue;
     (testPath(path) ? tests : importers).push(path);
   }
@@ -3841,7 +4132,7 @@ async function extractSourceModuleArtifactContext(options) {
     };
     return Object.freeze({
       ...base2,
-      contextRevision: createHash4("sha256").update(JSON.stringify(base2), "utf8").digest("hex")
+      contextRevision: createHash5("sha256").update(JSON.stringify(base2), "utf8").digest("hex")
     });
   }
   const stem = basename(options.relativePath, extname(options.relativePath));
@@ -3878,7 +4169,7 @@ ${staged.kind === "ok" ? staged.stdout : ""}`;
   };
   return Object.freeze({
     ...base,
-    contextRevision: createHash4("sha256").update(JSON.stringify(base), "utf8").digest("hex")
+    contextRevision: createHash5("sha256").update(JSON.stringify(base), "utf8").digest("hex")
   });
 }
 
@@ -4057,12 +4348,19 @@ function markdownDocument(relativePath) {
   return extension === ".md" || extension === ".mdx";
 }
 function workspaceEntityType(relativePath) {
+  if (contextConceptDocumentPath(relativePath)) return "concept";
   if (decisionDocumentPath(relativePath)) return "decision";
   if (markdownDocument(relativePath)) return "document";
   if (testSourcePath(relativePath)) return "verification";
   if (sourceModulePath(relativePath)) return "module";
   if (jsonConfigurationPath(relativePath)) return "configuration";
   return "file";
+}
+function conceptCanonicalName(relativePath) {
+  const name = basename3(relativePath);
+  const extension = extname3(name);
+  const stem = extension.length === 0 ? name : name.slice(0, -extension.length);
+  return stem.length === 0 ? name : `${stem[0]?.toLocaleUpperCase("en-US") ?? ""}${stem.slice(1)}`;
 }
 async function verifiedWorkspaceRoot(binding) {
   if (!binding.workspaceRoot || !isAbsolute2(binding.workspaceRoot)) {
@@ -4130,7 +4428,7 @@ async function scanWorkspace(root, maxFiles, maxDepth, ignoredDirectories, signa
   return files;
 }
 function indexRevision(files) {
-  const hash = createHash5("sha256");
+  const hash = createHash6("sha256");
   for (const file of files) {
     hash.update(file.relativePath, "utf8");
     hash.update("\0", "utf8");
@@ -4172,15 +4470,17 @@ var LocalWorkspaceContextIndex = class {
     return files.map((file) => {
       const name = basename3(file.relativePath);
       const parent = portablePath(dirname2(file.relativePath));
+      const entityType = workspaceEntityType(file.relativePath);
+      const canonicalName = entityType === "concept" ? conceptCanonicalName(file.relativePath) : name;
       return {
         schemaVersion: "1.0",
         scope: { ...binding.scope },
         entityId: fileEntityId(file.relativePath),
-        entityType: workspaceEntityType(file.relativePath),
+        entityType,
         canonicalKey: file.relativePath,
-        canonicalName: name,
-        aliases: fileAliases(file.relativePath),
-        summary: parent === "." ? "Workspace file" : `Workspace file in ${parent}`,
+        canonicalName,
+        aliases: fileAliases(file.relativePath).filter((alias) => alias !== canonicalName),
+        summary: entityType === "concept" ? `Explicit context concept in ${parent}` : parent === "." ? "Workspace file" : `Workspace file in ${parent}`,
         authorityRef: {
           provider: LOCAL_WORKSPACE_PROVIDER_ID,
           locator: file.relativePath
@@ -4231,13 +4531,42 @@ function gitStatusLabel(status) {
 function stableFileStat(before, after) {
   return before.size === after.size && before.mtimeMs === after.mtimeMs && before.ctimeMs === after.ctimeMs && before.ino === after.ino;
 }
+async function verifyConceptEvidence(root, concept, signal) {
+  if (signal?.aborted) return void 0;
+  let handle;
+  try {
+    const requested = resolve4(root, ...concept.evidence.sourcePath.split("/"));
+    const canonical = await realpath2(requested);
+    if (containedRelative(root, canonical) !== concept.evidence.sourcePath) return void 0;
+    handle = await open(canonical, "r");
+    const before = await handle.stat();
+    if (!before.isFile() || before.size > MAX_PREVIEW_FILE_BYTES) return void 0;
+    const content = await handle.readFile();
+    const decoded = utf8Content(content);
+    const after = await handle.stat();
+    if (decoded === void 0 || !stableFileStat(before, after) || signal?.aborted) {
+      return void 0;
+    }
+    const sourceLine = decoded.replace(/\r\n?/gu, "\n").split("\n")[concept.evidence.sourceLine - 1];
+    const compact2 = sourceLine?.replace(/^\s*(?:[-*+>])\s+/u, "").replace(/[\p{Cc}\p{Cf}]+/gu, " ").replace(/\s+/gu, " ").trim();
+    if (compact2 !== concept.evidence.excerpt) return void 0;
+    return {
+      sourceId: `${concept.evidence.sourcePath}:${concept.evidence.sourceLine}`,
+      revision: createHash6("sha256").update(content).digest("hex")
+    };
+  } catch {
+    return void 0;
+  } finally {
+    await handle?.close().catch(() => void 0);
+  }
+}
 var LocalWorkspaceRevisionProbe = class {
   async probe(request) {
     const observedAt = (/* @__PURE__ */ new Date()).toISOString();
     if (request.signal?.aborted) {
       return { kind: "unavailable", observedAt, retryable: true };
     }
-    if (request.entityType !== "file" && request.entityType !== "document" && request.entityType !== "module" && request.entityType !== "verification" && request.entityType !== "configuration" && request.entityType !== "decision") {
+    if (request.entityType !== "file" && request.entityType !== "document" && request.entityType !== "module" && request.entityType !== "verification" && request.entityType !== "configuration" && request.entityType !== "decision" && request.entityType !== "concept") {
       return { kind: "not_found", observedAt };
     }
     if (!request.entityId.startsWith("file:")) {
@@ -4261,7 +4590,7 @@ var LocalWorkspaceRevisionProbe = class {
       if (!info.isFile() || request.signal?.aborted) {
         return { kind: "unavailable", observedAt, retryable: true };
       }
-      const revision = createHash5("sha256").update(JSON.stringify({
+      const revision = createHash6("sha256").update(JSON.stringify({
         path: locator,
         size: info.size,
         modifiedMs: info.mtimeMs,
@@ -4291,7 +4620,7 @@ var LocalWorkspaceAuthoritativeProvider = class {
   providerId = LOCAL_WORKSPACE_PROVIDER_ID;
   async getDetail(request) {
     if (request.signal?.aborted) return { kind: "unavailable", retryable: true };
-    if (request.entityType !== "file" && request.entityType !== "document" && request.entityType !== "module" && request.entityType !== "verification" && request.entityType !== "configuration" && request.entityType !== "decision") {
+    if (request.entityType !== "file" && request.entityType !== "document" && request.entityType !== "module" && request.entityType !== "verification" && request.entityType !== "configuration" && request.entityType !== "decision" && request.entityType !== "concept") {
       return { kind: "not_found" };
     }
     if (request.authorityLocator.length < 1 || request.authorityLocator.length > MAX_RELATIVE_PATH_CHARS || request.authorityLocator.includes("\\") || request.authorityLocator.startsWith("/") || request.authorityLocator.split("/").includes("..") || request.entityId !== fileEntityId(request.authorityLocator) || workspaceEntityType(request.authorityLocator) !== request.entityType) {
@@ -4324,22 +4653,30 @@ var LocalWorkspaceAuthoritativeProvider = class {
         content: decoded,
         ...request.signal === void 0 ? {} : { signal: request.signal }
       }) : void 0;
+      const conceptContext = request.entityType === "concept" && decoded !== void 0 ? extractContextConceptArtifact(decoded) : void 0;
+      if (request.entityType === "concept" && conceptContext === void 0) {
+        return { kind: "not_found" };
+      }
       const after = await handle.stat();
       if (!stableFileStat(before, after) || request.signal?.aborted) {
         return { kind: "unavailable", retryable: true };
       }
-      const statRevision = createHash5("sha256").update(JSON.stringify({
+      const statRevision = createHash6("sha256").update(JSON.stringify({
         path: relativePath,
         size: after.size,
         modifiedMs: after.mtimeMs,
         changedMs: after.ctimeMs,
         inode: after.ino
       }), "utf8").digest("hex");
-      const contentHash = content === void 0 ? void 0 : createHash5("sha256").update(content).digest("hex");
-      const detailRevision = createHash5("sha256").update(contentHash ?? statRevision, "utf8").update("\0", "utf8").update(
-        markdownContext?.contextRevision ?? sourceModuleContext?.contextRevision ?? "file-metadata-v1",
+      const contentHash = content === void 0 ? void 0 : createHash6("sha256").update(content).digest("hex");
+      const conceptEvidence = conceptContext === void 0 ? void 0 : await verifyConceptEvidence(root, conceptContext, request.signal);
+      if (conceptContext !== void 0 && conceptEvidence === void 0) {
+        return { kind: "not_found" };
+      }
+      const detailRevision = createHash6("sha256").update(contentHash ?? statRevision, "utf8").update("\0", "utf8").update(
+        markdownContext?.contextRevision ?? sourceModuleContext?.contextRevision ?? conceptContext?.contextRevision ?? "file-metadata-v1",
         "utf8"
-      ).digest("hex");
+      ).update(conceptEvidence?.revision ?? "", "utf8").digest("hex");
       const extension = extname3(relativePath);
       const preview = content === void 0 ? void 0 : contentPreview(content);
       const observedAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -4392,6 +4729,13 @@ var LocalWorkspaceAuthoritativeProvider = class {
         "\u540E\u679C": decisionContext.consequences ?? "\u672A\u63D0\u4F9B\u53EF\u63D0\u53D6\u7684 Consequences \u6BB5\u843D",
         "\u8DEF\u5F84": relativePath
       };
+      const conceptFacts = conceptContext === void 0 ? void 0 : {
+        "\u5B83\u662F\u4EC0\u4E48\u610F\u601D": conceptContext.meaning,
+        "\u4E3A\u4EC0\u4E48\u73B0\u5728\u51FA\u73B0": conceptContext.currentContext,
+        "\u5B83\u4E0D\u662F\u4EC0\u4E48": conceptContext.boundary,
+        "\u6240\u5904\u6D41\u7A0B": conceptContext.sequence.map((item, index) => index === conceptContext.currentStep ? `\u5F53\u524D\uFF1A${item}` : item),
+        "\u8BC1\u636E": conceptContext.evidence.excerpt
+      };
       return {
         kind: "snapshot",
         snapshot: {
@@ -4401,7 +4745,7 @@ var LocalWorkspaceAuthoritativeProvider = class {
           entityRevision: `sha256:${detailRevision}`,
           observedAt,
           freshness: "current",
-          facts: decisionFacts ?? verificationFacts ?? configurationFacts ?? markdownFacts ?? moduleFacts ?? {
+          facts: conceptFacts ?? decisionFacts ?? verificationFacts ?? configurationFacts ?? markdownFacts ?? moduleFacts ?? {
             path: relativePath,
             name: basename3(relativePath),
             ...preview === void 0 ? {} : { preview },
@@ -4417,7 +4761,8 @@ var LocalWorkspaceAuthoritativeProvider = class {
               sourceId: relativePath
             },
             ...markdownContext?.gitAvailable === true ? [{ sourceType: "local_git", sourceId: relativePath }] : [],
-            ...sourceModuleContext?.gitAvailable === true ? [{ sourceType: "local_git", sourceId: relativePath }] : []
+            ...sourceModuleContext?.gitAvailable === true ? [{ sourceType: "local_git", sourceId: relativePath }] : [],
+            ...conceptEvidence === void 0 ? [] : [{ sourceType: "project_evidence", sourceId: conceptEvidence.sourceId }]
           ]
         },
         verification: {
@@ -4832,11 +5177,11 @@ function bindingFailure(kind) {
 function sameBinding(left, right) {
   return sameContextScope(left.scope, right.scope) && left.bindingRevision === right.bindingRevision && left.evidence === right.evidence && left.selectionGeneration === right.selectionGeneration && left.threadRef === right.threadRef && left.routeRef === right.routeRef && left.workspaceRoot === right.workspaceRoot;
 }
-function boundedText3(value) {
+function boundedText4(value) {
   return typeof value === "string" && value.trim().length > 0 && value.length <= 4096;
 }
 function optionalBoundedText(value) {
-  return value === void 0 || boundedText3(value);
+  return value === void 0 || boundedText4(value);
 }
 function parseContextScope(value) {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -4847,7 +5192,7 @@ function parseContextScope(value) {
     const kind = raw.kind;
     const namespace = raw.namespace;
     const id = raw.id;
-    if (!isContextScopeKind(kind) || !boundedText3(namespace) || !boundedText3(id)) {
+    if (!isContextScopeKind(kind) || !boundedText4(namespace) || !boundedText4(id)) {
       return void 0;
     }
     return Object.freeze({ kind, namespace, id });
@@ -4886,7 +5231,7 @@ function parseBindingResult(value) {
     const threadRef = raw.threadRef;
     const routeRef = raw.routeRef;
     const workspaceRoot = raw.workspaceRoot;
-    if (!scope || !boundedText3(bindingRevision) || evidence !== "verified_thread" && evidence !== "verified_workspace" && evidence !== "explicit_user" && evidence !== "fixture_manifest" || !Number.isSafeInteger(selectionGeneration) || Number(selectionGeneration) < 0 || !optionalBoundedText(threadRef) || !optionalBoundedText(routeRef) || !optionalBoundedText(workspaceRoot) || evidence === "verified_thread" && threadRef === void 0 || (evidence === "verified_workspace" || evidence === "fixture_manifest") && workspaceRoot === void 0) {
+    if (!scope || !boundedText4(bindingRevision) || evidence !== "verified_thread" && evidence !== "verified_workspace" && evidence !== "explicit_user" && evidence !== "fixture_manifest" || !Number.isSafeInteger(selectionGeneration) || Number(selectionGeneration) < 0 || !optionalBoundedText(threadRef) || !optionalBoundedText(routeRef) || !optionalBoundedText(workspaceRoot) || evidence === "verified_thread" && threadRef === void 0 || (evidence === "verified_workspace" || evidence === "fixture_manifest") && workspaceRoot === void 0) {
       return void 0;
     }
     const binding = {
@@ -5247,7 +5592,7 @@ function truncate(value, maximum) {
   return value.length <= maximum ? value : `${value.slice(0, maximum - 1)}\u2026`;
 }
 function sha2562(value) {
-  return createHash6("sha256").update(value, "utf8").digest("hex");
+  return createHash7("sha256").update(value, "utf8").digest("hex");
 }
 function scopeKey(entry) {
   return `${entry.scope.kind}\0${entry.scope.namespace}\0${entry.scope.id}`;
@@ -5260,6 +5605,40 @@ function factText2(value) {
     Array.isArray(value) ? value.map(scalarText).join(", ") : scalarText(value),
     1024
   );
+}
+function scalarFact(facts, key) {
+  const value = facts[key];
+  return typeof value === "string" ? truncate(value, 1024) : void 0;
+}
+function conceptComprehension(outcome) {
+  if (outcome.detail.entityType !== "concept") return void 0;
+  const meaning = scalarFact(outcome.detail.facts, "\u5B83\u662F\u4EC0\u4E48\u610F\u601D");
+  const context = scalarFact(outcome.detail.facts, "\u4E3A\u4EC0\u4E48\u73B0\u5728\u51FA\u73B0");
+  const boundary = scalarFact(outcome.detail.facts, "\u5B83\u4E0D\u662F\u4EC0\u4E48");
+  const evidenceExcerpt = scalarFact(outcome.detail.facts, "\u8BC1\u636E");
+  const rawSequence = outcome.detail.facts["\u6240\u5904\u6D41\u7A0B"];
+  if (meaning === void 0 || context === void 0 || boundary === void 0 || evidenceExcerpt === void 0 || !Array.isArray(rawSequence)) {
+    return void 0;
+  }
+  const normalizedSequence = rawSequence.filter((item) => typeof item === "string").slice(0, 4);
+  const sequence = normalizedSequence.map((item) => truncate(item.replace(/^当前[：:]\s*/u, ""), 256));
+  const currentStep = normalizedSequence.findIndex((item) => /^当前[：:]\s*/u.test(item));
+  const source = outcome.detail.sourceRefs.find((item) => item.sourceType === "project_evidence");
+  if (sequence.length < 2 || currentStep < 0 || currentStep >= sequence.length || source === void 0) {
+    return void 0;
+  }
+  return {
+    kind: "concept",
+    meaning,
+    context,
+    boundary,
+    sequence,
+    currentStep,
+    evidence: [{
+      excerpt: evidenceExcerpt,
+      source: truncate(source.sourceId, 512)
+    }]
+  };
 }
 function errorPresentation(code, message, retryable) {
   return { kind: "error", code, message, retryable };
@@ -5274,11 +5653,13 @@ function candidateView(candidate, candidateRef) {
 }
 function detailView(outcome, options = {}) {
   const purpose = outcome.detail.facts["\u7528\u9014"] ?? outcome.detail.facts["\u804C\u8D23"];
-  const scenarioSummary = outcome.detail.entityType === "verification" ? outcome.detail.facts["\u9A8C\u8BC1\u8303\u56F4"] : outcome.detail.entityType === "configuration" ? outcome.detail.facts["\u914D\u7F6E\u7528\u9014"] : outcome.detail.entityType === "decision" ? outcome.detail.facts["\u51B3\u7B56"] : void 0;
+  const scenarioSummary = outcome.detail.entityType === "verification" ? outcome.detail.facts["\u9A8C\u8BC1\u8303\u56F4"] : outcome.detail.entityType === "configuration" ? outcome.detail.facts["\u914D\u7F6E\u7528\u9014"] : outcome.detail.entityType === "decision" ? outcome.detail.facts["\u51B3\u7B56"] : outcome.detail.entityType === "concept" ? outcome.detail.facts["\u5B83\u662F\u4EC0\u4E48\u610F\u601D"] : void 0;
   const change = outcome.detail.facts["\u672C\u6B21\u53D8\u5316"];
   const activeChange = typeof change === "string" && /^(?:涉及：|modified\b|staged\b|untracked\b|conflicted\b)/u.test(change);
   const summaryValue = scenarioSummary ?? (activeChange ? change : purpose);
   const summary = typeof summaryValue === "string" ? truncate(summaryValue, 1024) : truncate(outcome.candidate.summary, 1024);
+  const comprehension = conceptComprehension(outcome);
+  const humanSummary = comprehension === void 0 ? void 0 : truncate(`${comprehension.meaning} ${comprehension.context}`, 1024);
   return {
     entityId: truncate(outcome.detail.entityId, 256),
     entityType: truncate(outcome.detail.entityType, 128),
@@ -5291,6 +5672,8 @@ function detailView(outcome, options = {}) {
     sources: outcome.detail.sourceRefs.slice(0, 5).map((source) => ({
       label: truncate(`${source.sourceType} / ${source.sourceId}`, 512)
     })),
+    ...humanSummary === void 0 ? {} : { humanSummary },
+    ...comprehension === void 0 ? {} : { comprehension },
     ...options.detailRef === void 0 ? {} : { detailRef: options.detailRef },
     ...options.changes === void 0 ? {} : { changes: options.changes }
   };
@@ -5743,6 +6126,7 @@ function immutableStatus(status) {
 }
 function createWorkspaceCompanion(options) {
   const intervalMs = refreshInterval(options.refreshIntervalMs);
+  const presentationMode = options.presentationMode ?? "record";
   const lookup = createWorkspaceLookupCallback({
     registry: options.registry,
     ...options.operationTimeoutMs === void 0 ? {} : { operationTimeoutMs: options.operationTimeoutMs }
@@ -5755,7 +6139,8 @@ function createWorkspaceCompanion(options) {
     ...options.discoveryTimeoutMs === void 0 ? {} : { discoveryTimeoutMs: options.discoveryTimeoutMs },
     ...options.lookupTimeoutMs === void 0 ? {} : { lookupTimeoutMs: options.lookupTimeoutMs },
     ...options.maxConcurrentLookupsPerTarget === void 0 ? {} : { maxConcurrentLookupsPerTarget: options.maxConcurrentLookupsPerTarget },
-    actionLabel: options.actionLabel ?? "\u67E5\u770B\u4E0A\u4E0B\u6587"
+    actionLabel: options.actionLabel ?? "\u67E5\u770B\u4E0A\u4E0B\u6587",
+    presentationMode
   };
   const adapter = new CodexCdpHostAdapter(adapterOptions);
   let state = "idle";
@@ -5774,6 +6159,7 @@ function createWorkspaceCompanion(options) {
     return immutableStatus({
       state,
       mode: "live-local-workspace",
+      presentationMode,
       experimentalHostAdapter: true,
       ...startedAt === void 0 ? {} : { startedAt },
       ...lastRefreshAt === void 0 ? {} : { lastRefreshAt },
@@ -5940,6 +6326,7 @@ function parseArguments(argv) {
   let registryPath = join(stateRoot, "task-workspace-bindings.json");
   let endpoint = "http://127.0.0.1:9223";
   let refreshIntervalMs = 2e3;
+  let presentationMode = "record";
   let workspaceRoot;
   let json = false;
   for (let index = 1; index < argv.length; index += 1) {
@@ -5961,6 +6348,11 @@ function parseArguments(argv) {
       endpoint = value;
     } else if (argument === "--refresh-ms") {
       refreshIntervalMs = boundedInteger2(value, "--refresh-ms");
+    } else if (argument === "--presentation-mode") {
+      if (value !== "record" && value !== "narrative" && value !== "mental-model") {
+        fail("--presentation-mode must be record, narrative, or mental-model");
+      }
+      presentationMode = value;
     } else if (argument === "--workspace-root") {
       if (!isAbsolute3(value)) fail("--workspace-root must be absolute");
       workspaceRoot = resolve5(value);
@@ -5977,6 +6369,7 @@ function parseArguments(argv) {
     registryPath,
     endpoint,
     refreshIntervalMs,
+    presentationMode,
     ...workspaceRoot === void 0 ? {} : { workspaceRoot },
     json
   };
@@ -6163,7 +6556,8 @@ async function runServer(arguments_) {
   const companion = createWorkspaceCompanion({
     registry,
     endpoint: arguments_.endpoint,
-    refreshIntervalMs: arguments_.refreshIntervalMs
+    refreshIntervalMs: arguments_.refreshIntervalMs,
+    presentationMode: arguments_.presentationMode
   });
   let resolveShutdown;
   const shutdown = new Promise((resolvePromise) => {
@@ -6276,6 +6670,8 @@ async function startDetached(arguments_) {
     arguments_.endpoint,
     "--refresh-ms",
     String(arguments_.refreshIntervalMs),
+    "--presentation-mode",
+    arguments_.presentationMode,
     "--json"
   ], {
     cwd: packageRoot(dirname3(entrypoint)),

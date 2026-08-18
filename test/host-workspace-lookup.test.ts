@@ -312,6 +312,58 @@ test("workspace lookup uses scenario-specific summaries without inventing test r
   }
 });
 
+test("workspace lookup projects one concept into narrative and mental-model views from the same facts", async () => {
+  const item = await fixture();
+  const evidence = "A pilot finds workflow defects but does not establish significance.";
+  try {
+    await mkdir(join(item.workspace, "docs", "concepts"), { recursive: true });
+    await writeFile(join(item.workspace, "docs", "evaluation-protocol.md"), `${evidence}\n`, "utf8");
+    await writeFile(join(item.workspace, "docs", "concepts", "pilot.md"), `# Pilot
+## 它是什么意思
+正式实验前的小规模可用性试跑。
+## 为什么现在出现
+技术链路已完成，人的理解效果尚未验证。
+## 它不是什么
+不能证明产品已经显著提升效率。
+## 所处流程
+- 原型完成
+- 当前：Pilot
+- 确定正式样本量
+- 正式实验
+## 证据
+> ${evidence}
+## 来源
+docs/evaluation-protocol.md:1
+`, "utf8");
+    const activeTask = task();
+    await item.registry.bind(activeTask, item.workspace);
+    const result = await invoke(
+      createWorkspaceLookupCallback({ registry: item.registry }),
+      request(activeTask, "pilot", { requestId: "request-workspace-pilot" }),
+    );
+    assert.equal(result.kind, "detail");
+    if (result.kind !== "detail") return;
+    assert.equal(result.detail.entityType, "concept");
+    assert.equal(result.detail.label, "Pilot");
+    assert.equal(result.detail.summary, "正式实验前的小规模可用性试跑。");
+    assert.match(result.detail.humanSummary ?? "", /人的理解效果尚未验证/u);
+    assert.deepEqual(result.detail.comprehension, {
+      kind: "concept",
+      meaning: "正式实验前的小规模可用性试跑。",
+      context: "技术链路已完成，人的理解效果尚未验证。",
+      boundary: "不能证明产品已经显著提升效率。",
+      sequence: ["原型完成", "Pilot", "确定正式样本量", "正式实验"],
+      currentStep: 1,
+      evidence: [{
+        excerpt: evidence,
+        source: "docs/evaluation-protocol.md:1",
+      }],
+    });
+  } finally {
+    await rm(item.root, { recursive: true, force: true });
+  }
+});
+
 test("workspace candidate references are one-shot and bound to task plus registry revision", async () => {
   const item = await fixture();
   try {

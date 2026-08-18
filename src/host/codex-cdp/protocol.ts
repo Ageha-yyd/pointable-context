@@ -44,6 +44,23 @@ export interface PointableChangeView {
   after: string;
 }
 
+export type PointablePresentationMode = "record" | "narrative" | "mental-model";
+
+export interface PointableEvidenceView {
+  excerpt: string;
+  source: string;
+}
+
+export interface PointableComprehensionView {
+  kind: "concept";
+  meaning: string;
+  context: string;
+  boundary: string;
+  sequence: string[];
+  currentStep: number;
+  evidence: PointableEvidenceView[];
+}
+
 export interface PointableDetailView {
   entityId: string;
   entityType: string;
@@ -54,6 +71,8 @@ export interface PointableDetailView {
   freshness: "current" | "stale" | "partial" | "unknown";
   facts: PointableFactView[];
   sources: PointableSourceView[];
+  humanSummary?: string;
+  comprehension?: PointableComprehensionView;
   detailRef?: string;
   changes?: PointableChangeView[];
 }
@@ -282,6 +301,8 @@ function validateDetail(value: unknown): PointableDetailView {
     "freshness",
     "facts",
     "sources",
+    "humanSummary",
+    "comprehension",
     "detailRef",
     "changes",
   ])) {
@@ -308,6 +329,7 @@ function validateDetail(value: unknown): PointableDetailView {
     value.facts.length > 5 ||
     !Array.isArray(value.sources) ||
     value.sources.length > 5 ||
+    (value.humanSummary !== undefined && !boundedString(value.humanSummary, 1, 1_024)) ||
     (value.detailRef !== undefined && !boundedString(value.detailRef, 8, 256)) ||
     (value.changes !== undefined &&
       (!Array.isArray(value.changes) || value.changes.length > 3))
@@ -338,6 +360,64 @@ function validateDetail(value: unknown): PointableDetailView {
     }
     return { label: requiredString(source.label, "source label", 512) };
   });
+  let comprehension: PointableComprehensionView | undefined;
+  if (value.comprehension !== undefined) {
+    const view = value.comprehension;
+    if (
+      !record(view) ||
+      !exactKeys(view, [
+        "kind",
+        "meaning",
+        "context",
+        "boundary",
+        "sequence",
+        "currentStep",
+        "evidence",
+      ]) ||
+      view.kind !== "concept" ||
+      !boundedString(view.meaning, 1, 1_024) ||
+      !boundedString(view.context, 1, 1_024) ||
+      !boundedString(view.boundary, 1, 1_024) ||
+      !Array.isArray(view.sequence) ||
+      view.sequence.length < 2 ||
+      view.sequence.length > 4 ||
+      !view.sequence.every((item) => boundedString(item, 1, 256)) ||
+      !Number.isSafeInteger(view.currentStep) ||
+      Number(view.currentStep) < 0 ||
+      Number(view.currentStep) >= view.sequence.length ||
+      !Array.isArray(view.evidence) ||
+      view.evidence.length < 1 ||
+      view.evidence.length > 3
+    ) {
+      throw new PointableProtocolError(
+        "invalid_lookup_result",
+        "detail comprehension view is invalid",
+      );
+    }
+    const evidence = view.evidence.map((item) => {
+      if (
+        !record(item) ||
+        !exactKeys(item, ["excerpt", "source"]) ||
+        !boundedString(item.excerpt, 1, 1_024) ||
+        !boundedString(item.source, 1, 512)
+      ) {
+        throw new PointableProtocolError(
+          "invalid_lookup_result",
+          "detail evidence is invalid",
+        );
+      }
+      return { excerpt: item.excerpt, source: item.source };
+    });
+    comprehension = {
+      kind: "concept",
+      meaning: view.meaning,
+      context: view.context,
+      boundary: view.boundary,
+      sequence: [...view.sequence],
+      currentStep: Number(view.currentStep),
+      evidence,
+    };
+  }
   const changes = value.changes === undefined
     ? undefined
     : value.changes.map((change) => {
@@ -363,6 +443,8 @@ function validateDetail(value: unknown): PointableDetailView {
     freshness: value.freshness,
     facts,
     sources,
+    ...(typeof value.humanSummary === "string" ? { humanSummary: value.humanSummary } : {}),
+    ...(comprehension === undefined ? {} : { comprehension }),
     ...(typeof value.detailRef === "string" ? { detailRef: value.detailRef } : {}),
     ...(changes === undefined ? {} : { changes }),
   };

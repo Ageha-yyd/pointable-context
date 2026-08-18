@@ -24,6 +24,29 @@ This hypothesis does not cover open-ended explanation, synthesis, design judgmen
 
 Use a within-subject, counterbalanced order. Randomize scenario order and assign A/B with a Latin-square schedule so practice and fatigue do not systematically favor one condition.
 
+### 3.1 Presentation pilot before the efficiency study
+
+Before comparing Quiet Context Reveal with linear Chat, run a smaller presentation-only pilot. Its purpose is to find comprehension and study-flow defects, not to claim an efficiency effect.
+
+All three pilot conditions use the same native Chat Lane trigger, the same selected object, the same authoritative facts, the same source excerpt, and zero added Chat Turns. Only the card projection changes:
+
+- **P-A — record:** one conventional summary plus collapsed facts and metadata;
+- **P-B — narrative:** a human-oriented explanation that combines meaning with the reason the object matters now;
+- **P-C — micro mental model:** meaning, current context, a short process with the current step highlighted, a visible boundary, and a collapsed `为什么这样说` evidence disclosure.
+
+Counterbalance P-A/P-B/P-C. Do not let a participant switch conditions within one task. The first frozen object is `pilot`, backed by `docs/concepts/pilot.md` and the verified evidence line in this protocol.
+
+The participant must answer, in their own words:
+
+1. What is a pilot?
+2. Why is it required at the current project stage?
+3. What can it not prove?
+4. What happens immediately before and after it?
+
+End timing only after the answer is submitted. Score the four answer units separately. Record evidence opening and evidence correctness, but do not require the evidence disclosure for the first three answers. Use [presentation-pilot-log.template.csv](presentation-pilot-log.template.csv); do not record raw selected text or unrelated Chat content.
+
+A pilot of roughly 8–12 participants can expose unclear wording, wrong visual priority, hidden evidence, overflow, or task-instruction defects and provide a variance estimate. It cannot establish significance or replace the later linear-Chat efficiency comparison.
+
 ## 4. Scenarios and correct-answer units
 
 | Scenario | Question answered | Correct-answer unit | Product boundary |

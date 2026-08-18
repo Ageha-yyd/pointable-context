@@ -219,3 +219,53 @@ test("revision and finite detail-diff presentations stay bounded", () => {
     },
   }), /metadata exceeds/u);
 });
+
+test("concept comprehension views keep flow, boundary, and evidence bounded", () => {
+  const base = {
+    kind: "detail",
+    detail: {
+      entityId: "file:docs/concepts/pilot.md",
+      entityType: "concept",
+      label: "Pilot",
+      summary: "正式实验前的小规模可用性试跑。",
+      humanSummary: "正式实验前的小规模可用性试跑，用于发现研究流程缺陷。",
+      revision: "r1",
+      observedAt: "2026-08-18T09:50:00.000Z",
+      freshness: "current",
+      facts: [],
+      sources: [{ label: "project_evidence / docs/evaluation-protocol.md:73" }],
+      comprehension: {
+        kind: "concept",
+        meaning: "正式实验前的小规模可用性试跑。",
+        context: "技术链路完成后，先验证人的理解任务是否可用。",
+        boundary: "不能证明产品已经显著提升效率。",
+        sequence: ["原型完成", "Pilot", "正式实验"],
+        currentStep: 1,
+        evidence: [{
+          excerpt: "A pilot may find workflow defects but must not claim significance.",
+          source: "docs/evaluation-protocol.md:73",
+        }],
+      },
+    },
+  } as const;
+  const result = validatePointableLookupPresentation(base);
+  assert.equal(result.kind, "detail");
+  if (result.kind === "detail") assert.equal(result.detail.comprehension?.currentStep, 1);
+  assert.throws(() => validatePointableLookupPresentation({
+    ...base,
+    detail: {
+      ...base.detail,
+      comprehension: { ...base.detail.comprehension, currentStep: 9 },
+    },
+  }), /comprehension view is invalid/u);
+  assert.throws(() => validatePointableLookupPresentation({
+    ...base,
+    detail: {
+      ...base.detail,
+      comprehension: {
+        ...base.detail.comprehension,
+        evidence: [{ excerpt: "x".repeat(1_025), source: "source" }],
+      },
+    },
+  }), /detail evidence is invalid/u);
+});

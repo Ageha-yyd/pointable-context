@@ -55,11 +55,14 @@ export {
   PointableProtocolError,
   validatePointableLookupPresentation,
   type PointableCandidateView,
+  type PointableComprehensionView,
   type PointableDetailView,
+  type PointableEvidenceView,
   type PointableFactView,
   type PointableLookupIntentV1,
   type PointableLookupPresentation,
   type PointableLookupResponseV1,
+  type PointablePresentationMode,
   type PointableSourceView,
 } from "./protocol.js";
 export {

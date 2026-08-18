@@ -13,6 +13,7 @@ import {
   createWorkspaceCompanion,
   type WorkspaceCompanion,
 } from "./workspace-companion.js";
+import type { PointablePresentationMode } from "./protocol.js";
 
 const CONTROL_SCHEMA_VERSION = 1;
 const CONTROL_TIMEOUT_MS = 3_000;
@@ -35,6 +36,7 @@ interface ParsedArguments {
   registryPath: string;
   endpoint: string;
   refreshIntervalMs: number;
+  presentationMode: PointablePresentationMode;
   workspaceRoot?: string;
   json: boolean;
 }
@@ -98,6 +100,7 @@ function parseArguments(argv: string[]): ParsedArguments {
   let registryPath = join(stateRoot, "task-workspace-bindings.json");
   let endpoint = "http://127.0.0.1:9223";
   let refreshIntervalMs = 2_000;
+  let presentationMode: PointablePresentationMode = "record";
   let workspaceRoot: string | undefined;
   let json = false;
   for (let index = 1; index < argv.length; index += 1) {
@@ -119,6 +122,11 @@ function parseArguments(argv: string[]): ParsedArguments {
       endpoint = value;
     } else if (argument === "--refresh-ms") {
       refreshIntervalMs = boundedInteger(value, "--refresh-ms");
+    } else if (argument === "--presentation-mode") {
+      if (value !== "record" && value !== "narrative" && value !== "mental-model") {
+        fail("--presentation-mode must be record, narrative, or mental-model");
+      }
+      presentationMode = value;
     } else if (argument === "--workspace-root") {
       if (!isAbsolute(value)) fail("--workspace-root must be absolute");
       workspaceRoot = resolve(value);
@@ -135,6 +143,7 @@ function parseArguments(argv: string[]): ParsedArguments {
     registryPath,
     endpoint,
     refreshIntervalMs,
+    presentationMode,
     ...(workspaceRoot === undefined ? {} : { workspaceRoot }),
     json,
   };
@@ -362,6 +371,7 @@ async function runServer(arguments_: ParsedArguments): Promise<void> {
     registry,
     endpoint: arguments_.endpoint,
     refreshIntervalMs: arguments_.refreshIntervalMs,
+    presentationMode: arguments_.presentationMode,
   });
   let resolveShutdown!: () => void;
   const shutdown = new Promise<void>((resolvePromise) => {
@@ -480,6 +490,8 @@ async function startDetached(arguments_: ParsedArguments): Promise<Record<string
     arguments_.endpoint,
     "--refresh-ms",
     String(arguments_.refreshIntervalMs),
+    "--presentation-mode",
+    arguments_.presentationMode,
     "--json",
   ], {
     cwd: packageRoot(dirname(entrypoint)),

@@ -129,7 +129,7 @@ try {
     overlay.setAttribute('data-selected-text-overlay-target', '');
     const text = document.createElement('span');
     text.id = 'fixture-text';
-    text.textContent = 'GOV-1';
+    text.textContent = 'pilot';
     Object.assign(text.style, { font: '20px sans-serif' });
     overlay.append(text);
     message.append(overlay);
@@ -144,8 +144,9 @@ try {
     createInstallPointableRendererExpression({
       bindingName,
       requestTimeoutMs: 5_000,
-      revisionCheckIntervalMs: 150,
+      revisionCheckIntervalMs: 500,
       actionLabel: "查看上下文（fixture）",
+      presentationMode: "mental-model",
     }),
   );
   lifecycleId = installed.lifecycleId;
@@ -181,7 +182,7 @@ try {
   });
   const action = await waitFor(connection, `(() => {
     const button = document.querySelector('[data-pointable-context-role="action"]');
-    if (!(button instanceof HTMLElement) || window.getSelection()?.toString() !== 'GOV-1') return null;
+    if (!(button instanceof HTMLElement) || window.getSelection()?.toString() !== 'pilot') return null;
     const rect = button.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0 || rect.left < 8 || rect.top < 8) return null;
     return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
@@ -234,15 +235,28 @@ try {
   const response = createPointableLookupResponse(intent, {
     kind: "detail",
     detail: {
-      entityId: "WU:GOV-1",
-      entityType: "work_unit",
-      label: "AEN Harness Foundation",
+      entityId: "file:docs/concepts/pilot.md",
+      entityType: "concept",
+      label: "Pilot",
       summary: "Headless close acceptance detail.",
+      humanSummary: "Pilot is a small usability run before the formal study.",
       revision: "r18",
       observedAt: "2026-08-17T08:10:00Z",
       freshness: "stale",
       facts: [{ label: "status", value: "completed" }],
       sources: [{ label: "headless acceptance" }],
+      comprehension: {
+        kind: "concept",
+        meaning: "Pilot is a small usability run before the formal study.",
+        context: "The technical path is ready, but human understanding is not yet verified.",
+        boundary: "It cannot establish a significant efficiency improvement.",
+        sequence: ["Prototype ready", "Pilot", "Formal study"],
+        currentStep: 1,
+        evidence: [{
+          excerpt: "A pilot may find workflow defects but must not claim significance.",
+          source: "docs/evaluation-protocol.md:73",
+        }],
+      },
       detailRef,
     },
   });
@@ -251,6 +265,32 @@ try {
     createDeliverPointableResultExpression(response, lifecycleId),
   );
   if (delivered?.outcome !== "applied") throw new Error("detail was not applied");
+
+  const evidenceToggle = await waitFor(connection, `(() => {
+    const card = document.querySelector('[data-pointable-context-role="card"]');
+    const flow = document.querySelector('[data-pointable-context-role="comprehension-flow"]');
+    const current = document.querySelector('[data-pointable-context-role="comprehension-step"][data-pointable-context-current="true"]');
+    const boundary = document.querySelector('[data-pointable-context-role="comprehension-boundary"]');
+    const toggle = document.querySelector('[data-pointable-context-role="evidence-toggle"]');
+    const evidence = document.querySelector('[data-pointable-context-role="evidence-body"]');
+    if (!(card instanceof HTMLElement) || card.dataset.pointableContextPresentation !== 'mental-model') return null;
+    if (!(flow instanceof HTMLElement) || !(current instanceof HTMLElement) || current.textContent !== '当前 · Pilot') return null;
+    if (!(boundary instanceof HTMLElement) || !boundary.textContent.includes('不会证明')) return null;
+    if (!(toggle instanceof HTMLButtonElement) || !(evidence instanceof HTMLElement) || evidence.getBoundingClientRect().height !== 0) return null;
+    const rect = toggle.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  })()`);
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mousePressed", x: evidenceToggle.x, y: evidenceToggle.y, button: "left", clickCount: 1,
+  });
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mouseReleased", x: evidenceToggle.x, y: evidenceToggle.y, button: "left", clickCount: 1,
+  });
+  await waitFor(connection, `(() => {
+    const toggle = document.querySelector('[data-pointable-context-role="evidence-toggle"]');
+    const evidence = document.querySelector('[data-pointable-context-role="evidence-body"]');
+    return toggle instanceof HTMLButtonElement && evidence instanceof HTMLElement && toggle.getAttribute('aria-expanded') === 'true' && evidence.textContent.includes('docs/evaluation-protocol.md:73') && evidence.getBoundingClientRect().height > 0;
+  })()`);
 
   const revisionIntent = await revisionIntentPromise;
   if (revisionIntent.detailRef !== detailRef) {
@@ -297,15 +337,28 @@ try {
     createDeliverPointableResultExpression(createPointableLookupResponse(refreshIntent, {
       kind: "detail",
       detail: {
-        entityId: "WU:GOV-1",
-        entityType: "work_unit",
-        label: "AEN Harness Foundation",
+        entityId: "file:docs/concepts/pilot.md",
+        entityType: "concept",
+        label: "Pilot",
         summary: "Headless refreshed detail.",
+        humanSummary: "Headless refreshed detail with a human-oriented explanation.",
         revision: "r19",
         observedAt: "2026-08-18T01:00:01Z",
         freshness: "current",
         facts: [{ label: "status", value: "completed" }],
         sources: [{ label: "headless acceptance" }],
+        comprehension: {
+          kind: "concept",
+          meaning: "Headless refreshed detail.",
+          context: "The refreshed current context remains in the same card.",
+          boundary: "It still cannot establish a significant efficiency improvement.",
+          sequence: ["Prototype ready", "Pilot", "Formal study"],
+          currentStep: 1,
+          evidence: [{
+            excerpt: "A pilot may find workflow defects but must not claim significance.",
+            source: "docs/evaluation-protocol.md:73",
+          }],
+        },
         detailRef,
         changes: [{
           label: "摘要",
@@ -330,6 +383,7 @@ try {
     const toggle = document.querySelector('[data-pointable-context-role="detail-toggle"]');
     const body = document.querySelector('[data-pointable-context-role="detail-body"]');
     if (!(disclosure instanceof HTMLElement) || !(toggle instanceof HTMLButtonElement) || !(body instanceof HTMLElement)) return null;
+    toggle.scrollIntoView({ block: 'nearest' });
     const rect = toggle.getBoundingClientRect();
     const bodyRect = body.getBoundingClientRect();
     return {
@@ -393,6 +447,8 @@ try {
     browser: "Microsoft Edge headless",
     selectedText: intent.selectionText,
     trustedActionProducedDetail: true,
+    mentalModelRenderedInLane: true,
+    evidenceExpandedInPlace: true,
     backgroundRevisionDetected: true,
     trustedRefreshUpdatedInPlace: true,
     refreshAddedChatTurns: 0,

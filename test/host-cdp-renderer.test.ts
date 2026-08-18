@@ -142,6 +142,14 @@ test("install expression is namespaced, generic, click-gated, text-only, and cle
   assert.match(expression, /operation === "check"/u);
   assert.match(expression, /operation === "refresh"/u);
   assert.match(expression, /data-pointable-context-role", "revision-changes"/u);
+  assert.match(expression, /data-pointable-context-role", "comprehension-model"/u);
+  assert.match(expression, /data-pointable-context-role", "comprehension-flow"/u);
+  assert.match(expression, /data-pointable-context-role", "comprehension-boundary"/u);
+  assert.match(expression, /data-pointable-context-role", "evidence-toggle"/u);
+  assert.match(expression, /为什么现在出现/u);
+  assert.match(expression, /你现在位于这里/u);
+  assert.match(expression, /不会证明：/u);
+  assert.match(expression, /为什么这样说/u);
   assert.match(expression, /Commit the explicit trusted activation synchronously/u);
   assert.match(expression, /range\.toString\(\)\.trim\(\)/u);
   assert.match(expression, /range\.intersectsNode/u);
@@ -165,6 +173,16 @@ test("install expression is namespaced, generic, click-gated, text-only, and cle
   const bindingCall = expression.indexOf("binding(JSON.stringify(payload))");
   assert.ok(submitStart > 0);
   assert.ok(bindingCall > submitStart, "binding payload must only be emitted by submitLookup");
+});
+
+test("renderer accepts one fixed presentation condition per installation", () => {
+  for (const presentationMode of ["record", "narrative", "mental-model"] as const) {
+    const expression = createInstallPointableRendererExpression({
+      bindingName: "__pointableContextBinding_test_12345678",
+      presentationMode,
+    });
+    assert.match(expression, new RegExp(`"presentationMode":"${presentationMode}"`, "u"));
+  }
 });
 
 test("host expressions address only the renderer namespace and preserve all fence fields", () => {

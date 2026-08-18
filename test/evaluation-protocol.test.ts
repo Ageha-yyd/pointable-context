@@ -3,11 +3,12 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 
-test("evaluation assets separate component latency from human efficiency claims", async () => {
-  const [protocol, benchmark, baselineText] = await Promise.all([
+test("evaluation assets separate component latency and presentation pilot from human efficiency claims", async () => {
+  const [protocol, benchmark, baselineText, pilotTemplate] = await Promise.all([
     readFile(resolve("docs/evaluation-protocol.md"), "utf8"),
     readFile(resolve("scripts/workspace-lookup-benchmark.mjs"), "utf8"),
     readFile(resolve("docs/evaluation-baseline-2026-08-18.json"), "utf8"),
+    readFile(resolve("docs/presentation-pilot-log.template.csv"), "utf8"),
   ]);
   const baseline = JSON.parse(baselineText) as {
     kind?: string;
@@ -22,6 +23,10 @@ test("evaluation assets separate component latency from human efficiency claims"
   assert.match(protocol, /time_to_verified_fact_ms/u);
   assert.match(protocol, /Score fact units, not clicks or card opens/u);
   assert.match(protocol, /must not be used to claim significance/u);
+  assert.match(protocol, /P-A\/P-B\/P-C/u);
+  assert.match(protocol, /What can it not prove/u);
+  assert.match(pilotTemplate, /time_to_correct_understanding_ms/u);
+  assert.match(pilotTemplate, /meaning_correct,why_now_correct,boundary_correct,flow_correct/u);
   assert.match(benchmark, /kind: "technical_latency_only"/u);
   assert.match(benchmark, /This is component latency, not human time_to_verified_fact/u);
   assert.doesNotMatch(benchmark, /turn\/start|ui\/message|sendFollowUpMessage/u);

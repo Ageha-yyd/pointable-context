@@ -6,6 +6,7 @@ import {
   validatePointableLookupPresentation,
   type PointableLookupIntentV1,
   type PointableLookupPresentation,
+  type PointablePresentationMode,
 } from "./protocol.js";
 import {
   createDeliverPointableResultExpression,
@@ -69,6 +70,7 @@ export interface CodexCdpHostAdapterOptions {
   lookupTimeoutMs?: number;
   maxConcurrentLookupsPerTarget?: number;
   actionLabel?: string;
+  presentationMode?: PointablePresentationMode;
 }
 
 export interface CodexCdpHostAdapterStatus {
@@ -306,6 +308,7 @@ export class CodexCdpHostAdapter {
   readonly #lookupTimeoutMs: number;
   readonly #maxConcurrentLookupsPerTarget: number;
   readonly #actionLabel: string | undefined;
+  readonly #presentationMode: PointablePresentationMode | undefined;
   readonly #attachments = new Map<string, TargetAttachment>();
   readonly #attaching = new Set<TargetAttachment>();
   readonly #recoveries = new Set<Promise<void>>();
@@ -325,6 +328,15 @@ export class CodexCdpHostAdapter {
     this.#maxConcurrentLookupsPerTarget =
       options.maxConcurrentLookupsPerTarget ?? 8;
     this.#actionLabel = options.actionLabel;
+    this.#presentationMode = options.presentationMode;
+    if (
+      this.#presentationMode !== undefined &&
+      this.#presentationMode !== "record" &&
+      this.#presentationMode !== "narrative" &&
+      this.#presentationMode !== "mental-model"
+    ) {
+      throw new RangeError("presentationMode is invalid");
+    }
     if (
       !Number.isSafeInteger(this.#lookupTimeoutMs) ||
       this.#lookupTimeoutMs < 100 ||
@@ -561,6 +573,9 @@ export class CodexCdpHostAdapter {
         ...(this.#actionLabel === undefined
           ? {}
           : { actionLabel: this.#actionLabel }),
+        ...(this.#presentationMode === undefined
+          ? {}
+          : { presentationMode: this.#presentationMode }),
       };
       const installed = await connection.send("Runtime.evaluate", {
         expression: createInstallPointableRendererExpression(rendererConfig),

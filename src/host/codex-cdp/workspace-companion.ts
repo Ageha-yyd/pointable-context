@@ -5,6 +5,7 @@ import {
 } from "./adapter.js";
 import type { PointableFetch } from "./targets.js";
 import type { CdpConnectionFactory } from "./transport.js";
+import type { PointablePresentationMode } from "./protocol.js";
 import {
   CodexTaskWorkspaceBindingRegistry,
   type CodexTaskWorkspaceBindingEntry,
@@ -24,6 +25,7 @@ export interface WorkspaceCompanionOptions {
   maxConcurrentLookupsPerTarget?: number;
   refreshIntervalMs?: number;
   actionLabel?: string;
+  presentationMode?: PointablePresentationMode;
 }
 
 export type CodexDesktopCompatibilityGate =
@@ -48,6 +50,7 @@ export interface CodexDesktopCompatibilityStatus {
 export interface WorkspaceCompanionStatus {
   state: "idle" | "running" | "stopping" | "stopped";
   mode: "live-local-workspace";
+  presentationMode: PointablePresentationMode;
   experimentalHostAdapter: true;
   startedAt?: string;
   lastRefreshAt?: string;
@@ -218,6 +221,7 @@ export function createWorkspaceCompanion(
   options: WorkspaceCompanionOptions,
 ): WorkspaceCompanion {
   const intervalMs = refreshInterval(options.refreshIntervalMs);
+  const presentationMode = options.presentationMode ?? "record";
   const lookup = createWorkspaceLookupCallback({
     registry: options.registry,
     ...(options.operationTimeoutMs === undefined
@@ -239,6 +243,7 @@ export function createWorkspaceCompanion(
       ? {}
       : { maxConcurrentLookupsPerTarget: options.maxConcurrentLookupsPerTarget }),
     actionLabel: options.actionLabel ?? "查看上下文",
+    presentationMode,
   };
   const adapter = new CodexCdpHostAdapter(adapterOptions);
   let state: WorkspaceCompanionStatus["state"] = "idle";
@@ -258,6 +263,7 @@ export function createWorkspaceCompanion(
     return immutableStatus({
       state,
       mode: "live-local-workspace",
+      presentationMode,
       experimentalHostAdapter: true,
       ...(startedAt === undefined ? {} : { startedAt }),
       ...(lastRefreshAt === undefined ? {} : { lastRefreshAt }),

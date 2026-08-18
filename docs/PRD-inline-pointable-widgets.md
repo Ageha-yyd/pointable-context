@@ -1,7 +1,7 @@
 # PRD：Quiet Context Reveal（选区式上下文速览）
 
-- 版本：v1.8
-- 状态：摘要优先、当前 build 兼容性、文件 revision 原位刷新、首批场景安全投影与技术基准/人工实验协议完成；正式用户效率实验待执行
+- 版本：v1.9
+- 状态：Quiet Reveal 主链、动态刷新与首批场景投影已完成；显式概念制品、A/B/C 人类理解呈现和非推断性 pilot 协议进入验证
 - 日期：2026-08-18
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
@@ -133,7 +133,7 @@ P0 不提供“识别更多概念”、自然语言语义扩展、LLM 候选生�
 
 ### 6.2 模块或项目内概念
 
-选中 `src/adapters/local-workspace.ts` 等 TypeScript/JavaScript 模块后，卡片显示：职责、公开入口、本次变化、直接依赖与字面引用/测试关联、路径。选中 `ContextScopeRef` 等尚无文件身份的抽象概念时，仍需等待独立的 Agent-known Context Index Provider。
+选中 `src/adapters/local-workspace.ts` 等 TypeScript/JavaScript 模块后，卡片显示：职责、公开入口、本次变化、直接依赖与字面引用/测试关联、路径。作者显式放入 `docs/concepts/*.md` 的概念制品可以通过文件名/稳定名称确定性解析，并按“它是什么意思、为什么现在出现、它不是什么、所处流程、证据”投影；普通 prose 中没有显式身份的抽象概念仍不做语义猜测。
 
 ### 6.3 架构或产品决策
 
@@ -191,6 +191,25 @@ P0 不提供“识别更多概念”、自然语言语义扩展、LLM 候选生�
 - 关闭后不自动重开；
 - 焦点回到触发入口或原阅读位置；
 - 不改变 Chat 滚动位置。
+
+### 7.5 人类理解投影
+
+详情卡不是统一数据库记录的缩小版。首屏应按对象类型回答用户正在建立的心智模型：
+
+| 对象 | 首屏理解任务 | 推荐微型表示 |
+|---|---|---|
+| 概念 | 它是什么意思、为什么现在出现、它不是什么 | 定义 + 当前语境 + 边界 |
+| 阶段 | 现在位于哪里、为什么做、下一步是什么 | 前一步 → 当前 → 下一步 |
+| 变更 | 原来怎样、现在怎样、影响谁 | Before → After → Impact |
+| 决策 | 为什么决定、选择了什么、后果是什么 | 问题 → 选择 → 后果 |
+| 模块 | 接收什么、负责什么、影响什么 | 输入 → 职责 → 输出 |
+| 文档 | 解决什么、核心结构是什么 | 一句话主旨 + 三段结构 |
+| 证据 | 证明什么、依据是什么、还没证明什么 | Claim → Evidence → Gap |
+| 状态/Gate | 能否继续、阻塞是什么、下一触发是什么 | 状态 + 阻塞 + 下一事件 |
+
+来源、修订、observedAt 和 freshness 默认仍在第二层；只有 stale、partial、evidence gap 等会改变当前判断时，才进入首屏。证据入口使用低显著性的卡内 `为什么这样说`，展开后显示有界原文片段与来源，不打开浏览器、不创建 Chat Turn。
+
+v1.9 首个实现只资格化显式 `concept` 制品，不借此宣称八类均已实现。`pilot` 作为冻结样例：首屏显示定义、当前阶段原因、四步流程、不能声称显著性的边界；证据默认收起。
 
 ## 8. 数据与对象模型
 
@@ -272,6 +291,16 @@ v1.6 首个实现切片把上述原则收窄为可验证的文件语义：
 v1.7 已把其中三类收窄为安全、可执行合同：测试源码默认摘要是静态验证范围且明确未执行；已知 JSON 配置默认摘要是用途且永不投影值；path-qualified ADR 默认摘要是显式 Decision 段落。它们不冒充运行结果、解析后有效配置或语义决策图。
 
 场景策略是投影优先级，不是新增 Provider 的理由。没有可靠数据时宁可少显示，也不填充通用字段凑满卡片。
+
+### 8.8 Explicit Concept Artifact
+
+P0 不从任意 prose 自动抽取概念。只有位于 `docs/concepts/*.md` 且包含冻结结构标题的作者制品才获得 `concept` 身份：`它是什么意思`、`为什么现在出现`、`它不是什么`、`所处流程`、`证据`、`来源`。
+
+- 文件 stem 是确定性名称/alias，不调用 embedding 或模型；
+- 流程最多 4 步，且必须显式标记一个 `当前：` 步骤；
+- 来源必须是 workspace 内相对路径和行号；详情读取时原文证据必须与该行精确一致；
+- 任一必填段、当前步骤或证据复验缺失时 fail closed；
+- 当前轻量 revision probe 仍只观察概念制品自身，外部证据文件单独变化可能需要重新打开卡片，这是 pilot 前已知边界。
 
 ## 9. P0 功能需求
 
@@ -369,6 +398,14 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 
 两组使用相同项目状态和事实，B 不得获得额外信息。
 
+在上述正式效率对照之前，先做不带因果主张的呈现 pilot：
+
+- P-A：当前记录式摘要 + 收起字段；
+- P-B：人类叙事摘要；
+- P-C：类型化微型心智模型 + 收起证据。
+
+三者必须使用同一对象、同一事实、同一 evidence 和同一原生 Chat Lane，仅改变 projection。首个 `pilot` 任务要求回答“是什么、为什么现在出现、不能证明什么、前后步骤”，并记录正确理解时间、四个答案单元、证据展开、Chat Turn、lane leave、错误对象和 card sufficiency。8–12 人只用于发现流程/表达缺陷和估计方差，不用于显著性声明。
+
 ### 12.2 任务
 
 1. 找出某文档本次更新的关键点；
@@ -419,6 +456,7 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 - [ ] Test/Spec 源码只显示静态标题和“未执行”边界，不推断 PASS/FAIL；
 - [ ] 已知 JSON 配置只显示用途与有限键名，配置值和潜在密钥不进入卡片；
 - [ ] ADR/Decision 只从 path-qualified Markdown 的显式章节读取；
+- [ ] Concept 只从 `docs/concepts/*.md` 的冻结结构读取，并复验 workspace 内证据行；
 - [ ] opaque ref 绑定完整 context 和对象身份；
 - [ ] 点击后读取当前 authoritative snapshot；
 - [ ] index/provider/context 漂移 fail closed；
@@ -435,6 +473,8 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 - [ ] 未完成正式实验前不声称“显著提升”。
 - [ ] 自动延迟基准始终标记 `technical_latency_only`，不冒充 `time_to_verified_fact`；
 - [ ] A/B 两条件使用相同 transcript、项目状态和事实答案键；
+- [ ] 呈现 pilot 的 P-A/P-B/P-C 使用同一对象、事实与证据，且条件内不可切换；
+- [ ] `pilot` 的四个理解单元分别计分，不以“打开卡片”代替理解完成；
 
 ## 14. 现有实现复用矩阵
 
@@ -466,6 +506,8 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 - Test Definition 投影：静态 `test/it` 标题、未执行边界、源码变化和有限依赖；
 - Known JSON Configuration 投影：用途、有限顶层键名、零值披露和路径；
 - Path-qualified ADR 投影：显式状态、决策、原因、后果和路径；
+- 显式 Concept Artifact：严格结构、确定性名称、当前步骤、边界和 workspace 内证据行复验；
+- renderer 固定的 `record/narrative/mental-model` 三种研究条件，以及 `pilot` 微型心智模型和卡内证据展开；
 - 摘要优先的卡内 progressive disclosure：默认隐藏事实/元数据/来源，保留类型与 freshness；
 - Artifact、Module/Concept、Decision/Task 类型化详情；
 - 来源、修订、新鲜度、观察时间和文本 fallback；
@@ -490,7 +532,8 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 2. 已完成当前 build 的四层启动兼容性自检与失败降级；
 3. 已完成首个文件 revision 失效提示、显式零-turn 刷新、有限差异和真实 Edge 零-turn 验收；
 4. 已完成文档、模块、测试源码、已知 JSON 配置与 path-qualified ADR 的摘要策略和真实仓库 Provider 验证；
-5. 已完成隔离技术延迟基准和人工 A/B 协议；下一步先做非推断性的可用性 pilot，再基于真实错误与方差决定 revision signal、测试运行证据或 Agent-known Provider 的扩展优先级。
+5. 已完成隔离技术延迟基准和正式 A/B 协议；
+6. 当前阶段：先以同一 `pilot` 对象运行 P-A/P-B/P-C 非推断性呈现 pilot，再基于真实错误与方差决定默认 projection，随后才进入线性 Chat 对照的效率研究。
 
 ## 17. 已冻结决策
 
@@ -507,6 +550,7 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 
 ## 18. 变更记录
 
+- v1.9：把卡片目标从“有界记录摘要”推进到“类型匹配的微型心智模型”；新增严格、无模型的 `docs/concepts/*.md` 概念制品与证据行复验；为同一 `pilot` 数据加入固定 `record/narrative/mental-model` 三种原生呈现条件、卡内证据展开和 8–12 人非推断性 pilot 协议。
 - v1.8：把技术响应速度与人的信息获取效率拆开；加入无模型、零 Chat Turn 的可重复 workspace latency benchmark、首个本机基线和 counterbalanced A/B 协议，明确自动 benchmark 不得冒充 `time_to_verified_fact` 或显著性证据。
 - v1.7：加入安全的场景摘要切片：测试源码只显示静态测试标题并明确未执行，已知 JSON 配置只显示用途和键名，path-qualified ADR 只读取显式决策章节；用当前仓库文档、模块、测试和配置做 Provider 实测，避免通用五字段堆叠。
 - v1.6：为打开的文件卡片增加绑定上下文的短期 detail ref、轻量 stat revision 探测、`内容已更新` 提示、可信显式原位刷新与最多 3 项差异；删除/不可用保留旧快照，过期、重绑定和容量耗尽 fail closed；真实 Edge 验收确认该路径零 Chat Turn。

@@ -1035,6 +1035,8 @@ function validateDetail(value) {
     "freshness",
     "facts",
     "sources",
+    "humanSummary",
+    "comprehension",
     "detailRef",
     "changes"
   ])) {
@@ -1049,7 +1051,7 @@ function validateDetail(value) {
       "detail freshness is invalid"
     );
   }
-  if (!boundedString(value.observedAt, 20, 64) || !Number.isFinite(Date.parse(value.observedAt)) || !Array.isArray(value.facts) || value.facts.length > 5 || !Array.isArray(value.sources) || value.sources.length > 5 || value.detailRef !== void 0 && !boundedString(value.detailRef, 8, 256) || value.changes !== void 0 && (!Array.isArray(value.changes) || value.changes.length > 3)) {
+  if (!boundedString(value.observedAt, 20, 64) || !Number.isFinite(Date.parse(value.observedAt)) || !Array.isArray(value.facts) || value.facts.length > 5 || !Array.isArray(value.sources) || value.sources.length > 5 || value.humanSummary !== void 0 && !boundedString(value.humanSummary, 1, 1024) || value.detailRef !== void 0 && !boundedString(value.detailRef, 8, 256) || value.changes !== void 0 && (!Array.isArray(value.changes) || value.changes.length > 3)) {
     throw new PointableProtocolError(
       "invalid_lookup_result",
       "detail metadata exceeds its contract"
@@ -1076,6 +1078,42 @@ function validateDetail(value) {
     }
     return { label: requiredString(source.label, "source label", 512) };
   });
+  let comprehension;
+  if (value.comprehension !== void 0) {
+    const view = value.comprehension;
+    if (!record(view) || !exactKeys(view, [
+      "kind",
+      "meaning",
+      "context",
+      "boundary",
+      "sequence",
+      "currentStep",
+      "evidence"
+    ]) || view.kind !== "concept" || !boundedString(view.meaning, 1, 1024) || !boundedString(view.context, 1, 1024) || !boundedString(view.boundary, 1, 1024) || !Array.isArray(view.sequence) || view.sequence.length < 2 || view.sequence.length > 4 || !view.sequence.every((item) => boundedString(item, 1, 256)) || !Number.isSafeInteger(view.currentStep) || Number(view.currentStep) < 0 || Number(view.currentStep) >= view.sequence.length || !Array.isArray(view.evidence) || view.evidence.length < 1 || view.evidence.length > 3) {
+      throw new PointableProtocolError(
+        "invalid_lookup_result",
+        "detail comprehension view is invalid"
+      );
+    }
+    const evidence = view.evidence.map((item) => {
+      if (!record(item) || !exactKeys(item, ["excerpt", "source"]) || !boundedString(item.excerpt, 1, 1024) || !boundedString(item.source, 1, 512)) {
+        throw new PointableProtocolError(
+          "invalid_lookup_result",
+          "detail evidence is invalid"
+        );
+      }
+      return { excerpt: item.excerpt, source: item.source };
+    });
+    comprehension = {
+      kind: "concept",
+      meaning: view.meaning,
+      context: view.context,
+      boundary: view.boundary,
+      sequence: [...view.sequence],
+      currentStep: Number(view.currentStep),
+      evidence
+    };
+  }
   const changes = value.changes === void 0 ? void 0 : value.changes.map((change) => {
     if (!record(change) || !exactKeys(change, ["label", "before", "after"])) {
       throw new PointableProtocolError(
@@ -1099,6 +1137,8 @@ function validateDetail(value) {
     freshness: value.freshness,
     facts,
     sources,
+    ...typeof value.humanSummary === "string" ? { humanSummary: value.humanSummary } : {},
+    ...comprehension === void 0 ? {} : { comprehension },
     ...typeof value.detailRef === "string" ? { detailRef: value.detailRef } : {},
     ...changes === void 0 ? {} : { changes }
   };
@@ -1213,6 +1253,16 @@ function validatePointableRendererResponse(value) {
   const factView = (candidate) => isRecord(candidate) && exact(candidate, ["label", "value"]) && bounded(candidate.label, 1, 128) && bounded(candidate.value, 1, 1024);
   const sourceView = (candidate) => isRecord(candidate) && exact(candidate, ["label"]) && bounded(candidate.label, 1, 512);
   const changeView = (candidate) => isRecord(candidate) && exact(candidate, ["label", "before", "after"]) && bounded(candidate.label, 1, 128) && bounded(candidate.before, 1, 1024) && bounded(candidate.after, 1, 1024);
+  const evidenceView = (candidate) => isRecord(candidate) && exact(candidate, ["excerpt", "source"]) && bounded(candidate.excerpt, 1, 1024) && bounded(candidate.source, 1, 512);
+  const comprehensionView = (candidate) => isRecord(candidate) && exact(candidate, [
+    "kind",
+    "meaning",
+    "context",
+    "boundary",
+    "sequence",
+    "currentStep",
+    "evidence"
+  ]) && candidate.kind === "concept" && bounded(candidate.meaning, 1, 1024) && bounded(candidate.context, 1, 1024) && bounded(candidate.boundary, 1, 1024) && Array.isArray(candidate.sequence) && candidate.sequence.length >= 2 && candidate.sequence.length <= 4 && candidate.sequence.every((item) => bounded(item, 1, 256)) && Number.isSafeInteger(candidate.currentStep) && Number(candidate.currentStep) >= 0 && Number(candidate.currentStep) < candidate.sequence.length && Array.isArray(candidate.evidence) && candidate.evidence.length >= 1 && candidate.evidence.length <= 3 && candidate.evidence.every(evidenceView);
   if (!isRecord(value) || !exact(value, [
     "schemaVersion",
     "kind",
@@ -1241,9 +1291,11 @@ function validatePointableRendererResponse(value) {
       "freshness",
       "facts",
       "sources",
+      "humanSummary",
+      "comprehension",
       "detailRef",
       "changes"
-    ]) || !bounded(detail.entityId, 1, 256) || !bounded(detail.entityType, 1, 128) || !bounded(detail.label, 1, 256) || !bounded(detail.summary, 1, 1024) || !bounded(detail.revision, 1, 512) || !bounded(detail.observedAt, 20, 64) || !Number.isFinite(Date.parse(detail.observedAt)) || detail.freshness !== "current" && detail.freshness !== "stale" && detail.freshness !== "partial" && detail.freshness !== "unknown" || !Array.isArray(detail.facts) || detail.facts.length > 5 || !detail.facts.every(factView) || !Array.isArray(detail.sources) || detail.sources.length > 5 || !detail.sources.every(sourceView) || detail.detailRef !== void 0 && !bounded(detail.detailRef, 8, 256) || detail.changes !== void 0 && (!Array.isArray(detail.changes) || detail.changes.length > 3 || !detail.changes.every(changeView))) {
+    ]) || !bounded(detail.entityId, 1, 256) || !bounded(detail.entityType, 1, 128) || !bounded(detail.label, 1, 256) || !bounded(detail.summary, 1, 1024) || !bounded(detail.revision, 1, 512) || !bounded(detail.observedAt, 20, 64) || !Number.isFinite(Date.parse(detail.observedAt)) || detail.freshness !== "current" && detail.freshness !== "stale" && detail.freshness !== "partial" && detail.freshness !== "unknown" || !Array.isArray(detail.facts) || detail.facts.length > 5 || !detail.facts.every(factView) || !Array.isArray(detail.sources) || detail.sources.length > 5 || !detail.sources.every(sourceView) || detail.humanSummary !== void 0 && !bounded(detail.humanSummary, 1, 1024) || detail.comprehension !== void 0 && !comprehensionView(detail.comprehension) || detail.detailRef !== void 0 && !bounded(detail.detailRef, 8, 256) || detail.changes !== void 0 && (!Array.isArray(detail.changes) || detail.changes.length > 3 || !detail.changes.every(changeView))) {
       return void 0;
     }
   } else if (presentation.kind === "revision") {
@@ -1275,6 +1327,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     throw new Error("pointable_renderer_revision_interval_invalid");
   }
   const actionLabel = typeof config.actionLabel === "string" && config.actionLabel.trim().length > 0 && config.actionLabel.length <= 64 ? config.actionLabel.trim() : "\u67E5\u770B\u4E0A\u4E0B\u6587";
+  const presentationMode = config.presentationMode === "narrative" || config.presentationMode === "mental-model" || config.presentationMode === "record" ? config.presentationMode : "record";
   const existing = window[namespace];
   if (typeof existing === "object" && existing !== null && "status" in existing && typeof existing.status === "function") {
     const existingApi = existing;
@@ -1666,6 +1719,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     shell.setAttribute("aria-labelledby", `${shell.id}-title`);
     shell.setAttribute("data-pointable-context-owned", lifecycleId);
     shell.setAttribute("data-pointable-context-role", "card");
+    shell.setAttribute("data-pointable-context-presentation", presentationMode);
     Object.assign(shell.style, {
       position: "fixed",
       zIndex: "2147482999",
@@ -1881,11 +1935,151 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     else shell.insertBefore(notice, header?.nextSibling ?? shell.firstChild);
     reposition();
   }
+  function mountConceptComprehension(body, model) {
+    const surface = document.createElement("div");
+    surface.setAttribute("data-pointable-context-role", "comprehension-model");
+    surface.setAttribute("data-pointable-context-kind", model.kind);
+    surface.append(paragraph(model.meaning));
+    const context = document.createElement("div");
+    context.setAttribute("data-pointable-context-role", "comprehension-context");
+    Object.assign(context.style, {
+      marginTop: "10px",
+      padding: "8px 10px",
+      borderLeft: "3px solid #8ba8ff",
+      borderRadius: "0 8px 8px 0",
+      background: "#f7f9ff"
+    });
+    const contextLabel = document.createElement("strong");
+    contextLabel.textContent = "\u4E3A\u4EC0\u4E48\u73B0\u5728\u51FA\u73B0";
+    Object.assign(contextLabel.style, {
+      display: "block",
+      marginBottom: "3px",
+      color: "#334155",
+      fontSize: "12px"
+    });
+    const contextText = paragraph(model.context, true);
+    context.append(contextLabel, contextText);
+    surface.append(context);
+    const flow = document.createElement("div");
+    flow.setAttribute("data-pointable-context-role", "comprehension-flow");
+    Object.assign(flow.style, { marginTop: "12px" });
+    const flowLabel = document.createElement("strong");
+    flowLabel.textContent = "\u4F60\u73B0\u5728\u4F4D\u4E8E\u8FD9\u91CC";
+    Object.assign(flowLabel.style, {
+      display: "block",
+      marginBottom: "6px",
+      color: "#334155",
+      fontSize: "12px"
+    });
+    flow.append(flowLabel);
+    for (let index = 0; index < model.sequence.length; index += 1) {
+      const step = document.createElement("div");
+      const current = index === model.currentStep;
+      step.setAttribute("data-pointable-context-role", "comprehension-step");
+      step.setAttribute("data-pointable-context-current", String(current));
+      step.textContent = `${current ? "\u5F53\u524D \xB7 " : ""}${model.sequence[index] ?? ""}`;
+      Object.assign(step.style, {
+        padding: "6px 9px",
+        border: current ? "1px solid #7798ff" : "1px solid #dce3ee",
+        borderRadius: "8px",
+        background: current ? "#edf2ff" : "#ffffff",
+        color: current ? "#1746c7" : "#52627a",
+        fontWeight: current ? "700" : "500",
+        fontSize: "12px"
+      });
+      flow.append(step);
+      if (index < model.sequence.length - 1) {
+        const arrow = document.createElement("div");
+        arrow.textContent = "\u2193";
+        arrow.setAttribute("aria-hidden", "true");
+        Object.assign(arrow.style, {
+          height: "16px",
+          color: "#94a3b8",
+          textAlign: "center",
+          lineHeight: "16px"
+        });
+        flow.append(arrow);
+      }
+    }
+    surface.append(flow);
+    const boundary = document.createElement("div");
+    boundary.setAttribute("data-pointable-context-role", "comprehension-boundary");
+    Object.assign(boundary.style, {
+      marginTop: "12px",
+      padding: "8px 10px",
+      borderRadius: "8px",
+      background: "#fff7ed",
+      color: "#8a4b00",
+      fontSize: "12px"
+    });
+    const boundaryLabel = document.createElement("strong");
+    boundaryLabel.textContent = "\u4E0D\u4F1A\u8BC1\u660E\uFF1A";
+    const boundaryText = document.createElement("span");
+    boundaryText.textContent = model.boundary;
+    boundary.append(boundaryLabel, boundaryText);
+    surface.append(boundary);
+    const evidenceDisclosure = document.createElement("div");
+    evidenceDisclosure.setAttribute("data-pointable-context-role", "evidence-disclosure");
+    Object.assign(evidenceDisclosure.style, { marginTop: "8px" });
+    const evidenceToggle = document.createElement("button");
+    evidenceToggle.type = "button";
+    evidenceToggle.textContent = "\u4E3A\u4EC0\u4E48\u8FD9\u6837\u8BF4";
+    evidenceToggle.setAttribute("aria-expanded", "false");
+    evidenceToggle.setAttribute("data-pointable-context-role", "evidence-toggle");
+    Object.assign(evidenceToggle.style, {
+      border: "0",
+      background: "transparent",
+      color: "#52627a",
+      cursor: "pointer",
+      padding: "2px 0",
+      fontSize: "12px",
+      fontWeight: "600"
+    });
+    const evidenceBody = document.createElement("div");
+    evidenceBody.id = `${cardElement?.id ?? cardIdBase}-evidence-body`;
+    evidenceBody.hidden = true;
+    evidenceBody.style.display = "none";
+    evidenceBody.setAttribute("data-pointable-context-role", "evidence-body");
+    evidenceToggle.setAttribute("aria-controls", evidenceBody.id);
+    for (const item of model.evidence) {
+      const quote = document.createElement("blockquote");
+      quote.textContent = item.excerpt;
+      Object.assign(quote.style, {
+        margin: "8px 0 0",
+        padding: "7px 9px",
+        borderLeft: "3px solid #cbd5e1",
+        color: "#475569",
+        fontSize: "11px"
+      });
+      const source = paragraph(item.source, true);
+      Object.assign(source.style, { marginTop: "4px", fontSize: "11px" });
+      evidenceBody.append(quote, source);
+    }
+    evidenceToggle.addEventListener("click", (event) => {
+      if (!event.isTrusted) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const expanded = evidenceToggle.getAttribute("aria-expanded") !== "true";
+      evidenceToggle.setAttribute("aria-expanded", String(expanded));
+      evidenceBody.hidden = !expanded;
+      evidenceBody.style.display = expanded ? "block" : "none";
+      evidenceToggle.textContent = expanded ? "\u6536\u8D77\u4F9D\u636E" : "\u4E3A\u4EC0\u4E48\u8FD9\u6837\u8BF4";
+      reposition();
+    });
+    evidenceDisclosure.append(evidenceToggle, evidenceBody);
+    surface.append(evidenceDisclosure);
+    body.append(surface);
+  }
   function mountDetail(detail) {
     clearRevisionTimer();
     state = "detail";
     const { body } = createShell(detail.label);
-    body.append(paragraph(detail.summary));
+    if (presentationMode === "mental-model" && detail.comprehension !== void 0) {
+      mountConceptComprehension(body, detail.comprehension);
+    } else {
+      const summary = presentationMode === "record" ? detail.summary : detail.humanSummary ?? detail.summary;
+      body.append(paragraph(summary));
+    }
     if (detail.changes !== void 0 && detail.changes.length > 0) {
       const changeSummary = document.createElement("div");
       changeSummary.setAttribute("data-pointable-context-role", "revision-changes");
@@ -2904,6 +3098,7 @@ var CodexCdpHostAdapter = class {
   #lookupTimeoutMs;
   #maxConcurrentLookupsPerTarget;
   #actionLabel;
+  #presentationMode;
   #attachments = /* @__PURE__ */ new Map();
   #attaching = /* @__PURE__ */ new Set();
   #recoveries = /* @__PURE__ */ new Set();
@@ -2921,6 +3116,10 @@ var CodexCdpHostAdapter = class {
     this.#lookupTimeoutMs = options.lookupTimeoutMs ?? 5e3;
     this.#maxConcurrentLookupsPerTarget = options.maxConcurrentLookupsPerTarget ?? 8;
     this.#actionLabel = options.actionLabel;
+    this.#presentationMode = options.presentationMode;
+    if (this.#presentationMode !== void 0 && this.#presentationMode !== "record" && this.#presentationMode !== "narrative" && this.#presentationMode !== "mental-model") {
+      throw new RangeError("presentationMode is invalid");
+    }
     if (!Number.isSafeInteger(this.#lookupTimeoutMs) || this.#lookupTimeoutMs < 100 || this.#lookupTimeoutMs > 3e4) {
       throw new RangeError("lookupTimeoutMs must be an integer from 100 to 30000");
     }
@@ -3109,7 +3308,8 @@ var CodexCdpHostAdapter = class {
       const rendererConfig = {
         bindingName,
         requestTimeoutMs: this.#lookupTimeoutMs,
-        ...this.#actionLabel === void 0 ? {} : { actionLabel: this.#actionLabel }
+        ...this.#actionLabel === void 0 ? {} : { actionLabel: this.#actionLabel },
+        ...this.#presentationMode === void 0 ? {} : { presentationMode: this.#presentationMode }
       };
       const installed = await connection.send("Runtime.evaluate", {
         expression: createInstallPointableRendererExpression(rendererConfig),

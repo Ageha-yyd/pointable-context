@@ -7,7 +7,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v1.8 keeps Quiet Context Reveal and freezes the measurement boundary", async () => {
+test("v1.9 keeps Quiet Context Reveal and adds a bounded comprehension pilot", async () => {
   const [prd, readme, mainSkill, workspaceSkill] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -15,7 +15,7 @@ test("v1.8 keeps Quiet Context Reveal and freezes the measurement boundary", asy
     text("skills/pointable-context-workspace/SKILL.md"),
   ]);
 
-  assert.match(prd, /版本：v1\.8/u);
+  assert.match(prd, /版本：v1\.9/u);
   assert.match(prd, /默认可视入口是用户选区后的轻量按钮/u);
   assert.match(prd, /selection 本身不读取详情、不调用模型/u);
   assert.match(prd, /产品不存在“识别更多概念”模型分支/u);
@@ -31,6 +31,8 @@ test("v1.8 keeps Quiet Context Reveal and freezes the measurement boundary", asy
   assert.match(prd, /启动自检只能证明可安装性，不能替代每个 build 的真实 selection/u);
   assert.match(prd, /自动延迟基准始终标记 `technical_latency_only`/u);
   assert.match(prd, /不证明人的 `time_to_verified_fact` 已下降/u);
+  assert.match(prd, /P-A\/P-B\/P-C 使用同一对象、事实与证据/u);
+  assert.match(prd, /`docs\/concepts\/\*\.md`/u);
 
   assert.match(readme, /primary interaction is \*\*Quiet Context Reveal\*\*/u);
   assert.match(readme, /no "identify more concepts" or semantic-model branch/u);
@@ -38,6 +40,7 @@ test("v1.8 keeps Quiet Context Reveal and freezes the measurement boundary", asy
   assert.match(readme, /same card shows a quiet `内容已更新` notice/u);
   assert.match(readme, /Reading the file never claims PASS or FAIL/u);
   assert.match(readme, /Configuration values and potential secrets never enter the card/u);
+  assert.match(readme, /three fixed research conditions/u);
   assert.match(mainSkill, /Use MCP `render_context_capsule` only when the user explicitly asks/u);
   assert.match(mainSkill, /Do not offer `识别更多概念`/u);
   assert.match(workspaceSkill, /Selection alone is inert/u);
@@ -47,6 +50,7 @@ test("v1.8 keeps Quiet Context Reveal and freezes the measurement boundary", asy
   assert.match(workspaceSkill, /trusted `刷新内容` click/u);
   assert.match(workspaceSkill, /Never translate source presence into PASS\/FAIL/u);
   assert.match(workspaceSkill, /Never expose configuration values/u);
+  assert.match(workspaceSkill, /explicitly authored `docs\/concepts\/\*\.md` artifact/u);
   assert.match(workspaceSkill, /`compatibility\.state` is `qualified`/u);
 });
 
@@ -59,5 +63,5 @@ test("plugin defaults enable Quiet Mode instead of proactively rendering capsule
   assert.ok(prompts.length > 0);
   assert.match(prompts[0] ?? "", /Enable Pointable Context Quiet Mode/u);
   assert.ok(prompts.every((prompt) => !/^Show |^Render /u.test(prompt)));
-  assert.match(manifest.interface?.longDescription ?? "", /semantic concept recognition/u);
+  assert.match(manifest.interface?.longDescription ?? "", /ordinary prose is never semantically mined/u);
 });

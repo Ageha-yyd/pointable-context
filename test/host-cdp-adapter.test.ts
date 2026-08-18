@@ -210,6 +210,7 @@ async function startedAdapter(
   limits: {
     lookupTimeoutMs?: number;
     maxConcurrentLookupsPerTarget?: number;
+    presentationMode?: "record" | "narrative" | "mental-model";
   } = {},
 ): Promise<CodexCdpHostAdapter> {
   const adapter = new CodexCdpHostAdapter({
@@ -240,7 +241,11 @@ async function waitUntil(
 
 test("adapter installs a namespaced renderer and removes it cleanly", async () => {
   const connection = new FakeCdpConnection();
-  const adapter = await startedAdapter(connection, async () => detailPresentation());
+  const adapter = await startedAdapter(
+    connection,
+    async () => detailPresentation(),
+    { presentationMode: "mental-model" },
+  );
   assert.deepEqual(
     connection.commands.slice(0, 4).map((command) => command.method),
     ["Page.enable", "Page.getFrameTree", "Runtime.enable", "Runtime.addBinding"],
@@ -250,6 +255,7 @@ test("adapter installs a namespaced renderer and removes it cleanly", async () =
     String(command.params.expression).includes("const install ="));
   assert.ok(install);
   assert.match(String(install.params.expression), /__pointableContextRenderer/u);
+  assert.match(String(install.params.expression), /"presentationMode":"mental-model"/u);
 
   const bindingName = adapter.status().targets[0]?.bindingName;
   assert.match(bindingName ?? "", /^__pointableContextBinding_/u);

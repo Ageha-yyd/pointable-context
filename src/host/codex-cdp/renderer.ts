@@ -1,5 +1,8 @@
 import type {
+  PointableComprehensionView,
+  PointableDetailView,
   PointableLookupResponseV1,
+  PointablePresentationMode,
   PointableSelectionSurface,
 } from "./protocol.js";
 
@@ -38,6 +41,7 @@ export interface PointableRendererConfig {
   requestTimeoutMs?: number;
   revisionCheckIntervalMs?: number;
   actionLabel?: string;
+  presentationMode?: PointablePresentationMode;
 }
 
 export interface PointableRendererStatus {
@@ -138,6 +142,37 @@ export function validatePointableRendererResponse(
     bounded(candidate.label, 1, 128) &&
     bounded(candidate.before, 1, 1_024) &&
     bounded(candidate.after, 1, 1_024);
+  const evidenceView = (candidate: unknown): boolean =>
+    isRecord(candidate) &&
+    exact(candidate, ["excerpt", "source"]) &&
+    bounded(candidate.excerpt, 1, 1_024) &&
+    bounded(candidate.source, 1, 512);
+  const comprehensionView = (candidate: unknown): boolean =>
+    isRecord(candidate) &&
+    exact(candidate, [
+      "kind",
+      "meaning",
+      "context",
+      "boundary",
+      "sequence",
+      "currentStep",
+      "evidence",
+    ]) &&
+    candidate.kind === "concept" &&
+    bounded(candidate.meaning, 1, 1_024) &&
+    bounded(candidate.context, 1, 1_024) &&
+    bounded(candidate.boundary, 1, 1_024) &&
+    Array.isArray(candidate.sequence) &&
+    candidate.sequence.length >= 2 &&
+    candidate.sequence.length <= 4 &&
+    candidate.sequence.every((item) => bounded(item, 1, 256)) &&
+    Number.isSafeInteger(candidate.currentStep) &&
+    Number(candidate.currentStep) >= 0 &&
+    Number(candidate.currentStep) < candidate.sequence.length &&
+    Array.isArray(candidate.evidence) &&
+    candidate.evidence.length >= 1 &&
+    candidate.evidence.length <= 3 &&
+    candidate.evidence.every(evidenceView);
 
   if (
     !isRecord(value) ||
@@ -191,6 +226,8 @@ export function validatePointableRendererResponse(
         "freshness",
         "facts",
         "sources",
+        "humanSummary",
+        "comprehension",
         "detailRef",
         "changes",
       ]) ||
@@ -211,6 +248,8 @@ export function validatePointableRendererResponse(
       !Array.isArray(detail.sources) ||
       detail.sources.length > 5 ||
       !detail.sources.every(sourceView) ||
+      (detail.humanSummary !== undefined && !bounded(detail.humanSummary, 1, 1_024)) ||
+      (detail.comprehension !== undefined && !comprehensionView(detail.comprehension)) ||
       (detail.detailRef !== undefined && !bounded(detail.detailRef, 8, 256)) ||
       (detail.changes !== undefined &&
         (!Array.isArray(detail.changes) ||
@@ -303,6 +342,12 @@ export function installPointableContextRenderer(
     config.actionLabel.length <= 64
     ? config.actionLabel.trim()
     : "查看上下文";
+  const presentationMode: PointablePresentationMode =
+    config.presentationMode === "narrative" ||
+    config.presentationMode === "mental-model" ||
+    config.presentationMode === "record"
+      ? config.presentationMode
+      : "record";
   const existing = window[namespace];
   if (
     typeof existing === "object" &&
@@ -841,6 +886,7 @@ export function installPointableContextRenderer(
     shell.setAttribute("aria-labelledby", `${shell.id}-title`);
     shell.setAttribute("data-pointable-context-owned", lifecycleId);
     shell.setAttribute("data-pointable-context-role", "card");
+    shell.setAttribute("data-pointable-context-presentation", presentationMode);
     Object.assign(shell.style, {
       position: "fixed",
       zIndex: "2147482999",
@@ -1094,23 +1140,161 @@ export function installPointableContextRenderer(
     reposition();
   }
 
-  function mountDetail(detail: {
-    entityId: string;
-    entityType: string;
-    label: string;
-    summary: string;
-    revision: string;
-    observedAt: string;
-    freshness: "current" | "stale" | "partial" | "unknown";
-    facts: Array<{ label: string; value: string }>;
-    sources: Array<{ label: string }>;
-    detailRef?: string;
-    changes?: Array<{ label: string; before: string; after: string }>;
-  }): void {
+  function mountConceptComprehension(
+    body: HTMLElement,
+    model: PointableComprehensionView,
+  ): void {
+    const surface = document.createElement("div");
+    surface.setAttribute("data-pointable-context-role", "comprehension-model");
+    surface.setAttribute("data-pointable-context-kind", model.kind);
+    surface.append(paragraph(model.meaning));
+
+    const context = document.createElement("div");
+    context.setAttribute("data-pointable-context-role", "comprehension-context");
+    Object.assign(context.style, {
+      marginTop: "10px",
+      padding: "8px 10px",
+      borderLeft: "3px solid #8ba8ff",
+      borderRadius: "0 8px 8px 0",
+      background: "#f7f9ff",
+    });
+    const contextLabel = document.createElement("strong");
+    contextLabel.textContent = "为什么现在出现";
+    Object.assign(contextLabel.style, {
+      display: "block",
+      marginBottom: "3px",
+      color: "#334155",
+      fontSize: "12px",
+    });
+    const contextText = paragraph(model.context, true);
+    context.append(contextLabel, contextText);
+    surface.append(context);
+
+    const flow = document.createElement("div");
+    flow.setAttribute("data-pointable-context-role", "comprehension-flow");
+    Object.assign(flow.style, { marginTop: "12px" });
+    const flowLabel = document.createElement("strong");
+    flowLabel.textContent = "你现在位于这里";
+    Object.assign(flowLabel.style, {
+      display: "block",
+      marginBottom: "6px",
+      color: "#334155",
+      fontSize: "12px",
+    });
+    flow.append(flowLabel);
+    for (let index = 0; index < model.sequence.length; index += 1) {
+      const step = document.createElement("div");
+      const current = index === model.currentStep;
+      step.setAttribute("data-pointable-context-role", "comprehension-step");
+      step.setAttribute("data-pointable-context-current", String(current));
+      step.textContent = `${current ? "当前 · " : ""}${model.sequence[index] ?? ""}`;
+      Object.assign(step.style, {
+        padding: "6px 9px",
+        border: current ? "1px solid #7798ff" : "1px solid #dce3ee",
+        borderRadius: "8px",
+        background: current ? "#edf2ff" : "#ffffff",
+        color: current ? "#1746c7" : "#52627a",
+        fontWeight: current ? "700" : "500",
+        fontSize: "12px",
+      });
+      flow.append(step);
+      if (index < model.sequence.length - 1) {
+        const arrow = document.createElement("div");
+        arrow.textContent = "↓";
+        arrow.setAttribute("aria-hidden", "true");
+        Object.assign(arrow.style, {
+          height: "16px",
+          color: "#94a3b8",
+          textAlign: "center",
+          lineHeight: "16px",
+        });
+        flow.append(arrow);
+      }
+    }
+    surface.append(flow);
+
+    const boundary = document.createElement("div");
+    boundary.setAttribute("data-pointable-context-role", "comprehension-boundary");
+    Object.assign(boundary.style, {
+      marginTop: "12px",
+      padding: "8px 10px",
+      borderRadius: "8px",
+      background: "#fff7ed",
+      color: "#8a4b00",
+      fontSize: "12px",
+    });
+    const boundaryLabel = document.createElement("strong");
+    boundaryLabel.textContent = "不会证明：";
+    const boundaryText = document.createElement("span");
+    boundaryText.textContent = model.boundary;
+    boundary.append(boundaryLabel, boundaryText);
+    surface.append(boundary);
+
+    const evidenceDisclosure = document.createElement("div");
+    evidenceDisclosure.setAttribute("data-pointable-context-role", "evidence-disclosure");
+    Object.assign(evidenceDisclosure.style, { marginTop: "8px" });
+    const evidenceToggle = document.createElement("button");
+    evidenceToggle.type = "button";
+    evidenceToggle.textContent = "为什么这样说";
+    evidenceToggle.setAttribute("aria-expanded", "false");
+    evidenceToggle.setAttribute("data-pointable-context-role", "evidence-toggle");
+    Object.assign(evidenceToggle.style, {
+      border: "0",
+      background: "transparent",
+      color: "#52627a",
+      cursor: "pointer",
+      padding: "2px 0",
+      fontSize: "12px",
+      fontWeight: "600",
+    });
+    const evidenceBody = document.createElement("div");
+    evidenceBody.id = `${cardElement?.id ?? cardIdBase}-evidence-body`;
+    evidenceBody.hidden = true;
+    evidenceBody.style.display = "none";
+    evidenceBody.setAttribute("data-pointable-context-role", "evidence-body");
+    evidenceToggle.setAttribute("aria-controls", evidenceBody.id);
+    for (const item of model.evidence) {
+      const quote = document.createElement("blockquote");
+      quote.textContent = item.excerpt;
+      Object.assign(quote.style, {
+        margin: "8px 0 0",
+        padding: "7px 9px",
+        borderLeft: "3px solid #cbd5e1",
+        color: "#475569",
+        fontSize: "11px",
+      });
+      const source = paragraph(item.source, true);
+      Object.assign(source.style, { marginTop: "4px", fontSize: "11px" });
+      evidenceBody.append(quote, source);
+    }
+    evidenceToggle.addEventListener("click", (event) => {
+      if (!event.isTrusted) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const expanded = evidenceToggle.getAttribute("aria-expanded") !== "true";
+      evidenceToggle.setAttribute("aria-expanded", String(expanded));
+      evidenceBody.hidden = !expanded;
+      evidenceBody.style.display = expanded ? "block" : "none";
+      evidenceToggle.textContent = expanded ? "收起依据" : "为什么这样说";
+      reposition();
+    });
+    evidenceDisclosure.append(evidenceToggle, evidenceBody);
+    surface.append(evidenceDisclosure);
+    body.append(surface);
+  }
+
+  function mountDetail(detail: PointableDetailView): void {
     clearRevisionTimer();
     state = "detail";
     const { body } = createShell(detail.label);
-    body.append(paragraph(detail.summary));
+    if (presentationMode === "mental-model" && detail.comprehension !== undefined) {
+      mountConceptComprehension(body, detail.comprehension);
+    } else {
+      const summary = presentationMode === "record"
+        ? detail.summary
+        : detail.humanSummary ?? detail.summary;
+      body.append(paragraph(summary));
+    }
     if (detail.changes !== undefined && detail.changes.length > 0) {
       const changeSummary = document.createElement("div");
       changeSummary.setAttribute("data-pointable-context-role", "revision-changes");

@@ -56,6 +56,12 @@ The workspace Provider now classifies three additional high-value development ar
 
 These are conservative projections of readable artifacts, not substitutes for an actual test-run result, runtime configuration resolution, or a semantic decision graph.
 
+## Explicit concept artifacts and presentation pilot
+
+An author can now give a high-value project concept a deterministic identity by placing a strictly structured Markdown artifact under `docs/concepts/*.md`. The format requires meaning, current context, boundary, a 2–4 step process with one explicit current step, an evidence excerpt, and a workspace-relative source line. The Provider verifies that evidence line before returning the card; missing or drifted evidence fails closed. Ordinary prose is still not semantically mined.
+
+The native renderer supports three fixed research conditions over the same detail payload: `record`, `narrative`, and `mental-model`. The first frozen object is `pilot`. Its mental-model card shows what the pilot means, why it is needed now, where it sits in the study sequence, and what it cannot prove; exact evidence stays behind an in-card `为什么这样说` disclosure. The condition is selected when the companion starts, not by the participant inside a task.
+
 ## Current fixture
 
 The installed MCP server is deliberately pinned to `fixtures/mini-project`. Every result is marked `FIXTURE-ONLY`; it is not evidence about the active workspace.
@@ -114,9 +120,9 @@ These foundations are implementation assets. Selection is the visual trigger; it
 - The standard MCP App path renders beside a tool result; it does not provide the required ordinary-prose selection hook.
 - The private Desktop selection companion is currently the primary interaction prototype, but remains host/build-specific and must be qualified per Codex build.
 - Further object/Extractor expansion is paused while cross-build native-host compatibility and scenario-specific summary quality are qualified.
-- Markdown artifact, TypeScript/JavaScript module, static test-definition, known JSON configuration, and path-qualified ADR context are implemented. Actual test-run results, task state, and Agent-known abstract concepts remain later stages.
+- Markdown artifact, TypeScript/JavaScript module, static test-definition, known JSON configuration, path-qualified ADR, and explicitly authored concept context are implemented. Actual test-run results, task state, and concepts without an explicit identity remain later stages.
 - Real Agent work results do not yet systematically emit context references.
-- Source files have a real local module Provider; Agent-known abstract concepts, decisions, tasks, and verification results are not yet connected.
+- Source files and strict `docs/concepts/*.md` artifacts have real local Providers; other Agent-known concepts, tasks, and verification results are not yet connected.
 - A persistent multi-object capsule strip is no longer a default product goal.
 - No formal user study has yet proven the expected efficiency gain.
 
@@ -145,7 +151,7 @@ node mcp/server.mjs --fixture-root ./fixtures/mini-project --project-id PRJ-01
 "PRD-inline-pointable-widgets.md" | node dist/src/cli.js lookup --stdin --project-dir ./fixtures/mini-project
 
 # Primary Quiet Context Reveal prototype in a controlled Desktop build
-node host/workspace-companion.mjs start --json
+node host/workspace-companion.mjs start --presentation-mode mental-model --json
 node host/workspace-companion.mjs status --json
 node host/workspace-companion.mjs bind --workspace-root 'D:\absolute\workspace' --json
 node host/workspace-companion.mjs stop --json

@@ -25,6 +25,7 @@ import type {
 import type {
   PointableCandidateView,
   PointableChangeView,
+  PointableComprehensionView,
   PointableDetailView,
   PointableLookupPresentation,
 } from "./protocol.js";
@@ -122,6 +123,58 @@ function factText(value: FactValue): string {
   );
 }
 
+function scalarFact(
+  facts: Readonly<Record<string, FactValue>>,
+  key: string,
+): string | undefined {
+  const value = facts[key];
+  return typeof value === "string" ? truncate(value, 1_024) : undefined;
+}
+
+function conceptComprehension(
+  outcome: Extract<LookupOutcome, { kind: "detail" }>,
+): PointableComprehensionView | undefined {
+  if (outcome.detail.entityType !== "concept") return undefined;
+  const meaning = scalarFact(outcome.detail.facts, "它是什么意思");
+  const context = scalarFact(outcome.detail.facts, "为什么现在出现");
+  const boundary = scalarFact(outcome.detail.facts, "它不是什么");
+  const evidenceExcerpt = scalarFact(outcome.detail.facts, "证据");
+  const rawSequence = outcome.detail.facts["所处流程"];
+  if (
+    meaning === undefined ||
+    context === undefined ||
+    boundary === undefined ||
+    evidenceExcerpt === undefined ||
+    !Array.isArray(rawSequence)
+  ) {
+    return undefined;
+  }
+  const normalizedSequence = rawSequence
+    .filter((item): item is string => typeof item === "string")
+    .slice(0, 4);
+  const sequence = normalizedSequence
+    .map((item) => truncate(item.replace(/^当前[：:]\s*/u, ""), 256));
+  const currentStep = normalizedSequence.findIndex((item) =>
+    /^当前[：:]\s*/u.test(item));
+  const source = outcome.detail.sourceRefs.find((item) =>
+    item.sourceType === "project_evidence");
+  if (sequence.length < 2 || currentStep < 0 || currentStep >= sequence.length || source === undefined) {
+    return undefined;
+  }
+  return {
+    kind: "concept",
+    meaning,
+    context,
+    boundary,
+    sequence,
+    currentStep,
+    evidence: [{
+      excerpt: evidenceExcerpt,
+      source: truncate(source.sourceId, 512),
+    }],
+  };
+}
+
 function errorPresentation(
   code: string,
   message: string,
@@ -150,6 +203,8 @@ function detailView(
       ? outcome.detail.facts["配置用途"]
       : outcome.detail.entityType === "decision"
         ? outcome.detail.facts["决策"]
+        : outcome.detail.entityType === "concept"
+          ? outcome.detail.facts["它是什么意思"]
         : undefined;
   const change = outcome.detail.facts["本次变化"];
   const activeChange = typeof change === "string" &&
@@ -158,6 +213,10 @@ function detailView(
   const summary = typeof summaryValue === "string"
     ? truncate(summaryValue, 1_024)
     : truncate(outcome.candidate.summary, 1_024);
+  const comprehension = conceptComprehension(outcome);
+  const humanSummary = comprehension === undefined
+    ? undefined
+    : truncate(`${comprehension.meaning} ${comprehension.context}`, 1_024);
   return {
     entityId: truncate(outcome.detail.entityId, 256),
     entityType: truncate(outcome.detail.entityType, 128),
@@ -174,6 +233,8 @@ function detailView(
       .map((source) => ({
         label: truncate(`${source.sourceType} / ${source.sourceId}`, 512),
       })),
+    ...(humanSummary === undefined ? {} : { humanSummary }),
+    ...(comprehension === undefined ? {} : { comprehension }),
     ...(options.detailRef === undefined ? {} : { detailRef: options.detailRef }),
     ...(options.changes === undefined ? {} : { changes: options.changes }),
   };
