@@ -94,7 +94,131 @@ test("workspace lookup returns current detail only after explicit task binding",
       assert.equal(after.detail.facts.some((fact) => fact.label === "用途"), true);
       assert.match(after.detail.summary, /Live workspace context/u);
       assert.equal(after.detail.sources[0]?.label, "local_workspace_file / README.md");
+      assert.match(after.detail.detailRef ?? "", /^pdet:/u);
     }
+  } finally {
+    await rm(item.root, { recursive: true, force: true });
+  }
+});
+
+test("workspace detail detects revision drift and refreshes in place with a finite diff", async () => {
+  const item = await fixture();
+  try {
+    const path = join(item.workspace, "README.md");
+    await writeFile(path, "# Pointable\nOld context summary.\n", "utf8");
+    const activeTask = task();
+    await item.registry.bind(activeTask, item.workspace);
+    const callback = createWorkspaceLookupCallback({ registry: item.registry });
+    const initial = await invoke(callback, request(activeTask, "README.md"));
+    assert.equal(initial.kind, "detail");
+    if (initial.kind !== "detail") return;
+    const detailRef = initial.detail.detailRef;
+    assert.ok(detailRef);
+
+    const unchanged = await invoke(callback, request(activeTask, "README.md", {
+      operation: "check",
+      detailRef,
+      requestId: "request-workspace-check-1",
+    }));
+    assert.equal(unchanged.kind, "revision");
+    if (unchanged.kind === "revision") assert.equal(unchanged.revision.state, "unchanged");
+
+    await writeFile(path, "# Pointable\nNew context summary with changed behavior.\n", "utf8");
+    const updated = await invoke(callback, request(activeTask, "README.md", {
+      operation: "check",
+      detailRef,
+      requestId: "request-workspace-check-2",
+    }));
+    assert.equal(updated.kind, "revision");
+    if (updated.kind === "revision") assert.equal(updated.revision.state, "updated");
+
+    const refreshed = await invoke(callback, request(activeTask, "README.md", {
+      operation: "refresh",
+      detailRef,
+      requestId: "request-workspace-refresh",
+    }));
+    assert.equal(refreshed.kind, "detail");
+    if (refreshed.kind !== "detail") return;
+    assert.equal(refreshed.detail.detailRef, detailRef);
+    assert.match(refreshed.detail.summary, /New context summary/u);
+    assert.notEqual(refreshed.detail.revision, initial.detail.revision);
+    assert.ok((refreshed.detail.changes?.length ?? 0) <= 3);
+    assert.equal(refreshed.detail.changes?.[0]?.label, "摘要");
+
+    const currentAgain = await invoke(callback, request(activeTask, "README.md", {
+      operation: "check",
+      detailRef,
+      requestId: "request-workspace-check-3",
+    }));
+    assert.equal(currentAgain.kind, "revision");
+    if (currentAgain.kind === "revision") {
+      assert.equal(currentAgain.revision.state, "unchanged");
+    }
+
+    await rm(path);
+    const deleted = await invoke(callback, request(activeTask, "README.md", {
+      operation: "check",
+      detailRef,
+      requestId: "request-workspace-check-deleted",
+    }));
+    assert.equal(deleted.kind, "revision");
+    if (deleted.kind === "revision") assert.equal(deleted.revision.state, "deleted");
+  } finally {
+    await rm(item.root, { recursive: true, force: true });
+  }
+});
+
+test("workspace detail references fail closed across expiry, task rebinding, and capacity", async () => {
+  const item = await fixture();
+  try {
+    await writeFile(join(item.workspace, "README.md"), "# Pointable\nBounded detail.\n", "utf8");
+    await writeFile(join(item.workspace, "GUIDE.md"), "# Guide\nSecond detail.\n", "utf8");
+    const activeTask = task();
+    await item.registry.bind(activeTask, item.workspace);
+    let currentTime = 1_000;
+    const callback = createWorkspaceLookupCallback({
+      registry: item.registry,
+      detailRefTtlMs: 1_000,
+      maxDetailRefs: 1,
+      clock: () => currentTime,
+    });
+
+    const first = await invoke(callback, request(activeTask, "README.md"));
+    assert.equal(first.kind, "detail");
+    if (first.kind !== "detail") return;
+    const detailRef = first.detail.detailRef;
+    assert.ok(detailRef);
+
+    const atCapacity = await invoke(callback, request(activeTask, "GUIDE.md", {
+      requestId: "request-workspace-capacity",
+    }));
+    assert.equal(atCapacity.kind, "detail");
+    if (atCapacity.kind === "detail") assert.equal(atCapacity.detail.detailRef, undefined);
+
+    await item.registry.bind(activeTask, item.workspace);
+    const afterRebind = await invoke(callback, request(activeTask, "README.md", {
+      operation: "check",
+      detailRef,
+      requestId: "request-workspace-rebound-detail",
+    }));
+    assert.equal(afterRebind.kind, "error");
+    if (afterRebind.kind === "error") assert.equal(afterRebind.code, "detail_ref_invalid");
+
+    const replacement = await invoke(callback, request(activeTask, "README.md", {
+      requestId: "request-workspace-replacement-detail",
+    }));
+    assert.equal(replacement.kind, "detail");
+    if (replacement.kind !== "detail") return;
+    const replacementRef = replacement.detail.detailRef;
+    assert.ok(replacementRef);
+    currentTime += 1_001;
+    const expired = await invoke(callback, request(activeTask, "README.md", {
+      operation: "check",
+      detailRef: replacementRef,
+      requestId: "request-workspace-expired-detail",
+    }));
+    assert.equal(expired.kind, "error");
+    if (expired.kind === "error") assert.equal(expired.code, "detail_ref_invalid");
   } finally {
     await rm(item.root, { recursive: true, force: true });
   }

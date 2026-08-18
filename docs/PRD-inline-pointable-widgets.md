@@ -1,7 +1,7 @@
 # PRD：Quiet Context Reveal（选区式上下文速览）
 
-- 版本：v1.5
-- 状态：摘要优先与当前 build 启动兼容性自检完成；进入动态 revision 阶段
+- 版本：v1.6
+- 状态：摘要优先、当前 build 启动兼容性自检与文件 revision 原位刷新切片完成；进入场景摘要验证阶段
 - 日期：2026-08-18
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
@@ -241,6 +241,15 @@ TypeScript/JavaScript 模块在用户点击后按需组合四类只读事实：
 5. 对象被删除、Provider 不可用或 binding 漂移时，保留旧快照但明确标记 stale/unavailable，不能冒充 current；
 6. 若没有历史 revision 数据，只能显示“当前状态”，不能编造“消息当时状态”。
 
+v1.6 首个实现切片把上述原则收窄为可验证的文件语义：
+
+- 卡片签发短期 `detailRef`，绑定 task、route、workspace scope、binding revision、selection digest/generation、对象身份与打开时快照；
+- 打开后后台只读取目标文件的有界 stat revision，不重复解析全文、Git 或关系引用；
+- revision 未变时仅续期，不改变卡片；变化时只显示 `内容已更新`；
+- 用户可信点击 `刷新内容` 后才重新执行完整 Provider 读取，并在同一卡片显示最多 3 项 `before → after` 差异；
+- 删除或探针不可用时保留旧卡并明确警告；过期、重新绑定、上下文漂移和容量耗尽均 fail closed；
+- 当前轻量探针不声称捕获只发生于 Git 状态或外部引用关系的变化，这些变化在后续 revision contract 资格化前需要重新打开详情。
+
 ### 8.7 Scenario relevance policy
 
 默认摘要只回答当前场景最可能需要的一个问题：
@@ -299,6 +308,10 @@ Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知�
 ### P0-10 Text/structured fallback
 
 无 UI 宿主必须保留有界、可读的 text/structured 结果，但不能把文本 fallback 表述为原生详情卡已挂载。
+
+### P0-11 Pinned snapshot and explicit refresh
+
+打开的卡片固定用户正在阅读的快照。后台仅做有界 revision 探测；变化后显示低干扰提示，只有可信 `刷新内容` 动作才能重读完整详情并在同一卡片投影最多 3 项差异。删除、不可用、过期或 binding 漂移必须保留旧快照或 fail closed，不能静默覆盖。
 
 ## 10. 明确非目标
 
@@ -379,6 +392,7 @@ Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知�
 - [ ] 详情在当前 Codex Desktop Chat Lane 原位显示；
 - [ ] 不打开浏览器或 Dashboard；
 - [ ] 打开、展开、关闭新增 Chat Turn 为 0；
+- [ ] revision 变化只出现卡内提示，可信刷新在原卡完成且新增 Chat Turn 为 0；
 - [ ] 关闭按钮、Escape、外点和焦点恢复可用；
 - [ ] 普通复制、高亮、terminal、browser、diff 不误触。
 
@@ -393,6 +407,8 @@ Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知�
 - [ ] index/provider/context 漂移 fail closed；
 - [ ] identity、source、revision、observedAt、freshness 全部可见；
 - [ ] fixture、stale、partial、unavailable 状态不被隐藏。
+- [ ] 打开快照不会被后台静默替换；删除/不可用保留旧值并显示明确警告；
+- [ ] detail ref 对过期、task 重绑定、context 漂移和容量上限 fail closed；
 
 ### 13.3 研究门禁
 
@@ -433,22 +449,24 @@ Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知�
 - 来源、修订、新鲜度、观察时间和文本 fallback；
 - 关闭、Escape、外点、导航清理与 stale-response 防护；
 - 现有 MCP App 胶囊零 `ui/message`、零浏览器导航。
+- 文件卡片的 pinned snapshot、轻量 stat revision 探测、`内容已更新` 提示、显式原位刷新和最多 3 项差异；
+- revision detail ref 的过期、task 重绑定、context 与容量 fail-closed 约束；
 
 仍缺：
 
 - 让当前 workspace 文件之外的 Module/Decision/Task 获得可靠 Provider；
 - 把 Agent 工作结果增量写入轻量 Context Index；
-- revision 漂移检测、显式零-turn 刷新和有限差异投影；
 - 证明不同 Codex Desktop 版本中的 Host Adapter 兼容性；
+- 扩展 revision contract 以覆盖只有 Git 状态或外部引用关系变化、而源文件 stat 未变化的场景；
 - 完成受控效率研究。
 
 ## 16. 推荐实施顺序
 
 1. 已完成摘要态、卡内展开/收起和关闭的当前 Codex Desktop 人工验收；
 2. 已完成当前 build 的四层启动兼容性自检与失败降级；
-3. 下一步实现 revision 失效提示、显式零-turn 刷新和有限差异；
-4. 用模块、文档、测试、决策/配置场景验证默认摘要是否命中重点；
-5. 最后开展 A/B 效率研究，再决定是否扩展 Provider。
+3. 已完成首个文件 revision 失效提示、显式零-turn 刷新、有限差异和真实 Edge 零-turn 验收；
+4. 下一步用模块、文档、测试、决策/配置场景验证默认摘要是否命中重点；
+5. 随后扩展必要的 revision signal，再开展 A/B 效率研究并决定是否扩展 Provider。
 
 ## 17. 已冻结决策
 
@@ -465,6 +483,7 @@ Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知�
 
 ## 18. 变更记录
 
+- v1.6：为打开的文件卡片增加绑定上下文的短期 detail ref、轻量 stat revision 探测、`内容已更新` 提示、可信显式原位刷新与最多 3 项差异；删除/不可用保留旧快照，过期、重绑定和容量耗尽 fail closed；真实 Edge 验收确认该路径零 Chat Turn。
 - v1.5：为 workspace companion 增加 `qualified/unavailable/incompatible/unchecked` 四态兼容性自检；按精确主目标、主 frame、默认主 execution context 与 renderer lifecycle fail closed，并明确启动检查不替代人工交互门禁。
 - v1.4：把五项事实从默认首屏改为卡内渐进披露；默认只保留场景摘要、类型和 freshness；冻结新增 Extractor，优先解决动态 revision 语义、场景信息优先级和 Codex Desktop 兼容性。
 - v1.3：加入 TypeScript/JavaScript Source Module Context Extractor；通过文件头说明、公开导出、静态依赖、Git diff/status/log 和有界字面引用提供五项代码模块速览，保持零执行、零模型、零 Chat Turn。

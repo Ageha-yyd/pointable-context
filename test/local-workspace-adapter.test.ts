@@ -9,6 +9,7 @@ import type { TrustedContextBinding } from "../src/contracts.js";
 import {
   LocalWorkspaceAuthoritativeProvider,
   LocalWorkspaceContextIndex,
+  LocalWorkspaceRevisionProbe,
 } from "../src/adapters/local-workspace.js";
 import { localWorkspaceScope } from "../src/host/codex-cdp/task-workspace-binding.js";
 import { resolveSelection } from "../src/resolver.js";
@@ -96,6 +97,40 @@ test("workspace provider performs a fresh bounded read and changes revision with
       assert.notEqual(second.snapshot.entityRevision, first.snapshot.entityRevision);
       assert.match(String(second.snapshot.facts["用途"]), /Updated notes/u);
     }
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("workspace revision probe detects source drift without projecting full detail", async () => {
+  const fixture = await workspaceFixture();
+  try {
+    const path = join(fixture.root, "README.md");
+    await writeFile(path, "first", "utf8");
+    const probe = new LocalWorkspaceRevisionProbe();
+    const first = await probe.probe({
+      binding: fixture.binding,
+      entityId: "file:README.md",
+      entityType: "document",
+    });
+    assert.equal(first.kind, "current");
+    await writeFile(path, "second revision", "utf8");
+    const second = await probe.probe({
+      binding: fixture.binding,
+      entityId: "file:README.md",
+      entityType: "document",
+    });
+    assert.equal(second.kind, "current");
+    if (first.kind === "current" && second.kind === "current") {
+      assert.notEqual(second.revision, first.revision);
+      assert.match(second.revision, /^workspace-file-stat:[a-f0-9]{64}$/u);
+    }
+    await rm(path);
+    assert.equal((await probe.probe({
+      binding: fixture.binding,
+      entityId: "file:README.md",
+      entityType: "document",
+    })).kind, "not_found");
   } finally {
     await rm(fixture.root, { recursive: true, force: true });
   }

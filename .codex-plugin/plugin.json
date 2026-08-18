@@ -1,6 +1,6 @@
 {
   "name": "pointable-context",
-  "version": "0.1.0+codex.20260818094433",
+  "version": "0.1.0+codex.20260818100146",
   "description": "Selection-triggered, zero-turn development context reveal in the native Codex Chat Lane.",
   "author": {
     "name": "Local developer"
@@ -15,7 +15,7 @@
   "interface": {
     "displayName": "Pointable Context",
     "shortDescription": "Select a reference and reveal verified context in place.",
-    "longDescription": "Keep the Codex Chat Lane quiet until the user selects a stable file, module, decision, or task reference. A trusted explicit action then reveals bounded, type-specific detail beside the selection without opening a browser, calling a model, or creating another chat turn. Deterministic identity matching and text fallback remain available; semantic concept recognition, App Server browser clients, and DCPM/CWA are not product dependencies.",
+    "longDescription": "Keep the Codex Chat Lane quiet until the user selects a stable file, module, decision, or task reference. A trusted explicit action reveals bounded, type-specific detail beside the selection without opening a browser, calling a model, or creating another chat turn. Open workspace cards pin their snapshot, signal detected file revision drift, and refresh in place only after another trusted action. Deterministic identity matching and text fallback remain available; semantic concept recognition, App Server browser clients, and DCPM/CWA are not product dependencies.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [

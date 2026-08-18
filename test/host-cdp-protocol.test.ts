@@ -62,6 +62,22 @@ test("choose intent requires one bounded candidate reference", () => {
   }
 });
 
+test("revision check and refresh intents require one opaque detail reference", () => {
+  for (const operation of ["check", "refresh"] as const) {
+    const result = parse(intentValue({ operation, detailRef: "pdet:opaque-reference" }));
+    assert.equal(result.operation, operation);
+    assert.equal(result.detailRef, "pdet:opaque-reference");
+  }
+  for (const invalid of [
+    intentValue({ operation: "check" }),
+    intentValue({ operation: "refresh", detailRef: "short" }),
+    intentValue({ operation: "check", detailRef: "pdet:opaque-reference", candidateRef: "candidate:gov-1" }),
+    intentValue({ operation: "resolve", detailRef: "pdet:opaque-reference" }),
+  ]) {
+    assert.throws(() => parse(invalid), PointableProtocolError);
+  }
+});
+
 test("binding intent fails closed for tampering, extra fields, and size overflow", () => {
   assert.throws(
     () => parse(intentValue({ selectionDigest: "0".repeat(64) })),
@@ -159,4 +175,47 @@ test("candidate and detail result budgets reject ambiguous or oversized output",
     }),
     /metadata exceeds/u,
   );
+});
+
+test("revision and finite detail-diff presentations stay bounded", () => {
+  const revision = validatePointableLookupPresentation({
+    kind: "revision",
+    revision: {
+      detailRef: "pdet:opaque-reference",
+      state: "updated",
+      checkedAt: "2026-08-18T09:50:00.000Z",
+    },
+  });
+  assert.equal(revision.kind, "revision");
+
+  const detail = validatePointableLookupPresentation({
+    kind: "detail",
+    detail: {
+      entityId: "file:README.md",
+      entityType: "document",
+      label: "README.md",
+      summary: "new summary",
+      revision: "r2",
+      observedAt: "2026-08-18T09:50:00.000Z",
+      freshness: "current",
+      facts: [],
+      sources: [{ label: "local workspace" }],
+      detailRef: "pdet:opaque-reference",
+      changes: [
+        { label: "摘要", before: "old summary", after: "new summary" },
+      ],
+    },
+  });
+  assert.equal(detail.kind, "detail");
+  assert.throws(() => validatePointableLookupPresentation({
+    kind: "detail",
+    detail: {
+      ...(detail.kind === "detail" ? detail.detail : {}),
+      changes: Array.from({ length: 4 }, () => ({
+        label: "change",
+        before: "old",
+        after: "new",
+      })),
+    },
+  }), /metadata exceeds/u);
 });

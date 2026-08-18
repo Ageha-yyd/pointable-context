@@ -5,7 +5,7 @@ export const MAX_SELECTION_CHARS = 512;
 export const MAX_BINDING_PAYLOAD_CHARS = 4_096;
 
 export type PointableSelectionSurface = "assistant_message" | "user_message";
-export type PointableLookupOperation = "resolve" | "choose";
+export type PointableLookupOperation = "resolve" | "choose" | "check" | "refresh";
 
 export interface PointableLookupIntentV1 {
   schemaVersion: typeof POINTABLE_PROTOCOL_VERSION;
@@ -19,6 +19,7 @@ export interface PointableLookupIntentV1 {
   contextFingerprint: string;
   requestedAt: string;
   candidateRef?: string;
+  detailRef?: string;
 }
 
 export interface PointableCandidateView {
@@ -37,6 +38,12 @@ export interface PointableSourceView {
   label: string;
 }
 
+export interface PointableChangeView {
+  label: string;
+  before: string;
+  after: string;
+}
+
 export interface PointableDetailView {
   entityId: string;
   entityType: string;
@@ -47,11 +54,20 @@ export interface PointableDetailView {
   freshness: "current" | "stale" | "partial" | "unknown";
   facts: PointableFactView[];
   sources: PointableSourceView[];
+  detailRef?: string;
+  changes?: PointableChangeView[];
+}
+
+export interface PointableRevisionView {
+  detailRef: string;
+  state: "unchanged" | "updated" | "deleted" | "unavailable";
+  checkedAt: string;
 }
 
 export type PointableLookupPresentation =
   | { kind: "candidates"; candidates: PointableCandidateView[] }
   | { kind: "detail"; detail: PointableDetailView }
+  | { kind: "revision"; revision: PointableRevisionView }
   | {
       kind: "error";
       code: string;
@@ -156,6 +172,7 @@ export function parsePointableLookupIntent(
     "contextFingerprint",
     "requestedAt",
     "candidateRef",
+    "detailRef",
   ])) {
     throw new PointableProtocolError(
       "binding_payload_invalid",
@@ -165,7 +182,10 @@ export function parsePointableLookupIntent(
   if (
     parsed.schemaVersion !== POINTABLE_PROTOCOL_VERSION ||
     parsed.kind !== "pointable.selection.lookup" ||
-    (parsed.operation !== "resolve" && parsed.operation !== "choose") ||
+    (parsed.operation !== "resolve" &&
+      parsed.operation !== "choose" &&
+      parsed.operation !== "check" &&
+      parsed.operation !== "refresh") ||
     !boundedString(parsed.requestId, 8, 128) ||
     !/^[A-Za-z0-9:_-]+$/u.test(parsed.requestId) ||
     !Number.isSafeInteger(parsed.selectionGeneration) ||
@@ -191,9 +211,14 @@ export function parsePointableLookupIntent(
     );
   }
   const candidateRef = parsed.candidateRef;
+  const detailRef = parsed.detailRef;
   if (
-    (parsed.operation === "resolve" && candidateRef !== undefined) ||
-    (parsed.operation === "choose" && !boundedString(candidateRef, 8, 256))
+    (parsed.operation === "resolve" &&
+      (candidateRef !== undefined || detailRef !== undefined)) ||
+    (parsed.operation === "choose" &&
+      (!boundedString(candidateRef, 8, 256) || detailRef !== undefined)) ||
+    ((parsed.operation === "check" || parsed.operation === "refresh") &&
+      (candidateRef !== undefined || !boundedString(detailRef, 8, 256)))
   ) {
     throw new PointableProtocolError(
       "binding_payload_invalid",
@@ -214,6 +239,7 @@ export function parsePointableLookupIntent(
     requestedAt: parsed.requestedAt,
   };
   if (typeof candidateRef === "string") intent.candidateRef = candidateRef;
+  if (typeof detailRef === "string") intent.detailRef = detailRef;
   return intent;
 }
 
@@ -256,6 +282,8 @@ function validateDetail(value: unknown): PointableDetailView {
     "freshness",
     "facts",
     "sources",
+    "detailRef",
+    "changes",
   ])) {
     throw new PointableProtocolError(
       "invalid_lookup_result",
@@ -279,7 +307,10 @@ function validateDetail(value: unknown): PointableDetailView {
     !Array.isArray(value.facts) ||
     value.facts.length > 5 ||
     !Array.isArray(value.sources) ||
-    value.sources.length > 5
+    value.sources.length > 5 ||
+    (value.detailRef !== undefined && !boundedString(value.detailRef, 8, 256)) ||
+    (value.changes !== undefined &&
+      (!Array.isArray(value.changes) || value.changes.length > 3))
   ) {
     throw new PointableProtocolError(
       "invalid_lookup_result",
@@ -307,6 +338,21 @@ function validateDetail(value: unknown): PointableDetailView {
     }
     return { label: requiredString(source.label, "source label", 512) };
   });
+  const changes = value.changes === undefined
+    ? undefined
+    : value.changes.map((change) => {
+        if (!record(change) || !exactKeys(change, ["label", "before", "after"])) {
+          throw new PointableProtocolError(
+            "invalid_lookup_result",
+            "detail change is invalid",
+          );
+        }
+        return {
+          label: requiredString(change.label, "change label", 128),
+          before: requiredString(change.before, "change before", 1_024),
+          after: requiredString(change.after, "change after", 1_024),
+        };
+      });
   return {
     entityId: requiredString(value.entityId, "entityId", 256),
     entityType: requiredString(value.entityType, "entityType", 128),
@@ -317,6 +363,8 @@ function validateDetail(value: unknown): PointableDetailView {
     freshness: value.freshness,
     facts,
     sources,
+    ...(typeof value.detailRef === "string" ? { detailRef: value.detailRef } : {}),
+    ...(changes === undefined ? {} : { changes }),
   };
 }
 
@@ -358,6 +406,33 @@ export function validatePointableLookupPresentation(
       );
     }
     return { kind: "detail", detail: validateDetail(value.detail) };
+  }
+  if (value.kind === "revision") {
+    if (
+      !exactKeys(value, ["kind", "revision"]) ||
+      !record(value.revision) ||
+      !exactKeys(value.revision, ["detailRef", "state", "checkedAt"]) ||
+      !boundedString(value.revision.detailRef, 8, 256) ||
+      (value.revision.state !== "unchanged" &&
+        value.revision.state !== "updated" &&
+        value.revision.state !== "deleted" &&
+        value.revision.state !== "unavailable") ||
+      !boundedString(value.revision.checkedAt, 20, 64) ||
+      !Number.isFinite(Date.parse(value.revision.checkedAt))
+    ) {
+      throw new PointableProtocolError(
+        "invalid_lookup_result",
+        "revision result is invalid",
+      );
+    }
+    return {
+      kind: "revision",
+      revision: {
+        detailRef: value.revision.detailRef,
+        state: value.revision.state,
+        checkedAt: value.revision.checkedAt,
+      },
+    };
   }
   if (value.kind === "error") {
     if (

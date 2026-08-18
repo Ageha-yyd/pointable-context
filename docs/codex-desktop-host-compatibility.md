@@ -27,8 +27,8 @@ Inline MCP App work is tracked as a separate host gate. It must not be inferred 
 ## Qualification evidence
 
 - `pnpm run check`: pass.
-- `pnpm test`: `194 / 194 PASS` after the v1.5 compatibility increment, including packaged-layout start, deterministic Markdown/source parsing, Git enrichment, non-Git fallback, bounded declaration projection, product-direction freeze, renderer contracts, and compatibility-state classification.
-- `pnpm run test:host-browser`: three consecutive real Edge headless passes; trusted drag → compact detail; detail body initially has zero layout height; trusted in-card disclosure expands in place; close clears native selection and prevents remount after 250 ms. The script waits for card reposition paint boundaries so the trusted pointer coordinates cannot race layout.
+- `pnpm test`: `199 / 199 PASS` after the v1.6 dynamic-detail increment, including packaged-layout start, deterministic Markdown/source parsing, Git enrichment, bounded revision probes, pinned detail references, finite diffs, product-direction freeze, renderer contracts, and compatibility-state classification.
+- `pnpm run test:host-browser`: three consecutive real Edge headless passes; trusted drag → compact detail; background file revision drift → `内容已更新`; trusted refresh → same-card replacement with a finite diff and zero Chat Turn; detail body initially has zero layout height; trusted in-card disclosure expands in place; close clears native selection and prevents remount after 250 ms. The script waits for card reposition paint boundaries so trusted pointer coordinates cannot race layout.
 - Real repository Artifact probe: `docs/PRD-inline-pointable-widgets.md` returned purpose, current changed sections, three bounded literal references, Git status, and relative path in 128 ms total on the qualified machine (16 ms index + 112 ms detail). This is one local probe, not a population latency claim.
 - Real repository Source Module probe: `src/adapters/local-workspace.ts` returned responsibility, public exports, changed declarations, prioritized local dependencies, test/importer references, and relative path in 140 ms total on the qualified machine (14 ms index + 126 ms detail). This is one local probe, not a population latency claim.
 - User manual gate: three visible workspace keywords produced live details; the repaired close action worked.
@@ -49,6 +49,12 @@ Inline MCP App work is tracked as a separate host gate. It must not be inferred 
 | `unchecked` | No refresh completed | Do not claim attachment or compatibility |
 
 Automated negative probes cover an empty qualified-target set, an invalid renderer-install response, and an unavailable discovery endpoint. The renderer mismatch probe verifies `targetCount=0` and a closed connection after cleanup. These startup gates prove only that the private renderer can be installed; they do not prove trusted selection, disclosure, close, focus, navigation, or virtualization behavior on a new Desktop build.
+
+## Dynamic snapshot gate (v1.6)
+
+An open workspace card now retains its displayed snapshot while a lightweight file-stat probe checks for revision drift. A changed probe revision produces a low-priority `内容已更新` notice; only a trusted `刷新内容` action performs the full Provider read and replaces detail in the same card. The response projects at most three changed fields. Deleted/unavailable probes retain the old snapshot with a warning, while expired references, task rebinding, context drift, and detail-reference capacity fail closed.
+
+This first revision gate covers selected source-file stat changes. It does not yet claim complete detection of relation-only or Git-only drift when the selected file itself is unchanged. The three-pass headless acceptance proves renderer behavior and zero Chat Turn mechanics in isolated Edge; a current Desktop manual update/refresh pass remains a separate qualification gate.
 
 ## Unsupported or unqualified
 

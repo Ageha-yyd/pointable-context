@@ -305,6 +305,82 @@ function stableFileStat(
   );
 }
 
+export type LocalWorkspaceRevisionProbeResult =
+  | { kind: "current"; revision: string; observedAt: string }
+  | { kind: "not_found"; observedAt: string }
+  | { kind: "unavailable"; observedAt: string; retryable: boolean };
+
+export class LocalWorkspaceRevisionProbe {
+  async probe(request: {
+    binding: TrustedContextBinding;
+    entityId: string;
+    entityType: string;
+    signal?: AbortSignal;
+  }): Promise<LocalWorkspaceRevisionProbeResult> {
+    const observedAt = new Date().toISOString();
+    if (request.signal?.aborted) {
+      return { kind: "unavailable", observedAt, retryable: true };
+    }
+    if (
+      request.entityType !== "file" &&
+      request.entityType !== "document" &&
+      request.entityType !== "module"
+    ) {
+      return { kind: "not_found", observedAt };
+    }
+    if (!request.entityId.startsWith("file:")) {
+      return { kind: "not_found", observedAt };
+    }
+    const locator = request.entityId.slice("file:".length);
+    if (
+      locator.length < 1 ||
+      locator.length > MAX_RELATIVE_PATH_CHARS ||
+      locator.includes("\\") ||
+      locator.startsWith("/") ||
+      locator.split("/").includes("..")
+    ) {
+      return { kind: "not_found", observedAt };
+    }
+    try {
+      const root = await verifiedWorkspaceRoot(request.binding);
+      const requestedPath = resolve(root, ...locator.split("/"));
+      const canonicalFile = await realpath(requestedPath);
+      if (containedRelative(root, canonicalFile) !== locator) {
+        return { kind: "not_found", observedAt };
+      }
+      const info = await stat(canonicalFile);
+      if (!info.isFile() || request.signal?.aborted) {
+        return { kind: "unavailable", observedAt, retryable: true };
+      }
+      const revision = createHash("sha256")
+        .update(JSON.stringify({
+          path: locator,
+          size: info.size,
+          modifiedMs: info.mtimeMs,
+          changedMs: info.ctimeMs,
+          inode: info.ino,
+        }), "utf8")
+        .digest("hex");
+      return {
+        kind: "current",
+        revision: `workspace-file-stat:${revision}`,
+        observedAt,
+      };
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT" || code === "ENOTDIR") {
+        return { kind: "not_found", observedAt };
+      }
+      if (error instanceof ContractError) throw error;
+      return {
+        kind: "unavailable",
+        observedAt,
+        retryable: code !== "EACCES" && code !== "EPERM",
+      };
+    }
+  }
+}
+
 export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvider {
   readonly providerId = LOCAL_WORKSPACE_PROVIDER_ID;
 

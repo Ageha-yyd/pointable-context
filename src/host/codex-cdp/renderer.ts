@@ -36,6 +36,7 @@ export type RendererEligibilityDecision =
 export interface PointableRendererConfig {
   bindingName: string;
   requestTimeoutMs?: number;
+  revisionCheckIntervalMs?: number;
   actionLabel?: string;
 }
 
@@ -131,6 +132,12 @@ export function validatePointableRendererResponse(
     isRecord(candidate) &&
     exact(candidate, ["label"]) &&
     bounded(candidate.label, 1, 512);
+  const changeView = (candidate: unknown): boolean =>
+    isRecord(candidate) &&
+    exact(candidate, ["label", "before", "after"]) &&
+    bounded(candidate.label, 1, 128) &&
+    bounded(candidate.before, 1, 1_024) &&
+    bounded(candidate.after, 1, 1_024);
 
   if (
     !isRecord(value) ||
@@ -184,6 +191,8 @@ export function validatePointableRendererResponse(
         "freshness",
         "facts",
         "sources",
+        "detailRef",
+        "changes",
       ]) ||
       !bounded(detail.entityId, 1, 256) ||
       !bounded(detail.entityType, 1, 128) ||
@@ -201,7 +210,28 @@ export function validatePointableRendererResponse(
       !detail.facts.every(factView) ||
       !Array.isArray(detail.sources) ||
       detail.sources.length > 5 ||
-      !detail.sources.every(sourceView)
+      !detail.sources.every(sourceView) ||
+      (detail.detailRef !== undefined && !bounded(detail.detailRef, 8, 256)) ||
+      (detail.changes !== undefined &&
+        (!Array.isArray(detail.changes) ||
+          detail.changes.length > 3 ||
+          !detail.changes.every(changeView)))
+    ) {
+      return undefined;
+    }
+  } else if (presentation.kind === "revision") {
+    const revision = presentation.revision;
+    if (
+      !exact(presentation, ["kind", "revision"]) ||
+      !isRecord(revision) ||
+      !exact(revision, ["detailRef", "state", "checkedAt"]) ||
+      !bounded(revision.detailRef, 8, 256) ||
+      (revision.state !== "unchanged" &&
+        revision.state !== "updated" &&
+        revision.state !== "deleted" &&
+        revision.state !== "unavailable") ||
+      !bounded(revision.checkedAt, 20, 64) ||
+      !Number.isFinite(Date.parse(revision.checkedAt))
     ) {
       return undefined;
     }
@@ -259,6 +289,14 @@ export function installPointableContextRenderer(
     requestTimeoutMs > 30_000
   ) {
     throw new Error("pointable_renderer_timeout_invalid");
+  }
+  const revisionCheckIntervalMs = config.revisionCheckIntervalMs ?? 5_000;
+  if (
+    !Number.isSafeInteger(revisionCheckIntervalMs) ||
+    revisionCheckIntervalMs < 100 ||
+    revisionCheckIntervalMs > 60_000
+  ) {
+    throw new Error("pointable_renderer_revision_interval_invalid");
   }
   const actionLabel = typeof config.actionLabel === "string" &&
     config.actionLabel.trim().length > 0 &&
@@ -323,8 +361,9 @@ export function installPointableContextRenderer(
     generation: number;
     digest: string;
     contextFingerprint: string;
-    operation: "resolve" | "choose";
+    operation: "resolve" | "choose" | "check" | "refresh";
     candidateRef?: string;
+    detailRef?: string;
     timeout: number;
   };
 
@@ -338,6 +377,7 @@ export function installPointableContextRenderer(
   let restoreFocus: HTMLElement | undefined;
   let actionElement: HTMLButtonElement | undefined;
   let cardElement: HTMLElement | undefined;
+  let revisionTimer: number | undefined;
   let uninstalled = false;
   const activeObserver = new MutationObserver(() => {
     if (candidate !== undefined) scheduleReconcile();
@@ -677,9 +717,9 @@ export function installPointableContextRenderer(
   }
 
   async function submitLookup(
-    operation: "resolve" | "choose",
+    operation: "resolve" | "choose" | "check" | "refresh",
     expectedGeneration: number,
-    candidateRef?: string,
+    reference?: string,
   ): Promise<void> {
     const current = candidate;
     if (
@@ -693,19 +733,27 @@ export function installPointableContextRenderer(
       return;
     }
     if (
-      (operation === "resolve" && candidateRef !== undefined) ||
+      (operation === "resolve" && reference !== undefined) ||
       (operation === "choose" &&
-        (typeof candidateRef !== "string" ||
-          candidateRef.length < 8 ||
-          candidateRef.length > 256))
+        (typeof reference !== "string" ||
+          reference.length < 8 ||
+          reference.length > 256)) ||
+      ((operation === "check" || operation === "refresh") &&
+        (typeof reference !== "string" ||
+          reference.length < 8 ||
+          reference.length > 256))
     ) {
-      mountError("候选引用无效。", false);
+      if (operation === "check" || operation === "refresh") {
+        showRevisionNotice("unavailable", reference);
+      } else {
+        mountError("候选引用无效。", false);
+      }
       return;
     }
     // Commit the explicit trusted activation synchronously. Chromium may
     // collapse the native Selection before the asynchronous digest finishes;
     // the cloned Range and context fences remain the authority after click.
-    state = "resolving";
+    if (operation === "resolve" || operation === "choose") state = "resolving";
     try {
       const digest = await digestText(current.text);
       if (
@@ -724,7 +772,11 @@ export function installPointableContextRenderer(
       const timeout = window.setTimeout(() => {
         if (pending?.requestId !== requestId) return;
         pending = undefined;
-        mountError("查询超时，请重试。", true);
+        if (operation === "check" || operation === "refresh") {
+          showRevisionNotice("unavailable", reference);
+        } else {
+          mountError("查询超时，请重试。", true);
+        }
       }, requestTimeoutMs);
       pending = {
         requestId,
@@ -732,10 +784,19 @@ export function installPointableContextRenderer(
         digest,
         contextFingerprint: current.contextFingerprint,
         operation,
-        ...(candidateRef === undefined ? {} : { candidateRef }),
+        ...(operation === "choose" && reference !== undefined
+          ? { candidateRef: reference }
+          : {}),
+        ...((operation === "check" || operation === "refresh") && reference !== undefined
+          ? { detailRef: reference }
+          : {}),
         timeout,
       };
-      mountLoading(operation === "choose" ? "正在读取上下文详情…" : "正在查找上下文对象…");
+      if (operation === "resolve" || operation === "choose") {
+        mountLoading(operation === "choose" ? "正在读取上下文详情…" : "正在查找上下文对象…");
+      } else if (operation === "refresh") {
+        showRevisionNotice("refreshing", reference);
+      }
       const payload = {
         schemaVersion: 1,
         kind: "pointable.selection.lookup",
@@ -747,13 +808,22 @@ export function installPointableContextRenderer(
         surface: current.surface,
         contextFingerprint: current.contextFingerprint,
         requestedAt: new Date().toISOString(),
-        ...(candidateRef === undefined ? {} : { candidateRef }),
+        ...(operation === "choose" && reference !== undefined
+          ? { candidateRef: reference }
+          : {}),
+        ...((operation === "check" || operation === "refresh") && reference !== undefined
+          ? { detailRef: reference }
+          : {}),
       };
       (binding as (payload: string) => void)(JSON.stringify(payload));
     } catch {
       if (pending !== undefined) window.clearTimeout(pending.timeout);
       pending = undefined;
-      mountError("宿主查询通道不可用。", true);
+      if (operation === "check" || operation === "refresh") {
+        showRevisionNotice("unavailable", reference);
+      } else {
+        mountError("宿主查询通道不可用。", true);
+      }
     }
   }
 
@@ -933,6 +1003,97 @@ export function installPointableContextRenderer(
     return row;
   }
 
+  function clearRevisionTimer(): void {
+    if (revisionTimer !== undefined) window.clearTimeout(revisionTimer);
+    revisionTimer = undefined;
+  }
+
+  function removeRevisionNotice(): void {
+    connectedOwnedElement("card")
+      ?.querySelector('[data-pointable-context-role="revision-notice"]')
+      ?.remove();
+  }
+
+  function scheduleRevisionCheck(detailRef: string, expectedGeneration: number): void {
+    clearRevisionTimer();
+    revisionTimer = window.setTimeout(() => {
+      revisionTimer = undefined;
+      if (
+        state !== "detail" ||
+        candidate?.generation !== expectedGeneration ||
+        connectedOwnedElement("card") === null
+      ) {
+        return;
+      }
+      if (pending !== undefined) {
+        scheduleRevisionCheck(detailRef, expectedGeneration);
+        return;
+      }
+      void submitLookup("check", expectedGeneration, detailRef);
+    }, revisionCheckIntervalMs);
+  }
+
+  function showRevisionNotice(
+    noticeState: "updated" | "deleted" | "unavailable" | "refreshing",
+    detailRef: string | undefined,
+  ): void {
+    clearRevisionTimer();
+    const shell = connectedOwnedElement("card");
+    if (shell === null) return;
+    removeRevisionNotice();
+    const notice = document.createElement("div");
+    notice.setAttribute("data-pointable-context-role", "revision-notice");
+    notice.setAttribute("role", "status");
+    Object.assign(notice.style, {
+      margin: "8px 12px 0",
+      padding: "8px 10px",
+      borderRadius: "8px",
+      background: noticeState === "deleted" || noticeState === "unavailable"
+        ? "#fff4e5"
+        : "#eef4ff",
+      color: noticeState === "deleted" || noticeState === "unavailable"
+        ? "#8a4b00"
+        : "#1746c7",
+      fontSize: "12px",
+    });
+    const message = document.createElement("span");
+    message.textContent = noticeState === "updated"
+      ? "内容已更新"
+      : noticeState === "deleted"
+        ? "对象已删除；当前显示的是旧快照"
+        : noticeState === "refreshing"
+          ? "正在刷新当前详情…"
+          : "暂时无法确认最新状态；当前显示的是旧快照";
+    notice.append(message);
+    if (noticeState === "updated" && detailRef !== undefined) {
+      const refresh = document.createElement("button");
+      refresh.type = "button";
+      refresh.textContent = "刷新内容";
+      refresh.setAttribute("data-pointable-context-role", "revision-refresh");
+      Object.assign(refresh.style, {
+        marginLeft: "8px",
+        border: "0",
+        background: "transparent",
+        color: "#1746c7",
+        padding: "1px 0",
+        cursor: "pointer",
+        fontWeight: "700",
+      });
+      const expectedGeneration = candidate?.generation;
+      refresh.addEventListener("click", (event) => {
+        if (!event.isTrusted || expectedGeneration === undefined) return;
+        event.preventDefault();
+        event.stopPropagation();
+        void submitLookup("refresh", expectedGeneration, detailRef);
+      });
+      notice.append(refresh);
+    }
+    const header = shell.firstElementChild;
+    if (header?.nextSibling === null) shell.append(notice);
+    else shell.insertBefore(notice, header?.nextSibling ?? shell.firstChild);
+    reposition();
+  }
+
   function mountDetail(detail: {
     entityId: string;
     entityType: string;
@@ -943,10 +1104,36 @@ export function installPointableContextRenderer(
     freshness: "current" | "stale" | "partial" | "unknown";
     facts: Array<{ label: string; value: string }>;
     sources: Array<{ label: string }>;
+    detailRef?: string;
+    changes?: Array<{ label: string; before: string; after: string }>;
   }): void {
+    clearRevisionTimer();
     state = "detail";
     const { body } = createShell(detail.label);
     body.append(paragraph(detail.summary));
+    if (detail.changes !== undefined && detail.changes.length > 0) {
+      const changeSummary = document.createElement("div");
+      changeSummary.setAttribute("data-pointable-context-role", "revision-changes");
+      Object.assign(changeSummary.style, {
+        marginTop: "8px",
+        padding: "8px 10px",
+        borderRadius: "8px",
+        background: "#eef4ff",
+        color: "#1746c7",
+        fontSize: "12px",
+      });
+      const heading = document.createElement("strong");
+      heading.textContent = "本次刷新";
+      const list = document.createElement("ul");
+      Object.assign(list.style, { margin: "4px 0 0", paddingLeft: "18px" });
+      for (const change of detail.changes) {
+        const item = document.createElement("li");
+        item.textContent = `${change.label}：${change.before} → ${change.after}`;
+        list.append(item);
+      }
+      changeSummary.append(heading, list);
+      body.append(changeSummary);
+    }
     const compactState = document.createElement("div");
     compactState.textContent = `${detail.entityType} · ${detail.freshness}`;
     Object.assign(compactState.style, {
@@ -1035,6 +1222,9 @@ export function installPointableContextRenderer(
       reposition();
     });
     body.append(disclosure);
+    if (detail.detailRef !== undefined && candidate !== undefined) {
+      scheduleRevisionCheck(detail.detailRef, candidate.generation);
+    }
   }
 
   function mountError(message: string, retryable: boolean): void {
@@ -1106,12 +1296,41 @@ export function installPointableContextRenderer(
         code: "pointable_context_changed",
       };
     }
+    if (
+      (response.presentation.kind === "revision" &&
+        (request.operation !== "check" ||
+          response.presentation.revision.detailRef !== request.detailRef)) ||
+      (request.operation === "refresh" &&
+        response.presentation.kind === "detail" &&
+        response.presentation.detail.detailRef !== request.detailRef)
+    ) {
+      window.clearTimeout(request.timeout);
+      pending = undefined;
+      return {
+        ok: false,
+        requestId: response.requestId,
+        outcome: "stale",
+        code: "pointable_refresh_ref_mismatch",
+      };
+    }
     window.clearTimeout(request.timeout);
     pending = undefined;
     if (response.presentation.kind === "candidates") {
       mountCandidates(response.presentation.candidates);
     } else if (response.presentation.kind === "detail") {
       mountDetail(response.presentation.detail);
+    } else if (response.presentation.kind === "revision") {
+      const revision = response.presentation.revision;
+      state = "detail";
+      if (revision.state === "unchanged") {
+        removeRevisionNotice();
+        scheduleRevisionCheck(revision.detailRef, request.generation);
+      } else {
+        showRevisionNotice(revision.state, revision.detailRef);
+      }
+    } else if (request.operation === "check" || request.operation === "refresh") {
+      state = "detail";
+      showRevisionNotice("unavailable", request.detailRef);
     } else {
       mountError(response.presentation.message, response.presentation.retryable);
     }
@@ -1220,6 +1439,7 @@ export function installPointableContextRenderer(
   }
 
   function cleanup(clearCandidate: boolean, restore: boolean): void {
+    clearRevisionTimer();
     removeOwned("action");
     removeOwned("card");
     resizeObserver?.disconnect();

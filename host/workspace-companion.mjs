@@ -883,14 +883,15 @@ function parsePointableLookupIntent(payload) {
     "surface",
     "contextFingerprint",
     "requestedAt",
-    "candidateRef"
+    "candidateRef",
+    "detailRef"
   ])) {
     throw new PointableProtocolError(
       "binding_payload_invalid",
       "binding payload contains unsupported fields"
     );
   }
-  if (parsed.schemaVersion !== POINTABLE_PROTOCOL_VERSION || parsed.kind !== "pointable.selection.lookup" || parsed.operation !== "resolve" && parsed.operation !== "choose" || !boundedString(parsed.requestId, 8, 128) || !/^[A-Za-z0-9:_-]+$/u.test(parsed.requestId) || !Number.isSafeInteger(parsed.selectionGeneration) || Number(parsed.selectionGeneration) < 1 || !boundedString(parsed.selectionText, 1, MAX_SELECTION_CHARS) || parsed.selectionText !== parsed.selectionText.trim() || !boundedString(parsed.selectionDigest, 64, 64) || !/^[0-9a-f]{64}$/u.test(parsed.selectionDigest) || parsed.surface !== "assistant_message" && parsed.surface !== "user_message" || !boundedString(parsed.contextFingerprint, 1, 2048) || !boundedString(parsed.requestedAt, 20, 64) || !Number.isFinite(Date.parse(parsed.requestedAt))) {
+  if (parsed.schemaVersion !== POINTABLE_PROTOCOL_VERSION || parsed.kind !== "pointable.selection.lookup" || parsed.operation !== "resolve" && parsed.operation !== "choose" && parsed.operation !== "check" && parsed.operation !== "refresh" || !boundedString(parsed.requestId, 8, 128) || !/^[A-Za-z0-9:_-]+$/u.test(parsed.requestId) || !Number.isSafeInteger(parsed.selectionGeneration) || Number(parsed.selectionGeneration) < 1 || !boundedString(parsed.selectionText, 1, MAX_SELECTION_CHARS) || parsed.selectionText !== parsed.selectionText.trim() || !boundedString(parsed.selectionDigest, 64, 64) || !/^[0-9a-f]{64}$/u.test(parsed.selectionDigest) || parsed.surface !== "assistant_message" && parsed.surface !== "user_message" || !boundedString(parsed.contextFingerprint, 1, 2048) || !boundedString(parsed.requestedAt, 20, 64) || !Number.isFinite(Date.parse(parsed.requestedAt))) {
     throw new PointableProtocolError(
       "binding_payload_invalid",
       "binding payload fields are invalid"
@@ -903,7 +904,8 @@ function parsePointableLookupIntent(payload) {
     );
   }
   const candidateRef = parsed.candidateRef;
-  if (parsed.operation === "resolve" && candidateRef !== void 0 || parsed.operation === "choose" && !boundedString(candidateRef, 8, 256)) {
+  const detailRef = parsed.detailRef;
+  if (parsed.operation === "resolve" && (candidateRef !== void 0 || detailRef !== void 0) || parsed.operation === "choose" && (!boundedString(candidateRef, 8, 256) || detailRef !== void 0) || (parsed.operation === "check" || parsed.operation === "refresh") && (candidateRef !== void 0 || !boundedString(detailRef, 8, 256))) {
     throw new PointableProtocolError(
       "binding_payload_invalid",
       "candidateRef is inconsistent with the requested operation"
@@ -922,6 +924,7 @@ function parsePointableLookupIntent(payload) {
     requestedAt: parsed.requestedAt
   };
   if (typeof candidateRef === "string") intent.candidateRef = candidateRef;
+  if (typeof detailRef === "string") intent.detailRef = detailRef;
   return intent;
 }
 function validateCandidate(value) {
@@ -961,7 +964,9 @@ function validateDetail(value) {
     "observedAt",
     "freshness",
     "facts",
-    "sources"
+    "sources",
+    "detailRef",
+    "changes"
   ])) {
     throw new PointableProtocolError(
       "invalid_lookup_result",
@@ -974,7 +979,7 @@ function validateDetail(value) {
       "detail freshness is invalid"
     );
   }
-  if (!boundedString(value.observedAt, 20, 64) || !Number.isFinite(Date.parse(value.observedAt)) || !Array.isArray(value.facts) || value.facts.length > 5 || !Array.isArray(value.sources) || value.sources.length > 5) {
+  if (!boundedString(value.observedAt, 20, 64) || !Number.isFinite(Date.parse(value.observedAt)) || !Array.isArray(value.facts) || value.facts.length > 5 || !Array.isArray(value.sources) || value.sources.length > 5 || value.detailRef !== void 0 && !boundedString(value.detailRef, 8, 256) || value.changes !== void 0 && (!Array.isArray(value.changes) || value.changes.length > 3)) {
     throw new PointableProtocolError(
       "invalid_lookup_result",
       "detail metadata exceeds its contract"
@@ -1001,6 +1006,19 @@ function validateDetail(value) {
     }
     return { label: requiredString(source.label, "source label", 512) };
   });
+  const changes = value.changes === void 0 ? void 0 : value.changes.map((change) => {
+    if (!record2(change) || !exactKeys2(change, ["label", "before", "after"])) {
+      throw new PointableProtocolError(
+        "invalid_lookup_result",
+        "detail change is invalid"
+      );
+    }
+    return {
+      label: requiredString(change.label, "change label", 128),
+      before: requiredString(change.before, "change before", 1024),
+      after: requiredString(change.after, "change after", 1024)
+    };
+  });
   return {
     entityId: requiredString(value.entityId, "entityId", 256),
     entityType: requiredString(value.entityType, "entityType", 128),
@@ -1010,7 +1028,9 @@ function validateDetail(value) {
     observedAt: value.observedAt,
     freshness: value.freshness,
     facts,
-    sources
+    sources,
+    ...typeof value.detailRef === "string" ? { detailRef: value.detailRef } : {},
+    ...changes === void 0 ? {} : { changes }
   };
 }
 function validatePointableLookupPresentation(value) {
@@ -1044,6 +1064,22 @@ function validatePointableLookupPresentation(value) {
       );
     }
     return { kind: "detail", detail: validateDetail(value.detail) };
+  }
+  if (value.kind === "revision") {
+    if (!exactKeys2(value, ["kind", "revision"]) || !record2(value.revision) || !exactKeys2(value.revision, ["detailRef", "state", "checkedAt"]) || !boundedString(value.revision.detailRef, 8, 256) || value.revision.state !== "unchanged" && value.revision.state !== "updated" && value.revision.state !== "deleted" && value.revision.state !== "unavailable" || !boundedString(value.revision.checkedAt, 20, 64) || !Number.isFinite(Date.parse(value.revision.checkedAt))) {
+      throw new PointableProtocolError(
+        "invalid_lookup_result",
+        "revision result is invalid"
+      );
+    }
+    return {
+      kind: "revision",
+      revision: {
+        detailRef: value.revision.detailRef,
+        state: value.revision.state,
+        checkedAt: value.revision.checkedAt
+      }
+    };
   }
   if (value.kind === "error") {
     if (!exactKeys2(value, ["kind", "code", "message", "retryable"]) || !boundedString(value.code, 1, 128) || !/^[a-z0-9_:-]+$/u.test(value.code) || !boundedString(value.message, 1, 1024) || typeof value.retryable !== "boolean") {
@@ -1106,6 +1142,7 @@ function validatePointableRendererResponse(value) {
   const candidateView2 = (candidate) => isRecord(candidate) && exact(candidate, ["candidateRef", "label", "entityType", "summary"]) && bounded(candidate.candidateRef, 8, 256) && bounded(candidate.label, 1, 256) && bounded(candidate.entityType, 1, 128) && bounded(candidate.summary, 1, 1024);
   const factView = (candidate) => isRecord(candidate) && exact(candidate, ["label", "value"]) && bounded(candidate.label, 1, 128) && bounded(candidate.value, 1, 1024);
   const sourceView = (candidate) => isRecord(candidate) && exact(candidate, ["label"]) && bounded(candidate.label, 1, 512);
+  const changeView = (candidate) => isRecord(candidate) && exact(candidate, ["label", "before", "after"]) && bounded(candidate.label, 1, 128) && bounded(candidate.before, 1, 1024) && bounded(candidate.after, 1, 1024);
   if (!isRecord(value) || !exact(value, [
     "schemaVersion",
     "kind",
@@ -1133,8 +1170,15 @@ function validatePointableRendererResponse(value) {
       "observedAt",
       "freshness",
       "facts",
-      "sources"
-    ]) || !bounded(detail.entityId, 1, 256) || !bounded(detail.entityType, 1, 128) || !bounded(detail.label, 1, 256) || !bounded(detail.summary, 1, 1024) || !bounded(detail.revision, 1, 512) || !bounded(detail.observedAt, 20, 64) || !Number.isFinite(Date.parse(detail.observedAt)) || detail.freshness !== "current" && detail.freshness !== "stale" && detail.freshness !== "partial" && detail.freshness !== "unknown" || !Array.isArray(detail.facts) || detail.facts.length > 5 || !detail.facts.every(factView) || !Array.isArray(detail.sources) || detail.sources.length > 5 || !detail.sources.every(sourceView)) {
+      "sources",
+      "detailRef",
+      "changes"
+    ]) || !bounded(detail.entityId, 1, 256) || !bounded(detail.entityType, 1, 128) || !bounded(detail.label, 1, 256) || !bounded(detail.summary, 1, 1024) || !bounded(detail.revision, 1, 512) || !bounded(detail.observedAt, 20, 64) || !Number.isFinite(Date.parse(detail.observedAt)) || detail.freshness !== "current" && detail.freshness !== "stale" && detail.freshness !== "partial" && detail.freshness !== "unknown" || !Array.isArray(detail.facts) || detail.facts.length > 5 || !detail.facts.every(factView) || !Array.isArray(detail.sources) || detail.sources.length > 5 || !detail.sources.every(sourceView) || detail.detailRef !== void 0 && !bounded(detail.detailRef, 8, 256) || detail.changes !== void 0 && (!Array.isArray(detail.changes) || detail.changes.length > 3 || !detail.changes.every(changeView))) {
+      return void 0;
+    }
+  } else if (presentation.kind === "revision") {
+    const revision = presentation.revision;
+    if (!exact(presentation, ["kind", "revision"]) || !isRecord(revision) || !exact(revision, ["detailRef", "state", "checkedAt"]) || !bounded(revision.detailRef, 8, 256) || revision.state !== "unchanged" && revision.state !== "updated" && revision.state !== "deleted" && revision.state !== "unavailable" || !bounded(revision.checkedAt, 20, 64) || !Number.isFinite(Date.parse(revision.checkedAt))) {
       return void 0;
     }
   } else if (presentation.kind === "error") {
@@ -1155,6 +1199,10 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   const requestTimeoutMs = config.requestTimeoutMs ?? 5e3;
   if (!Number.isSafeInteger(requestTimeoutMs) || requestTimeoutMs < 100 || requestTimeoutMs > 3e4) {
     throw new Error("pointable_renderer_timeout_invalid");
+  }
+  const revisionCheckIntervalMs = config.revisionCheckIntervalMs ?? 5e3;
+  if (!Number.isSafeInteger(revisionCheckIntervalMs) || revisionCheckIntervalMs < 100 || revisionCheckIntervalMs > 6e4) {
+    throw new Error("pointable_renderer_revision_interval_invalid");
   }
   const actionLabel = typeof config.actionLabel === "string" && config.actionLabel.trim().length > 0 && config.actionLabel.length <= 64 ? config.actionLabel.trim() : "\u67E5\u770B\u4E0A\u4E0B\u6587";
   const existing = window[namespace];
@@ -1198,6 +1246,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   let restoreFocus;
   let actionElement;
   let cardElement;
+  let revisionTimer;
   let uninstalled = false;
   const activeObserver = new MutationObserver(() => {
     if (candidate !== void 0) scheduleReconcile();
@@ -1461,17 +1510,21 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     );
     return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
   }
-  async function submitLookup(operation, expectedGeneration, candidateRef) {
+  async function submitLookup(operation, expectedGeneration, reference) {
     const current = candidate;
     if (current === void 0 || current.generation !== expectedGeneration || current.range.toString().trim() !== current.text || readContextFingerprint() !== current.contextFingerprint || !candidateAnchorIsCurrent()) {
       cleanup(true, false);
       return;
     }
-    if (operation === "resolve" && candidateRef !== void 0 || operation === "choose" && (typeof candidateRef !== "string" || candidateRef.length < 8 || candidateRef.length > 256)) {
-      mountError("\u5019\u9009\u5F15\u7528\u65E0\u6548\u3002", false);
+    if (operation === "resolve" && reference !== void 0 || operation === "choose" && (typeof reference !== "string" || reference.length < 8 || reference.length > 256) || (operation === "check" || operation === "refresh") && (typeof reference !== "string" || reference.length < 8 || reference.length > 256)) {
+      if (operation === "check" || operation === "refresh") {
+        showRevisionNotice("unavailable", reference);
+      } else {
+        mountError("\u5019\u9009\u5F15\u7528\u65E0\u6548\u3002", false);
+      }
       return;
     }
-    state = "resolving";
+    if (operation === "resolve" || operation === "choose") state = "resolving";
     try {
       const digest = await digestText(current.text);
       if (candidate?.generation !== expectedGeneration || current.range.toString().trim() !== current.text || readContextFingerprint() !== current.contextFingerprint || !candidateAnchorIsCurrent()) {
@@ -1483,7 +1536,11 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       const timeout = window.setTimeout(() => {
         if (pending?.requestId !== requestId) return;
         pending = void 0;
-        mountError("\u67E5\u8BE2\u8D85\u65F6\uFF0C\u8BF7\u91CD\u8BD5\u3002", true);
+        if (operation === "check" || operation === "refresh") {
+          showRevisionNotice("unavailable", reference);
+        } else {
+          mountError("\u67E5\u8BE2\u8D85\u65F6\uFF0C\u8BF7\u91CD\u8BD5\u3002", true);
+        }
       }, requestTimeoutMs);
       pending = {
         requestId,
@@ -1491,10 +1548,15 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
         digest,
         contextFingerprint: current.contextFingerprint,
         operation,
-        ...candidateRef === void 0 ? {} : { candidateRef },
+        ...operation === "choose" && reference !== void 0 ? { candidateRef: reference } : {},
+        ...(operation === "check" || operation === "refresh") && reference !== void 0 ? { detailRef: reference } : {},
         timeout
       };
-      mountLoading(operation === "choose" ? "\u6B63\u5728\u8BFB\u53D6\u4E0A\u4E0B\u6587\u8BE6\u60C5\u2026" : "\u6B63\u5728\u67E5\u627E\u4E0A\u4E0B\u6587\u5BF9\u8C61\u2026");
+      if (operation === "resolve" || operation === "choose") {
+        mountLoading(operation === "choose" ? "\u6B63\u5728\u8BFB\u53D6\u4E0A\u4E0B\u6587\u8BE6\u60C5\u2026" : "\u6B63\u5728\u67E5\u627E\u4E0A\u4E0B\u6587\u5BF9\u8C61\u2026");
+      } else if (operation === "refresh") {
+        showRevisionNotice("refreshing", reference);
+      }
       const payload = {
         schemaVersion: 1,
         kind: "pointable.selection.lookup",
@@ -1506,13 +1568,18 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
         surface: current.surface,
         contextFingerprint: current.contextFingerprint,
         requestedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        ...candidateRef === void 0 ? {} : { candidateRef }
+        ...operation === "choose" && reference !== void 0 ? { candidateRef: reference } : {},
+        ...(operation === "check" || operation === "refresh") && reference !== void 0 ? { detailRef: reference } : {}
       };
       binding(JSON.stringify(payload));
     } catch {
       if (pending !== void 0) window.clearTimeout(pending.timeout);
       pending = void 0;
-      mountError("\u5BBF\u4E3B\u67E5\u8BE2\u901A\u9053\u4E0D\u53EF\u7528\u3002", true);
+      if (operation === "check" || operation === "refresh") {
+        showRevisionNotice("unavailable", reference);
+      } else {
+        mountError("\u5BBF\u4E3B\u67E5\u8BE2\u901A\u9053\u4E0D\u53EF\u7528\u3002", true);
+      }
     }
   }
   function createShell(titleText) {
@@ -1676,10 +1743,102 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     row.append(label, value);
     return row;
   }
+  function clearRevisionTimer() {
+    if (revisionTimer !== void 0) window.clearTimeout(revisionTimer);
+    revisionTimer = void 0;
+  }
+  function removeRevisionNotice() {
+    connectedOwnedElement("card")?.querySelector('[data-pointable-context-role="revision-notice"]')?.remove();
+  }
+  function scheduleRevisionCheck(detailRef, expectedGeneration) {
+    clearRevisionTimer();
+    revisionTimer = window.setTimeout(() => {
+      revisionTimer = void 0;
+      if (state !== "detail" || candidate?.generation !== expectedGeneration || connectedOwnedElement("card") === null) {
+        return;
+      }
+      if (pending !== void 0) {
+        scheduleRevisionCheck(detailRef, expectedGeneration);
+        return;
+      }
+      void submitLookup("check", expectedGeneration, detailRef);
+    }, revisionCheckIntervalMs);
+  }
+  function showRevisionNotice(noticeState, detailRef) {
+    clearRevisionTimer();
+    const shell = connectedOwnedElement("card");
+    if (shell === null) return;
+    removeRevisionNotice();
+    const notice = document.createElement("div");
+    notice.setAttribute("data-pointable-context-role", "revision-notice");
+    notice.setAttribute("role", "status");
+    Object.assign(notice.style, {
+      margin: "8px 12px 0",
+      padding: "8px 10px",
+      borderRadius: "8px",
+      background: noticeState === "deleted" || noticeState === "unavailable" ? "#fff4e5" : "#eef4ff",
+      color: noticeState === "deleted" || noticeState === "unavailable" ? "#8a4b00" : "#1746c7",
+      fontSize: "12px"
+    });
+    const message = document.createElement("span");
+    message.textContent = noticeState === "updated" ? "\u5185\u5BB9\u5DF2\u66F4\u65B0" : noticeState === "deleted" ? "\u5BF9\u8C61\u5DF2\u5220\u9664\uFF1B\u5F53\u524D\u663E\u793A\u7684\u662F\u65E7\u5FEB\u7167" : noticeState === "refreshing" ? "\u6B63\u5728\u5237\u65B0\u5F53\u524D\u8BE6\u60C5\u2026" : "\u6682\u65F6\u65E0\u6CD5\u786E\u8BA4\u6700\u65B0\u72B6\u6001\uFF1B\u5F53\u524D\u663E\u793A\u7684\u662F\u65E7\u5FEB\u7167";
+    notice.append(message);
+    if (noticeState === "updated" && detailRef !== void 0) {
+      const refresh = document.createElement("button");
+      refresh.type = "button";
+      refresh.textContent = "\u5237\u65B0\u5185\u5BB9";
+      refresh.setAttribute("data-pointable-context-role", "revision-refresh");
+      Object.assign(refresh.style, {
+        marginLeft: "8px",
+        border: "0",
+        background: "transparent",
+        color: "#1746c7",
+        padding: "1px 0",
+        cursor: "pointer",
+        fontWeight: "700"
+      });
+      const expectedGeneration = candidate?.generation;
+      refresh.addEventListener("click", (event) => {
+        if (!event.isTrusted || expectedGeneration === void 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        void submitLookup("refresh", expectedGeneration, detailRef);
+      });
+      notice.append(refresh);
+    }
+    const header = shell.firstElementChild;
+    if (header?.nextSibling === null) shell.append(notice);
+    else shell.insertBefore(notice, header?.nextSibling ?? shell.firstChild);
+    reposition();
+  }
   function mountDetail(detail) {
+    clearRevisionTimer();
     state = "detail";
     const { body } = createShell(detail.label);
     body.append(paragraph(detail.summary));
+    if (detail.changes !== void 0 && detail.changes.length > 0) {
+      const changeSummary = document.createElement("div");
+      changeSummary.setAttribute("data-pointable-context-role", "revision-changes");
+      Object.assign(changeSummary.style, {
+        marginTop: "8px",
+        padding: "8px 10px",
+        borderRadius: "8px",
+        background: "#eef4ff",
+        color: "#1746c7",
+        fontSize: "12px"
+      });
+      const heading = document.createElement("strong");
+      heading.textContent = "\u672C\u6B21\u5237\u65B0";
+      const list = document.createElement("ul");
+      Object.assign(list.style, { margin: "4px 0 0", paddingLeft: "18px" });
+      for (const change of detail.changes) {
+        const item = document.createElement("li");
+        item.textContent = `${change.label}\uFF1A${change.before} \u2192 ${change.after}`;
+        list.append(item);
+      }
+      changeSummary.append(heading, list);
+      body.append(changeSummary);
+    }
     const compactState = document.createElement("div");
     compactState.textContent = `${detail.entityType} \xB7 ${detail.freshness}`;
     Object.assign(compactState.style, {
@@ -1767,6 +1926,9 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       reposition();
     });
     body.append(disclosure);
+    if (detail.detailRef !== void 0 && candidate !== void 0) {
+      scheduleRevisionCheck(detail.detailRef, candidate.generation);
+    }
   }
   function mountError(message, retryable) {
     state = "error";
@@ -1826,12 +1988,34 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
         code: "pointable_context_changed"
       };
     }
+    if (response.presentation.kind === "revision" && (request.operation !== "check" || response.presentation.revision.detailRef !== request.detailRef) || request.operation === "refresh" && response.presentation.kind === "detail" && response.presentation.detail.detailRef !== request.detailRef) {
+      window.clearTimeout(request.timeout);
+      pending = void 0;
+      return {
+        ok: false,
+        requestId: response.requestId,
+        outcome: "stale",
+        code: "pointable_refresh_ref_mismatch"
+      };
+    }
     window.clearTimeout(request.timeout);
     pending = void 0;
     if (response.presentation.kind === "candidates") {
       mountCandidates(response.presentation.candidates);
     } else if (response.presentation.kind === "detail") {
       mountDetail(response.presentation.detail);
+    } else if (response.presentation.kind === "revision") {
+      const revision = response.presentation.revision;
+      state = "detail";
+      if (revision.state === "unchanged") {
+        removeRevisionNotice();
+        scheduleRevisionCheck(revision.detailRef, request.generation);
+      } else {
+        showRevisionNotice(revision.state, revision.detailRef);
+      }
+    } else if (request.operation === "check" || request.operation === "refresh") {
+      state = "detail";
+      showRevisionNotice("unavailable", request.detailRef);
     } else {
       mountError(response.presentation.message, response.presentation.retryable);
     }
@@ -1909,6 +2093,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     });
   }
   function cleanup(clearCandidate, restore) {
+    clearRevisionTimer();
     removeOwned("action");
     removeOwned("card");
     resizeObserver?.disconnect();
@@ -2949,6 +3134,7 @@ var CodexCdpHostAdapter = class {
             contextFingerprint: intent.contextFingerprint,
             requestedAt: intent.requestedAt,
             ...intent.candidateRef === void 0 ? {} : { candidateRef: intent.candidateRef },
+            ...intent.detailRef === void 0 ? {} : { detailRef: intent.detailRef },
             host: {
               targetId: attachment.target.id,
               targetUrl: attachment.target.url,
@@ -3909,6 +4095,59 @@ function gitStatusLabel(status) {
 function stableFileStat(before, after) {
   return before.size === after.size && before.mtimeMs === after.mtimeMs && before.ctimeMs === after.ctimeMs && before.ino === after.ino;
 }
+var LocalWorkspaceRevisionProbe = class {
+  async probe(request) {
+    const observedAt = (/* @__PURE__ */ new Date()).toISOString();
+    if (request.signal?.aborted) {
+      return { kind: "unavailable", observedAt, retryable: true };
+    }
+    if (request.entityType !== "file" && request.entityType !== "document" && request.entityType !== "module") {
+      return { kind: "not_found", observedAt };
+    }
+    if (!request.entityId.startsWith("file:")) {
+      return { kind: "not_found", observedAt };
+    }
+    const locator = request.entityId.slice("file:".length);
+    if (locator.length < 1 || locator.length > MAX_RELATIVE_PATH_CHARS || locator.includes("\\") || locator.startsWith("/") || locator.split("/").includes("..")) {
+      return { kind: "not_found", observedAt };
+    }
+    try {
+      const root = await verifiedWorkspaceRoot(request.binding);
+      const requestedPath = resolve4(root, ...locator.split("/"));
+      const canonicalFile = await realpath2(requestedPath);
+      if (containedRelative(root, canonicalFile) !== locator) {
+        return { kind: "not_found", observedAt };
+      }
+      const info = await stat2(canonicalFile);
+      if (!info.isFile() || request.signal?.aborted) {
+        return { kind: "unavailable", observedAt, retryable: true };
+      }
+      const revision = createHash5("sha256").update(JSON.stringify({
+        path: locator,
+        size: info.size,
+        modifiedMs: info.mtimeMs,
+        changedMs: info.ctimeMs,
+        inode: info.ino
+      }), "utf8").digest("hex");
+      return {
+        kind: "current",
+        revision: `workspace-file-stat:${revision}`,
+        observedAt
+      };
+    } catch (error) {
+      const code = error.code;
+      if (code === "ENOENT" || code === "ENOTDIR") {
+        return { kind: "not_found", observedAt };
+      }
+      if (error instanceof ContractError) throw error;
+      return {
+        kind: "unavailable",
+        observedAt,
+        retryable: code !== "EACCES" && code !== "EPERM"
+      };
+    }
+  }
+};
 var LocalWorkspaceAuthoritativeProvider = class {
   providerId = LOCAL_WORKSPACE_PROVIDER_ID;
   async getDetail(request) {
@@ -4833,6 +5072,8 @@ var LookupService = class {
 // src/host/codex-cdp/workspace-lookup.ts
 var DEFAULT_CANDIDATE_REF_TTL_MS = 6e4;
 var DEFAULT_MAX_CANDIDATE_REFS = 256;
+var DEFAULT_DETAIL_REF_TTL_MS = 10 * 6e4;
+var DEFAULT_MAX_DETAIL_REFS = 256;
 function boundedPrintable(value, minimum, maximum) {
   return typeof value === "string" && value.length >= minimum && value.length <= maximum && !/[\p{Cc}\p{Cf}]/u.test(value);
 }
@@ -4865,7 +5106,7 @@ function candidateView(candidate, candidateRef) {
     summary: truncate(candidate.summary, 1024)
   };
 }
-function detailView(outcome) {
+function detailView(outcome, options = {}) {
   const purpose = outcome.detail.facts["\u7528\u9014"] ?? outcome.detail.facts["\u804C\u8D23"];
   const change = outcome.detail.facts["\u672C\u6B21\u53D8\u5316"];
   const activeChange = typeof change === "string" && /^(?:涉及：|modified\b|staged\b|untracked\b|conflicted\b)/u.test(change);
@@ -4882,8 +5123,25 @@ function detailView(outcome) {
     facts: Object.entries(outcome.detail.facts).slice(0, 5).map(([label, value]) => ({ label, value: factText2(value) })),
     sources: outcome.detail.sourceRefs.slice(0, 5).map((source) => ({
       label: truncate(`${source.sourceType} / ${source.sourceId}`, 512)
-    }))
+    })),
+    ...options.detailRef === void 0 ? {} : { detailRef: options.detailRef },
+    ...options.changes === void 0 ? {} : { changes: options.changes }
   };
+}
+function detailChanges(before, after) {
+  const previous = new Map(before.facts.map((fact) => [fact.label, fact.value]));
+  const changes = [];
+  if (before.summary !== after.summary) {
+    changes.push({ label: "\u6458\u8981", before: before.summary, after: after.summary });
+  }
+  for (const fact of after.facts) {
+    const oldValue = previous.get(fact.label);
+    if (oldValue !== void 0 && oldValue !== fact.value) {
+      changes.push({ label: fact.label, before: oldValue, after: fact.value });
+    }
+    if (changes.length >= 3) break;
+  }
+  return changes.slice(0, 3);
 }
 function outcomeError(outcome) {
   if (outcome.kind === "no_match") {
@@ -4919,29 +5177,42 @@ function outcomeError(outcome) {
 }
 function validRequest(request) {
   const task = request.host.task;
-  return (request.operation === "resolve" || request.operation === "choose") && boundedPrintable(request.requestId, 8, 128) && boundedPrintable(request.selection.text, 1, 512) && request.selection.text === request.selection.text.trim() && /^[0-9a-f]{64}$/u.test(request.selection.digest) && sha2562(request.selection.text) === request.selection.digest && Number.isSafeInteger(request.selection.generation) && request.selection.generation >= 1 && (request.selection.surface === "assistant_message" || request.selection.surface === "user_message") && boundedPrintable(request.contextFingerprint, 1, 2048) && request.host.targetUrl === "app://-/index.html" && task !== void 0 && request.host.revalidateTask !== void 0 && task.contextFingerprint === request.contextFingerprint && task.routeRef === request.host.targetUrl && (request.operation === "resolve" ? request.candidateRef === void 0 : boundedPrintable(request.candidateRef, 8, 256));
+  return (request.operation === "resolve" || request.operation === "choose" || request.operation === "check" || request.operation === "refresh") && boundedPrintable(request.requestId, 8, 128) && boundedPrintable(request.selection.text, 1, 512) && request.selection.text === request.selection.text.trim() && /^[0-9a-f]{64}$/u.test(request.selection.digest) && sha2562(request.selection.text) === request.selection.digest && Number.isSafeInteger(request.selection.generation) && request.selection.generation >= 1 && (request.selection.surface === "assistant_message" || request.selection.surface === "user_message") && boundedPrintable(request.contextFingerprint, 1, 2048) && request.host.targetUrl === "app://-/index.html" && task !== void 0 && request.host.revalidateTask !== void 0 && task.contextFingerprint === request.contextFingerprint && task.routeRef === request.host.targetUrl && (request.operation === "resolve" ? request.candidateRef === void 0 && request.detailRef === void 0 : request.operation === "choose" ? boundedPrintable(request.candidateRef, 8, 256) && request.detailRef === void 0 : request.candidateRef === void 0 && boundedPrintable(request.detailRef, 8, 256));
 }
 function createWorkspaceLookupCallback(options) {
   const candidateRefTtlMs = options.candidateRefTtlMs ?? DEFAULT_CANDIDATE_REF_TTL_MS;
   const maxCandidateRefs = options.maxCandidateRefs ?? DEFAULT_MAX_CANDIDATE_REFS;
+  const detailRefTtlMs = options.detailRefTtlMs ?? DEFAULT_DETAIL_REF_TTL_MS;
+  const maxDetailRefs = options.maxDetailRefs ?? DEFAULT_MAX_DETAIL_REFS;
   if (!Number.isSafeInteger(candidateRefTtlMs) || candidateRefTtlMs < 100 || candidateRefTtlMs > 3e5) {
     throw new RangeError("candidateRefTtlMs must be an integer from 100 to 300000");
   }
   if (!Number.isSafeInteger(maxCandidateRefs) || maxCandidateRefs < 1 || maxCandidateRefs > 4096) {
     throw new RangeError("maxCandidateRefs must be an integer from 1 to 4096");
   }
+  if (!Number.isSafeInteger(detailRefTtlMs) || detailRefTtlMs < 1e3 || detailRefTtlMs > 36e5) {
+    throw new RangeError("detailRefTtlMs must be an integer from 1000 to 3600000");
+  }
+  if (!Number.isSafeInteger(maxDetailRefs) || maxDetailRefs < 1 || maxDetailRefs > 4096) {
+    throw new RangeError("maxDetailRefs must be an integer from 1 to 4096");
+  }
   const index = options.index ?? new LocalWorkspaceContextIndex();
   const provider = options.provider ?? new LocalWorkspaceAuthoritativeProvider();
+  const revisionProbe = options.revisionProbe === false ? void 0 : options.revisionProbe ?? new LocalWorkspaceRevisionProbe();
   const clock = options.clock ?? Date.now;
-  const grants = /* @__PURE__ */ new Map();
+  const candidateGrants = /* @__PURE__ */ new Map();
+  const detailGrants = /* @__PURE__ */ new Map();
   const now = () => {
     const value = clock();
     if (!Number.isFinite(value) || value < 0) throw new Error("workspace lookup clock is invalid");
     return value;
   };
   const prune = (at) => {
-    for (const [candidateRef, grant] of grants) {
-      if (grant.expiresAt <= at) grants.delete(candidateRef);
+    for (const [candidateRef, grant] of candidateGrants) {
+      if (grant.expiresAt <= at) candidateGrants.delete(candidateRef);
+    }
+    for (const [detailRef, grant] of detailGrants) {
+      if (grant.expiresAt <= at) detailGrants.delete(detailRef);
     }
   };
   const consumeCandidate = async (request) => {
@@ -4949,12 +5220,12 @@ function createWorkspaceLookupCallback(options) {
     if (candidateRef === void 0 || request.host.task === void 0) return void 0;
     const checkedAt = now();
     prune(checkedAt);
-    const grant = grants.get(candidateRef);
+    const grant = candidateGrants.get(candidateRef);
     const entry = await options.registry.find(request.host.task);
     if (grant === void 0 || entry === void 0 || grant.expiresAt <= checkedAt || grant.targetId !== request.host.targetId || grant.bindingGeneration !== request.host.bindingGeneration || grant.contextFingerprint !== request.contextFingerprint || grant.selectionDigest !== request.selection.digest || grant.selectionGeneration !== request.selection.generation || grant.bindingRevision !== entry.bindingRevision || grant.scopeKey !== scopeKey(entry)) {
       return void 0;
     }
-    grants.delete(candidateRef);
+    candidateGrants.delete(candidateRef);
     return grant.entityId;
   };
   const issueCandidates = async (request, candidates2) => {
@@ -4965,10 +5236,10 @@ function createWorkspaceLookupCallback(options) {
     }
     const issuedAt = now();
     prune(issuedAt);
-    if (grants.size + candidates2.length > maxCandidateRefs) return void 0;
+    if (candidateGrants.size + candidates2.length > maxCandidateRefs) return void 0;
     return candidates2.map((candidate) => {
       const candidateRef = `pcand:${randomBytes3(32).toString("base64url")}`;
-      grants.set(candidateRef, {
+      candidateGrants.set(candidateRef, {
         targetId: request.host.targetId,
         bindingGeneration: request.host.bindingGeneration,
         contextFingerprint: request.contextFingerprint,
@@ -4981,6 +5252,116 @@ function createWorkspaceLookupCallback(options) {
       });
       return candidateView(candidate, candidateRef);
     });
+  };
+  const runtimeFor = (request, activeEntry) => {
+    if (request.host.task === void 0 || request.host.revalidateTask === void 0) {
+      throw new Error("host context unavailable");
+    }
+    const authority = {
+      current: async (signal) => await request.host.revalidateTask?.(signal)
+    };
+    const binding = new CodexTaskWorkspaceBindingPort(
+      options.registry,
+      request.host.task,
+      authority
+    );
+    const selection = {
+      text: request.selection.text,
+      surface: request.selection.surface,
+      selectionGeneration: request.selection.generation
+    };
+    const hostContext = {
+      selectionGeneration: request.selection.generation,
+      explicitScope: { ...activeEntry.scope },
+      threadRef: codexTaskThreadRef(request.host.task),
+      routeRef: request.host.task.routeRef,
+      workspaceRoot: activeEntry.workspaceRoot
+    };
+    const service = new LookupService(binding, index, [provider], {
+      ...options.operationTimeoutMs === void 0 ? {} : { operationTimeoutMs: options.operationTimeoutMs }
+    });
+    return { binding, selection, hostContext, service };
+  };
+  const runLookup = async (request, activeEntry, chosenEntityId) => {
+    const runtime = runtimeFor(request, activeEntry);
+    const activation = runtime.service.issueActivation(
+      runtime.selection,
+      runtime.hostContext,
+      chosenEntityId
+    );
+    if (activation.kind !== "issued") {
+      return {
+        kind: "error",
+        presentation: errorPresentation(
+          activation.kind === "capacity_exceeded" ? "lookup_capacity" : "invalid_request",
+          activation.kind === "capacity_exceeded" ? "\u5DE5\u4F5C\u533A\u67E5\u8BE2\u5BB9\u91CF\u5DF2\u6EE1\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002" : "\u5DE5\u4F5C\u533A\u67E5\u8BE2\u8BF7\u6C42\u65E0\u6548\u3002",
+          activation.kind === "capacity_exceeded"
+        )
+      };
+    }
+    const outcome = await runtime.service.submitLookupIntent({
+      ...activation.ticket,
+      selection: runtime.selection,
+      hostContext: runtime.hostContext,
+      ...chosenEntityId === void 0 ? {} : { chosenEntityId }
+    }, request.signal);
+    return { kind: "outcome", outcome, runtime };
+  };
+  const probeWithFence = async (runtime, entityId, entityType, signal) => {
+    if (revisionProbe === void 0 || signal.aborted) return void 0;
+    const resolved = await runtime.binding.resolve(runtime.hostContext, signal);
+    if (resolved.kind !== "trusted") return void 0;
+    const probed = await revisionProbe.probe({
+      binding: resolved,
+      entityId,
+      entityType,
+      signal
+    });
+    const revalidated = await runtime.binding.revalidate(resolved, signal);
+    if (revalidated.kind !== "trusted") return void 0;
+    return probed;
+  };
+  const issueDetail = async (request, activeEntry, outcome, runtime) => {
+    const detail = detailView(outcome);
+    const issuedAt = now();
+    prune(issuedAt);
+    if (detailGrants.size >= maxDetailRefs) return detail;
+    const probe = await probeWithFence(
+      runtime,
+      outcome.detail.entityId,
+      outcome.detail.entityType,
+      request.signal
+    );
+    if (probe?.kind !== "current") return detail;
+    const detailRef = `pdet:${randomBytes3(32).toString("base64url")}`;
+    detailGrants.set(detailRef, {
+      targetId: request.host.targetId,
+      bindingGeneration: request.host.bindingGeneration,
+      contextFingerprint: request.contextFingerprint,
+      selectionDigest: request.selection.digest,
+      selectionGeneration: request.selection.generation,
+      entityId: outcome.detail.entityId,
+      entityType: outcome.detail.entityType,
+      scopeKey: scopeKey(activeEntry),
+      bindingRevision: activeEntry.bindingRevision,
+      probeRevision: probe.revision,
+      detail,
+      expiresAt: issuedAt + detailRefTtlMs
+    });
+    return { ...detail, detailRef };
+  };
+  const currentDetailGrant = async (request, activeEntry) => {
+    const detailRef = request.detailRef;
+    if (detailRef === void 0) return void 0;
+    const checkedAt = now();
+    prune(checkedAt);
+    const grant = detailGrants.get(detailRef);
+    if (grant === void 0) return void 0;
+    if (grant.expiresAt <= checkedAt || grant.targetId !== request.host.targetId || grant.bindingGeneration !== request.host.bindingGeneration || grant.contextFingerprint !== request.contextFingerprint || grant.selectionDigest !== request.selection.digest || grant.selectionGeneration !== request.selection.generation || grant.bindingRevision !== activeEntry.bindingRevision || grant.scopeKey !== scopeKey(activeEntry)) {
+      detailGrants.delete(detailRef);
+      return void 0;
+    }
+    return { detailRef, grant };
   };
   return async (request) => {
     if (!validRequest(request) || request.host.task === void 0 || request.host.revalidateTask === void 0) {
@@ -4997,48 +5378,89 @@ function createWorkspaceLookupCallback(options) {
         false
       );
     }
+    if (request.operation === "check" || request.operation === "refresh") {
+      const current = await currentDetailGrant(request, activeEntry);
+      if (current === void 0) {
+        return errorPresentation(
+          "detail_ref_invalid",
+          "\u8BE6\u60C5\u5237\u65B0\u5F15\u7528\u65E0\u6548\u6216\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u3002",
+          true
+        );
+      }
+      const runtime = runtimeFor(request, activeEntry);
+      if (request.operation === "check") {
+        const probe2 = await probeWithFence(
+          runtime,
+          current.grant.entityId,
+          current.grant.entityType,
+          request.signal
+        );
+        if (probe2 === void 0) {
+          return errorPresentation(
+            "context_changed",
+            "\u5F53\u524D\u4EFB\u52A1\u6216\u5DE5\u4F5C\u533A\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u540E\u91CD\u8BD5\u3002",
+            true
+          );
+        }
+        const state = probe2.kind === "current" ? probe2.revision === current.grant.probeRevision ? "unchanged" : "updated" : probe2.kind === "not_found" ? "deleted" : "unavailable";
+        if (state === "unchanged") {
+          current.grant.expiresAt = now() + detailRefTtlMs;
+        }
+        return {
+          kind: "revision",
+          revision: {
+            detailRef: current.detailRef,
+            state,
+            checkedAt: probe2.observedAt
+          }
+        };
+      }
+      const refreshed = await runLookup(request, activeEntry, current.grant.entityId);
+      if (refreshed.kind === "error") return refreshed.presentation;
+      if (refreshed.outcome.kind === "candidates") {
+        return errorPresentation(
+          "refresh_identity_ambiguous",
+          "\u5237\u65B0\u65F6\u5BF9\u8C61\u8EAB\u4EFD\u4E0D\u518D\u552F\u4E00\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u3002",
+          false
+        );
+      }
+      if (refreshed.outcome.kind !== "detail") return outcomeError(refreshed.outcome);
+      const nextDetail = detailView(refreshed.outcome);
+      const probe = await probeWithFence(
+        refreshed.runtime,
+        refreshed.outcome.detail.entityId,
+        refreshed.outcome.detail.entityType,
+        request.signal
+      );
+      if (probe?.kind !== "current") {
+        return errorPresentation(
+          "refresh_unavailable",
+          "\u66F4\u65B0\u540E\u7684\u8BE6\u60C5\u65E0\u6CD5\u88AB\u5F53\u524D Provider \u590D\u9A8C\u3002",
+          true
+        );
+      }
+      const changes = detailChanges(current.grant.detail, nextDetail);
+      current.grant.probeRevision = probe.revision;
+      current.grant.detail = nextDetail;
+      current.grant.expiresAt = now() + detailRefTtlMs;
+      return {
+        kind: "detail",
+        detail: { ...nextDetail, detailRef: current.detailRef, changes }
+      };
+    }
     const chosenEntityId = request.operation === "choose" ? await consumeCandidate(request) : void 0;
     if (request.operation === "choose" && chosenEntityId === void 0) {
       return errorPresentation("candidate_ref_invalid", "\u5019\u9009\u5F15\u7528\u65E0\u6548\u6216\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u67E5\u8BE2\u3002", true);
     }
-    const authority = {
-      current: async (signal) => await request.host.revalidateTask?.(signal)
-    };
-    const binding = new CodexTaskWorkspaceBindingPort(
-      options.registry,
-      request.host.task,
-      authority
-    );
-    const service = new LookupService(binding, index, [provider], {
-      ...options.operationTimeoutMs === void 0 ? {} : { operationTimeoutMs: options.operationTimeoutMs }
-    });
-    const selection = {
-      text: request.selection.text,
-      surface: request.selection.surface,
-      selectionGeneration: request.selection.generation
-    };
-    const hostContext = {
-      selectionGeneration: request.selection.generation,
-      explicitScope: { ...activeEntry.scope },
-      threadRef: codexTaskThreadRef(request.host.task),
-      routeRef: request.host.task.routeRef,
-      workspaceRoot: activeEntry.workspaceRoot
-    };
-    const activation = service.issueActivation(selection, hostContext, chosenEntityId);
-    if (activation.kind !== "issued") {
-      return errorPresentation(
-        activation.kind === "capacity_exceeded" ? "lookup_capacity" : "invalid_request",
-        activation.kind === "capacity_exceeded" ? "\u5DE5\u4F5C\u533A\u67E5\u8BE2\u5BB9\u91CF\u5DF2\u6EE1\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002" : "\u5DE5\u4F5C\u533A\u67E5\u8BE2\u8BF7\u6C42\u65E0\u6548\u3002",
-        activation.kind === "capacity_exceeded"
-      );
+    const resolved = await runLookup(request, activeEntry, chosenEntityId);
+    if (resolved.kind === "error") return resolved.presentation;
+    const outcome = resolved.outcome;
+    if (outcome.kind === "detail") {
+      return {
+        kind: "detail",
+        detail: await issueDetail(request, activeEntry, outcome, resolved.runtime)
+      };
     }
-    const outcome = await service.submitLookupIntent({
-      ...activation.ticket,
-      selection,
-      hostContext,
-      ...chosenEntityId === void 0 ? {} : { chosenEntityId }
-    }, request.signal);
-    if (outcome.kind === "detail") return { kind: "detail", detail: detailView(outcome) };
     if (outcome.kind === "candidates") {
       const candidates2 = await issueCandidates(request, outcome.candidates);
       return candidates2 === void 0 ? errorPresentation("candidate_ref_capacity", "\u5019\u9009\u5F15\u7528\u6682\u65F6\u4E0D\u53EF\u7528\uFF0C\u8BF7\u91CD\u8BD5\u3002", true) : { kind: "candidates", candidates: candidates2 };

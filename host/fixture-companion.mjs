@@ -953,14 +953,15 @@ function parsePointableLookupIntent(payload) {
     "surface",
     "contextFingerprint",
     "requestedAt",
-    "candidateRef"
+    "candidateRef",
+    "detailRef"
   ])) {
     throw new PointableProtocolError(
       "binding_payload_invalid",
       "binding payload contains unsupported fields"
     );
   }
-  if (parsed.schemaVersion !== POINTABLE_PROTOCOL_VERSION || parsed.kind !== "pointable.selection.lookup" || parsed.operation !== "resolve" && parsed.operation !== "choose" || !boundedString(parsed.requestId, 8, 128) || !/^[A-Za-z0-9:_-]+$/u.test(parsed.requestId) || !Number.isSafeInteger(parsed.selectionGeneration) || Number(parsed.selectionGeneration) < 1 || !boundedString(parsed.selectionText, 1, MAX_SELECTION_CHARS) || parsed.selectionText !== parsed.selectionText.trim() || !boundedString(parsed.selectionDigest, 64, 64) || !/^[0-9a-f]{64}$/u.test(parsed.selectionDigest) || parsed.surface !== "assistant_message" && parsed.surface !== "user_message" || !boundedString(parsed.contextFingerprint, 1, 2048) || !boundedString(parsed.requestedAt, 20, 64) || !Number.isFinite(Date.parse(parsed.requestedAt))) {
+  if (parsed.schemaVersion !== POINTABLE_PROTOCOL_VERSION || parsed.kind !== "pointable.selection.lookup" || parsed.operation !== "resolve" && parsed.operation !== "choose" && parsed.operation !== "check" && parsed.operation !== "refresh" || !boundedString(parsed.requestId, 8, 128) || !/^[A-Za-z0-9:_-]+$/u.test(parsed.requestId) || !Number.isSafeInteger(parsed.selectionGeneration) || Number(parsed.selectionGeneration) < 1 || !boundedString(parsed.selectionText, 1, MAX_SELECTION_CHARS) || parsed.selectionText !== parsed.selectionText.trim() || !boundedString(parsed.selectionDigest, 64, 64) || !/^[0-9a-f]{64}$/u.test(parsed.selectionDigest) || parsed.surface !== "assistant_message" && parsed.surface !== "user_message" || !boundedString(parsed.contextFingerprint, 1, 2048) || !boundedString(parsed.requestedAt, 20, 64) || !Number.isFinite(Date.parse(parsed.requestedAt))) {
     throw new PointableProtocolError(
       "binding_payload_invalid",
       "binding payload fields are invalid"
@@ -973,7 +974,8 @@ function parsePointableLookupIntent(payload) {
     );
   }
   const candidateRef = parsed.candidateRef;
-  if (parsed.operation === "resolve" && candidateRef !== void 0 || parsed.operation === "choose" && !boundedString(candidateRef, 8, 256)) {
+  const detailRef = parsed.detailRef;
+  if (parsed.operation === "resolve" && (candidateRef !== void 0 || detailRef !== void 0) || parsed.operation === "choose" && (!boundedString(candidateRef, 8, 256) || detailRef !== void 0) || (parsed.operation === "check" || parsed.operation === "refresh") && (candidateRef !== void 0 || !boundedString(detailRef, 8, 256))) {
     throw new PointableProtocolError(
       "binding_payload_invalid",
       "candidateRef is inconsistent with the requested operation"
@@ -992,6 +994,7 @@ function parsePointableLookupIntent(payload) {
     requestedAt: parsed.requestedAt
   };
   if (typeof candidateRef === "string") intent.candidateRef = candidateRef;
+  if (typeof detailRef === "string") intent.detailRef = detailRef;
   return intent;
 }
 function validateCandidate(value) {
@@ -1031,7 +1034,9 @@ function validateDetail(value) {
     "observedAt",
     "freshness",
     "facts",
-    "sources"
+    "sources",
+    "detailRef",
+    "changes"
   ])) {
     throw new PointableProtocolError(
       "invalid_lookup_result",
@@ -1044,7 +1049,7 @@ function validateDetail(value) {
       "detail freshness is invalid"
     );
   }
-  if (!boundedString(value.observedAt, 20, 64) || !Number.isFinite(Date.parse(value.observedAt)) || !Array.isArray(value.facts) || value.facts.length > 5 || !Array.isArray(value.sources) || value.sources.length > 5) {
+  if (!boundedString(value.observedAt, 20, 64) || !Number.isFinite(Date.parse(value.observedAt)) || !Array.isArray(value.facts) || value.facts.length > 5 || !Array.isArray(value.sources) || value.sources.length > 5 || value.detailRef !== void 0 && !boundedString(value.detailRef, 8, 256) || value.changes !== void 0 && (!Array.isArray(value.changes) || value.changes.length > 3)) {
     throw new PointableProtocolError(
       "invalid_lookup_result",
       "detail metadata exceeds its contract"
@@ -1071,6 +1076,19 @@ function validateDetail(value) {
     }
     return { label: requiredString(source.label, "source label", 512) };
   });
+  const changes = value.changes === void 0 ? void 0 : value.changes.map((change) => {
+    if (!record(change) || !exactKeys(change, ["label", "before", "after"])) {
+      throw new PointableProtocolError(
+        "invalid_lookup_result",
+        "detail change is invalid"
+      );
+    }
+    return {
+      label: requiredString(change.label, "change label", 128),
+      before: requiredString(change.before, "change before", 1024),
+      after: requiredString(change.after, "change after", 1024)
+    };
+  });
   return {
     entityId: requiredString(value.entityId, "entityId", 256),
     entityType: requiredString(value.entityType, "entityType", 128),
@@ -1080,7 +1098,9 @@ function validateDetail(value) {
     observedAt: value.observedAt,
     freshness: value.freshness,
     facts,
-    sources
+    sources,
+    ...typeof value.detailRef === "string" ? { detailRef: value.detailRef } : {},
+    ...changes === void 0 ? {} : { changes }
   };
 }
 function validatePointableLookupPresentation(value) {
@@ -1114,6 +1134,22 @@ function validatePointableLookupPresentation(value) {
       );
     }
     return { kind: "detail", detail: validateDetail(value.detail) };
+  }
+  if (value.kind === "revision") {
+    if (!exactKeys(value, ["kind", "revision"]) || !record(value.revision) || !exactKeys(value.revision, ["detailRef", "state", "checkedAt"]) || !boundedString(value.revision.detailRef, 8, 256) || value.revision.state !== "unchanged" && value.revision.state !== "updated" && value.revision.state !== "deleted" && value.revision.state !== "unavailable" || !boundedString(value.revision.checkedAt, 20, 64) || !Number.isFinite(Date.parse(value.revision.checkedAt))) {
+      throw new PointableProtocolError(
+        "invalid_lookup_result",
+        "revision result is invalid"
+      );
+    }
+    return {
+      kind: "revision",
+      revision: {
+        detailRef: value.revision.detailRef,
+        state: value.revision.state,
+        checkedAt: value.revision.checkedAt
+      }
+    };
   }
   if (value.kind === "error") {
     if (!exactKeys(value, ["kind", "code", "message", "retryable"]) || !boundedString(value.code, 1, 128) || !/^[a-z0-9_:-]+$/u.test(value.code) || !boundedString(value.message, 1, 1024) || typeof value.retryable !== "boolean") {
@@ -1176,6 +1212,7 @@ function validatePointableRendererResponse(value) {
   const candidateView2 = (candidate) => isRecord(candidate) && exact(candidate, ["candidateRef", "label", "entityType", "summary"]) && bounded(candidate.candidateRef, 8, 256) && bounded(candidate.label, 1, 256) && bounded(candidate.entityType, 1, 128) && bounded(candidate.summary, 1, 1024);
   const factView = (candidate) => isRecord(candidate) && exact(candidate, ["label", "value"]) && bounded(candidate.label, 1, 128) && bounded(candidate.value, 1, 1024);
   const sourceView = (candidate) => isRecord(candidate) && exact(candidate, ["label"]) && bounded(candidate.label, 1, 512);
+  const changeView = (candidate) => isRecord(candidate) && exact(candidate, ["label", "before", "after"]) && bounded(candidate.label, 1, 128) && bounded(candidate.before, 1, 1024) && bounded(candidate.after, 1, 1024);
   if (!isRecord(value) || !exact(value, [
     "schemaVersion",
     "kind",
@@ -1203,8 +1240,15 @@ function validatePointableRendererResponse(value) {
       "observedAt",
       "freshness",
       "facts",
-      "sources"
-    ]) || !bounded(detail.entityId, 1, 256) || !bounded(detail.entityType, 1, 128) || !bounded(detail.label, 1, 256) || !bounded(detail.summary, 1, 1024) || !bounded(detail.revision, 1, 512) || !bounded(detail.observedAt, 20, 64) || !Number.isFinite(Date.parse(detail.observedAt)) || detail.freshness !== "current" && detail.freshness !== "stale" && detail.freshness !== "partial" && detail.freshness !== "unknown" || !Array.isArray(detail.facts) || detail.facts.length > 5 || !detail.facts.every(factView) || !Array.isArray(detail.sources) || detail.sources.length > 5 || !detail.sources.every(sourceView)) {
+      "sources",
+      "detailRef",
+      "changes"
+    ]) || !bounded(detail.entityId, 1, 256) || !bounded(detail.entityType, 1, 128) || !bounded(detail.label, 1, 256) || !bounded(detail.summary, 1, 1024) || !bounded(detail.revision, 1, 512) || !bounded(detail.observedAt, 20, 64) || !Number.isFinite(Date.parse(detail.observedAt)) || detail.freshness !== "current" && detail.freshness !== "stale" && detail.freshness !== "partial" && detail.freshness !== "unknown" || !Array.isArray(detail.facts) || detail.facts.length > 5 || !detail.facts.every(factView) || !Array.isArray(detail.sources) || detail.sources.length > 5 || !detail.sources.every(sourceView) || detail.detailRef !== void 0 && !bounded(detail.detailRef, 8, 256) || detail.changes !== void 0 && (!Array.isArray(detail.changes) || detail.changes.length > 3 || !detail.changes.every(changeView))) {
+      return void 0;
+    }
+  } else if (presentation.kind === "revision") {
+    const revision = presentation.revision;
+    if (!exact(presentation, ["kind", "revision"]) || !isRecord(revision) || !exact(revision, ["detailRef", "state", "checkedAt"]) || !bounded(revision.detailRef, 8, 256) || revision.state !== "unchanged" && revision.state !== "updated" && revision.state !== "deleted" && revision.state !== "unavailable" || !bounded(revision.checkedAt, 20, 64) || !Number.isFinite(Date.parse(revision.checkedAt))) {
       return void 0;
     }
   } else if (presentation.kind === "error") {
@@ -1225,6 +1269,10 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   const requestTimeoutMs = config.requestTimeoutMs ?? 5e3;
   if (!Number.isSafeInteger(requestTimeoutMs) || requestTimeoutMs < 100 || requestTimeoutMs > 3e4) {
     throw new Error("pointable_renderer_timeout_invalid");
+  }
+  const revisionCheckIntervalMs = config.revisionCheckIntervalMs ?? 5e3;
+  if (!Number.isSafeInteger(revisionCheckIntervalMs) || revisionCheckIntervalMs < 100 || revisionCheckIntervalMs > 6e4) {
+    throw new Error("pointable_renderer_revision_interval_invalid");
   }
   const actionLabel = typeof config.actionLabel === "string" && config.actionLabel.trim().length > 0 && config.actionLabel.length <= 64 ? config.actionLabel.trim() : "\u67E5\u770B\u4E0A\u4E0B\u6587";
   const existing = window[namespace];
@@ -1268,6 +1316,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   let restoreFocus;
   let actionElement;
   let cardElement;
+  let revisionTimer;
   let uninstalled = false;
   const activeObserver = new MutationObserver(() => {
     if (candidate !== void 0) scheduleReconcile();
@@ -1531,17 +1580,21 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     );
     return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
   }
-  async function submitLookup(operation, expectedGeneration, candidateRef) {
+  async function submitLookup(operation, expectedGeneration, reference) {
     const current = candidate;
     if (current === void 0 || current.generation !== expectedGeneration || current.range.toString().trim() !== current.text || readContextFingerprint() !== current.contextFingerprint || !candidateAnchorIsCurrent()) {
       cleanup(true, false);
       return;
     }
-    if (operation === "resolve" && candidateRef !== void 0 || operation === "choose" && (typeof candidateRef !== "string" || candidateRef.length < 8 || candidateRef.length > 256)) {
-      mountError("\u5019\u9009\u5F15\u7528\u65E0\u6548\u3002", false);
+    if (operation === "resolve" && reference !== void 0 || operation === "choose" && (typeof reference !== "string" || reference.length < 8 || reference.length > 256) || (operation === "check" || operation === "refresh") && (typeof reference !== "string" || reference.length < 8 || reference.length > 256)) {
+      if (operation === "check" || operation === "refresh") {
+        showRevisionNotice("unavailable", reference);
+      } else {
+        mountError("\u5019\u9009\u5F15\u7528\u65E0\u6548\u3002", false);
+      }
       return;
     }
-    state = "resolving";
+    if (operation === "resolve" || operation === "choose") state = "resolving";
     try {
       const digest = await digestText(current.text);
       if (candidate?.generation !== expectedGeneration || current.range.toString().trim() !== current.text || readContextFingerprint() !== current.contextFingerprint || !candidateAnchorIsCurrent()) {
@@ -1553,7 +1606,11 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       const timeout = window.setTimeout(() => {
         if (pending?.requestId !== requestId) return;
         pending = void 0;
-        mountError("\u67E5\u8BE2\u8D85\u65F6\uFF0C\u8BF7\u91CD\u8BD5\u3002", true);
+        if (operation === "check" || operation === "refresh") {
+          showRevisionNotice("unavailable", reference);
+        } else {
+          mountError("\u67E5\u8BE2\u8D85\u65F6\uFF0C\u8BF7\u91CD\u8BD5\u3002", true);
+        }
       }, requestTimeoutMs);
       pending = {
         requestId,
@@ -1561,10 +1618,15 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
         digest,
         contextFingerprint: current.contextFingerprint,
         operation,
-        ...candidateRef === void 0 ? {} : { candidateRef },
+        ...operation === "choose" && reference !== void 0 ? { candidateRef: reference } : {},
+        ...(operation === "check" || operation === "refresh") && reference !== void 0 ? { detailRef: reference } : {},
         timeout
       };
-      mountLoading(operation === "choose" ? "\u6B63\u5728\u8BFB\u53D6\u4E0A\u4E0B\u6587\u8BE6\u60C5\u2026" : "\u6B63\u5728\u67E5\u627E\u4E0A\u4E0B\u6587\u5BF9\u8C61\u2026");
+      if (operation === "resolve" || operation === "choose") {
+        mountLoading(operation === "choose" ? "\u6B63\u5728\u8BFB\u53D6\u4E0A\u4E0B\u6587\u8BE6\u60C5\u2026" : "\u6B63\u5728\u67E5\u627E\u4E0A\u4E0B\u6587\u5BF9\u8C61\u2026");
+      } else if (operation === "refresh") {
+        showRevisionNotice("refreshing", reference);
+      }
       const payload = {
         schemaVersion: 1,
         kind: "pointable.selection.lookup",
@@ -1576,13 +1638,18 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
         surface: current.surface,
         contextFingerprint: current.contextFingerprint,
         requestedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        ...candidateRef === void 0 ? {} : { candidateRef }
+        ...operation === "choose" && reference !== void 0 ? { candidateRef: reference } : {},
+        ...(operation === "check" || operation === "refresh") && reference !== void 0 ? { detailRef: reference } : {}
       };
       binding(JSON.stringify(payload));
     } catch {
       if (pending !== void 0) window.clearTimeout(pending.timeout);
       pending = void 0;
-      mountError("\u5BBF\u4E3B\u67E5\u8BE2\u901A\u9053\u4E0D\u53EF\u7528\u3002", true);
+      if (operation === "check" || operation === "refresh") {
+        showRevisionNotice("unavailable", reference);
+      } else {
+        mountError("\u5BBF\u4E3B\u67E5\u8BE2\u901A\u9053\u4E0D\u53EF\u7528\u3002", true);
+      }
     }
   }
   function createShell(titleText) {
@@ -1746,10 +1813,102 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     row.append(label, value);
     return row;
   }
+  function clearRevisionTimer() {
+    if (revisionTimer !== void 0) window.clearTimeout(revisionTimer);
+    revisionTimer = void 0;
+  }
+  function removeRevisionNotice() {
+    connectedOwnedElement("card")?.querySelector('[data-pointable-context-role="revision-notice"]')?.remove();
+  }
+  function scheduleRevisionCheck(detailRef, expectedGeneration) {
+    clearRevisionTimer();
+    revisionTimer = window.setTimeout(() => {
+      revisionTimer = void 0;
+      if (state !== "detail" || candidate?.generation !== expectedGeneration || connectedOwnedElement("card") === null) {
+        return;
+      }
+      if (pending !== void 0) {
+        scheduleRevisionCheck(detailRef, expectedGeneration);
+        return;
+      }
+      void submitLookup("check", expectedGeneration, detailRef);
+    }, revisionCheckIntervalMs);
+  }
+  function showRevisionNotice(noticeState, detailRef) {
+    clearRevisionTimer();
+    const shell = connectedOwnedElement("card");
+    if (shell === null) return;
+    removeRevisionNotice();
+    const notice = document.createElement("div");
+    notice.setAttribute("data-pointable-context-role", "revision-notice");
+    notice.setAttribute("role", "status");
+    Object.assign(notice.style, {
+      margin: "8px 12px 0",
+      padding: "8px 10px",
+      borderRadius: "8px",
+      background: noticeState === "deleted" || noticeState === "unavailable" ? "#fff4e5" : "#eef4ff",
+      color: noticeState === "deleted" || noticeState === "unavailable" ? "#8a4b00" : "#1746c7",
+      fontSize: "12px"
+    });
+    const message = document.createElement("span");
+    message.textContent = noticeState === "updated" ? "\u5185\u5BB9\u5DF2\u66F4\u65B0" : noticeState === "deleted" ? "\u5BF9\u8C61\u5DF2\u5220\u9664\uFF1B\u5F53\u524D\u663E\u793A\u7684\u662F\u65E7\u5FEB\u7167" : noticeState === "refreshing" ? "\u6B63\u5728\u5237\u65B0\u5F53\u524D\u8BE6\u60C5\u2026" : "\u6682\u65F6\u65E0\u6CD5\u786E\u8BA4\u6700\u65B0\u72B6\u6001\uFF1B\u5F53\u524D\u663E\u793A\u7684\u662F\u65E7\u5FEB\u7167";
+    notice.append(message);
+    if (noticeState === "updated" && detailRef !== void 0) {
+      const refresh = document.createElement("button");
+      refresh.type = "button";
+      refresh.textContent = "\u5237\u65B0\u5185\u5BB9";
+      refresh.setAttribute("data-pointable-context-role", "revision-refresh");
+      Object.assign(refresh.style, {
+        marginLeft: "8px",
+        border: "0",
+        background: "transparent",
+        color: "#1746c7",
+        padding: "1px 0",
+        cursor: "pointer",
+        fontWeight: "700"
+      });
+      const expectedGeneration = candidate?.generation;
+      refresh.addEventListener("click", (event) => {
+        if (!event.isTrusted || expectedGeneration === void 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        void submitLookup("refresh", expectedGeneration, detailRef);
+      });
+      notice.append(refresh);
+    }
+    const header = shell.firstElementChild;
+    if (header?.nextSibling === null) shell.append(notice);
+    else shell.insertBefore(notice, header?.nextSibling ?? shell.firstChild);
+    reposition();
+  }
   function mountDetail(detail) {
+    clearRevisionTimer();
     state = "detail";
     const { body } = createShell(detail.label);
     body.append(paragraph(detail.summary));
+    if (detail.changes !== void 0 && detail.changes.length > 0) {
+      const changeSummary = document.createElement("div");
+      changeSummary.setAttribute("data-pointable-context-role", "revision-changes");
+      Object.assign(changeSummary.style, {
+        marginTop: "8px",
+        padding: "8px 10px",
+        borderRadius: "8px",
+        background: "#eef4ff",
+        color: "#1746c7",
+        fontSize: "12px"
+      });
+      const heading = document.createElement("strong");
+      heading.textContent = "\u672C\u6B21\u5237\u65B0";
+      const list = document.createElement("ul");
+      Object.assign(list.style, { margin: "4px 0 0", paddingLeft: "18px" });
+      for (const change of detail.changes) {
+        const item = document.createElement("li");
+        item.textContent = `${change.label}\uFF1A${change.before} \u2192 ${change.after}`;
+        list.append(item);
+      }
+      changeSummary.append(heading, list);
+      body.append(changeSummary);
+    }
     const compactState = document.createElement("div");
     compactState.textContent = `${detail.entityType} \xB7 ${detail.freshness}`;
     Object.assign(compactState.style, {
@@ -1837,6 +1996,9 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       reposition();
     });
     body.append(disclosure);
+    if (detail.detailRef !== void 0 && candidate !== void 0) {
+      scheduleRevisionCheck(detail.detailRef, candidate.generation);
+    }
   }
   function mountError(message, retryable) {
     state = "error";
@@ -1896,12 +2058,34 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
         code: "pointable_context_changed"
       };
     }
+    if (response.presentation.kind === "revision" && (request.operation !== "check" || response.presentation.revision.detailRef !== request.detailRef) || request.operation === "refresh" && response.presentation.kind === "detail" && response.presentation.detail.detailRef !== request.detailRef) {
+      window.clearTimeout(request.timeout);
+      pending = void 0;
+      return {
+        ok: false,
+        requestId: response.requestId,
+        outcome: "stale",
+        code: "pointable_refresh_ref_mismatch"
+      };
+    }
     window.clearTimeout(request.timeout);
     pending = void 0;
     if (response.presentation.kind === "candidates") {
       mountCandidates(response.presentation.candidates);
     } else if (response.presentation.kind === "detail") {
       mountDetail(response.presentation.detail);
+    } else if (response.presentation.kind === "revision") {
+      const revision = response.presentation.revision;
+      state = "detail";
+      if (revision.state === "unchanged") {
+        removeRevisionNotice();
+        scheduleRevisionCheck(revision.detailRef, request.generation);
+      } else {
+        showRevisionNotice(revision.state, revision.detailRef);
+      }
+    } else if (request.operation === "check" || request.operation === "refresh") {
+      state = "detail";
+      showRevisionNotice("unavailable", request.detailRef);
     } else {
       mountError(response.presentation.message, response.presentation.retryable);
     }
@@ -1979,6 +2163,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     });
   }
   function cleanup(clearCandidate, restore) {
+    clearRevisionTimer();
     removeOwned("action");
     removeOwned("card");
     resizeObserver?.disconnect();
@@ -3019,6 +3204,7 @@ var CodexCdpHostAdapter = class {
             contextFingerprint: intent.contextFingerprint,
             requestedAt: intent.requestedAt,
             ...intent.candidateRef === void 0 ? {} : { candidateRef: intent.candidateRef },
+            ...intent.detailRef === void 0 ? {} : { detailRef: intent.detailRef },
             host: {
               targetId: attachment.target.id,
               targetUrl: attachment.target.url,

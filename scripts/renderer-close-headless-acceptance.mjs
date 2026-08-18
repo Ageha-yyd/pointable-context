@@ -84,6 +84,26 @@ async function waitFor(connection, expression, timeoutMs = 5_000) {
   throw new Error("headless renderer acceptance timed out");
 }
 
+function waitForBindingIntent(connection, bindingName, expectedOperation, timeoutMs = 5_000) {
+  return new Promise((resolveIntent, rejectIntent) => {
+    const timeout = setTimeout(() => {
+      unsubscribe();
+      rejectIntent(new Error(`renderer did not invoke ${expectedOperation} binding`));
+    }, timeoutMs);
+    const unsubscribe = connection.onEvent((event) => {
+      if (
+        event.method !== "Runtime.bindingCalled" ||
+        event.params?.name !== bindingName
+      ) return;
+      const intent = parsePointableLookupIntent(event.params.payload, bindingName);
+      if (intent.operation !== expectedOperation) return;
+      clearTimeout(timeout);
+      unsubscribe();
+      resolveIntent(intent);
+    });
+  });
+}
+
 let connection;
 let lifecycleId;
 try {
@@ -124,6 +144,7 @@ try {
     createInstallPointableRendererExpression({
       bindingName,
       requestTimeoutMs: 5_000,
+      revisionCheckIntervalMs: 150,
       actionLabel: "查看上下文（fixture）",
     }),
   );
@@ -208,6 +229,8 @@ try {
       throw new Error(`renderer did not invoke binding: ${JSON.stringify(diagnostic)}`);
     }),
   ]);
+  const detailRef = `pdet:${Buffer.alloc(32, 7).toString("base64url")}`;
+  const revisionIntentPromise = waitForBindingIntent(connection, bindingName, "check");
   const response = createPointableLookupResponse(intent, {
     kind: "detail",
     detail: {
@@ -220,6 +243,7 @@ try {
       freshness: "stale",
       facts: [{ label: "status", value: "completed" }],
       sources: [{ label: "headless acceptance" }],
+      detailRef,
     },
   });
   const delivered = await evaluate(
@@ -227,6 +251,77 @@ try {
     createDeliverPointableResultExpression(response, lifecycleId),
   );
   if (delivered?.outcome !== "applied") throw new Error("detail was not applied");
+
+  const revisionIntent = await revisionIntentPromise;
+  if (revisionIntent.detailRef !== detailRef) {
+    throw new Error("revision check did not preserve the opaque detail reference");
+  }
+  const revisionDelivered = await evaluate(
+    connection,
+    createDeliverPointableResultExpression(createPointableLookupResponse(revisionIntent, {
+      kind: "revision",
+      revision: {
+        detailRef,
+        state: "updated",
+        checkedAt: "2026-08-18T01:00:00Z",
+      },
+    }), lifecycleId),
+  );
+  if (revisionDelivered?.outcome !== "applied") {
+    throw new Error("revision notice was not applied");
+  }
+  await evaluate(connection, `new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
+  })`);
+  const refresh = await waitFor(connection, `(() => {
+    const notice = document.querySelector('[data-pointable-context-role="revision-notice"]');
+    if (!(notice instanceof HTMLElement) || !notice.textContent.includes('内容已更新')) return null;
+    const button = Array.from(notice.querySelectorAll('button')).find((node) => node.textContent === '刷新内容');
+    if (!(button instanceof HTMLButtonElement)) return null;
+    const rect = button.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  })()`);
+  const refreshIntentPromise = waitForBindingIntent(connection, bindingName, "refresh");
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mousePressed", x: refresh.x, y: refresh.y, button: "left", clickCount: 1,
+  });
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mouseReleased", x: refresh.x, y: refresh.y, button: "left", clickCount: 1,
+  });
+  const refreshIntent = await refreshIntentPromise;
+  if (refreshIntent.detailRef !== detailRef) {
+    throw new Error("refresh did not preserve the opaque detail reference");
+  }
+  const refreshDelivered = await evaluate(
+    connection,
+    createDeliverPointableResultExpression(createPointableLookupResponse(refreshIntent, {
+      kind: "detail",
+      detail: {
+        entityId: "WU:GOV-1",
+        entityType: "work_unit",
+        label: "AEN Harness Foundation",
+        summary: "Headless refreshed detail.",
+        revision: "r19",
+        observedAt: "2026-08-18T01:00:01Z",
+        freshness: "current",
+        facts: [{ label: "status", value: "completed" }],
+        sources: [{ label: "headless acceptance" }],
+        detailRef,
+        changes: [{
+          label: "摘要",
+          before: "Headless close acceptance detail.",
+          after: "Headless refreshed detail.",
+        }],
+      },
+    }), lifecycleId),
+  );
+  if (refreshDelivered?.outcome !== "applied") {
+    throw new Error("refreshed detail was not applied");
+  }
+  await waitFor(connection, `(() => {
+    const card = document.querySelector('[data-pointable-context-role="card"]');
+    return card instanceof HTMLElement && card.textContent.includes('Headless refreshed detail.') && card.textContent.includes('本次刷新');
+  })()`);
   await evaluate(connection, `new Promise((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
   })`);
@@ -298,6 +393,9 @@ try {
     browser: "Microsoft Edge headless",
     selectedText: intent.selectionText,
     trustedActionProducedDetail: true,
+    backgroundRevisionDetected: true,
+    trustedRefreshUpdatedInPlace: true,
+    refreshAddedChatTurns: 0,
     detailInitiallyCollapsed: true,
     trustedDisclosureExpandedInPlace: true,
     closeClearedSelection: true,

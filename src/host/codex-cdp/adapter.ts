@@ -43,6 +43,7 @@ export interface PointableLookupCallbackRequest {
   contextFingerprint: string;
   requestedAt: string;
   candidateRef?: string;
+  detailRef?: string;
   host: {
     targetId: string;
     targetUrl: string;
@@ -685,6 +686,9 @@ export class CodexCdpHostAdapter {
             ...(intent.candidateRef === undefined
               ? {}
               : { candidateRef: intent.candidateRef }),
+            ...(intent.detailRef === undefined
+              ? {}
+              : { detailRef: intent.detailRef }),
             host: {
               targetId: attachment.target.id,
               targetUrl: attachment.target.url,

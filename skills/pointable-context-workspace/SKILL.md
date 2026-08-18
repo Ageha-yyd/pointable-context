@@ -17,6 +17,8 @@ Manage the private Codex Desktop companion that keeps normal Chat visually uncha
 - A Markdown document detail prioritizes `用途`, `本次变化`, `影响范围`, `Git 状态`, and `路径`. These fields come from bounded file structure, Git, and literal references, never a model.
 - A TypeScript/JavaScript module detail prioritizes `职责`, `公开入口`, `本次变化`, `依赖与影响`, and `路径`. These fields come from bounded source declarations, static imports, Git, and literal test/importer references; source is never executed.
 - The card is summary-first: facts, revision, observed time, and sources remain inside a collapsed in-card `查看详情` disclosure. Keep type and freshness visible even while collapsed.
+- An open card pins its snapshot. A lightweight file-stat revision probe may show `内容已更新`; only a trusted `刷新内容` click may re-read full detail, update the same card, and expose at most three changed fields. This creates no model call or Chat Turn.
+- If the selected file is deleted or revision status is unavailable, keep the old snapshot visible with an explicit warning. Never silently replace, hide, or relabel it as current.
 
 ## Boundaries
 
@@ -45,8 +47,9 @@ $companion = Join-Path $pluginRoot 'host\workspace-companion.mjs'
 5. Read back `status --json`. Report mode, process state, `compatibility.state/code`, target count, active task count, and `activeBinding` root/revision without exposing the control token.
 6. Ask the user to select an exact visible file name/path, such as `README.md`, and click `查看上下文`.
 7. Verify that selection alone produces no detail request; the trusted click produces one direct detail or a bounded candidate menu.
-8. Run `unbind --json` only when explicitly requested. Verify that `activeBinding` disappears before binding another root.
-9. Run `stop --json` when requested. Stopping removes the renderer/runtime binding but intentionally preserves the explicit task-to-workspace registry for later reuse.
+8. For revision qualification, leave one card open, change the selected file, confirm `内容已更新`, then click `刷新内容`. Verify that the card updates in place, displays a finite diff, opens no browser, and adds no Chat Turn.
+9. Run `unbind --json` only when explicitly requested. Verify that `activeBinding` disappears before binding another root.
+10. Run `stop --json` when requested. Stopping removes the renderer/runtime binding but intentionally preserves the explicit task-to-workspace registry for later reuse.
 
 ```powershell
 node $companion status --json
@@ -63,5 +66,6 @@ node $companion stop --json
 - If binding sees zero or multiple active tasks, ask the user to focus exactly one task and retry.
 - If selected text has no exact file identity, leave Chat/copy behavior unchanged; do not send it to a model.
 - If task, route, workspace root, binding revision, selection digest, renderer generation, index, or Provider drifts, discard the result and require a fresh explicit action.
+- Treat the current lightweight revision probe as source-file-stat evidence only. Do not claim it detects relation-only or Git-only drift.
 - Present `current` only for a verified live read. Preserve stale/unavailable states exactly as returned.
 - Treat Markdown `影响范围` and module `依赖与影响` as bounded literal evidence, not a semantic dependency or runtime impact claim. Preserve explicit Git-unavailable wording when the workspace is not a qualifying Git root.

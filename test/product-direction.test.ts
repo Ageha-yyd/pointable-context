@@ -7,7 +7,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v1.5 keeps summary-first disclosure and adds fail-closed runtime compatibility", async () => {
+test("v1.6 keeps Quiet Context Reveal and adds explicit zero-turn revision refresh", async () => {
   const [prd, readme, mainSkill, workspaceSkill] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -15,7 +15,7 @@ test("v1.5 keeps summary-first disclosure and adds fail-closed runtime compatibi
     text("skills/pointable-context-workspace/SKILL.md"),
   ]);
 
-  assert.match(prd, /版本：v1\.5/u);
+  assert.match(prd, /版本：v1\.6/u);
   assert.match(prd, /默认可视入口是用户选区后的轻量按钮/u);
   assert.match(prd, /selection 本身不读取详情、不调用模型/u);
   assert.match(prd, /产品不存在“识别更多概念”模型分支/u);
@@ -24,6 +24,8 @@ test("v1.5 keeps summary-first disclosure and adds fail-closed runtime compatibi
   assert.match(prd, /Source Module 的职责、exports、diff 声明、imports 和测试\/引用位置均来自有界本地解析\/Git/u);
   assert.match(prd, /字段默认全部收起/u);
   assert.match(prd, /卡片打开时固定 `entityRevision\/observedAt\/freshness`/u);
+  assert.match(prd, /可信 `刷新内容`/u);
+  assert.match(prd, /最多 3 项/u);
   assert.match(prd, /私有 Host Adapter 的兼容性优先级高于继续增加对象类型/u);
   assert.match(prd, /`qualified`：四层全部通过/u);
   assert.match(prd, /启动自检只能证明可安装性，不能替代每个 build 的真实 selection/u);
@@ -31,12 +33,14 @@ test("v1.5 keeps summary-first disclosure and adds fail-closed runtime compatibi
   assert.match(readme, /primary interaction is \*\*Quiet Context Reveal\*\*/u);
   assert.match(readme, /no "identify more concepts" or semantic-model branch/u);
   assert.match(readme, /Only `qualified` permits the current runtime to be described as attached/u);
+  assert.match(readme, /same card shows a quiet `内容已更新` notice/u);
   assert.match(mainSkill, /Use MCP `render_context_capsule` only when the user explicitly asks/u);
   assert.match(mainSkill, /Do not offer `识别更多概念`/u);
   assert.match(workspaceSkill, /Selection alone is inert/u);
   assert.match(workspaceSkill, /There is no `识别更多概念`/u);
   assert.match(workspaceSkill, /source is never executed/u);
   assert.match(workspaceSkill, /summary-first/u);
+  assert.match(workspaceSkill, /trusted `刷新内容` click/u);
   assert.match(workspaceSkill, /`compatibility\.state` is `qualified`/u);
 });
 

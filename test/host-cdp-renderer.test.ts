@@ -86,6 +86,18 @@ test("renderer response validator accepts bounded text-only views and rejects fe
     ...response,
     selectionDigest: "not-a-digest",
   }), undefined);
+  const revision = {
+    ...response,
+    presentation: {
+      kind: "revision",
+      revision: {
+        detailRef: "pdet:opaque-reference",
+        state: "updated",
+        checkedAt: "2026-08-18T09:50:00.000Z",
+      },
+    },
+  };
+  assert.deepEqual(validatePointableRendererResponse(revision), revision);
   assert.equal(validatePointableRendererResponse({
     ...response,
     presentation: {
@@ -124,6 +136,12 @@ test("install expression is namespaced, generic, click-gated, text-only, and cle
   assert.match(expression, /data-pointable-context-role", "detail-disclosure"/u);
   assert.match(expression, /disclosureToggle\.textContent = "查看详情"/u);
   assert.match(expression, /expanded \? "收起详情" : "查看详情"/u);
+  assert.match(expression, /内容已更新/u);
+  assert.match(expression, /刷新内容/u);
+  assert.match(expression, /scheduleRevisionCheck/u);
+  assert.match(expression, /operation === "check"/u);
+  assert.match(expression, /operation === "refresh"/u);
+  assert.match(expression, /data-pointable-context-role", "revision-changes"/u);
   assert.match(expression, /Commit the explicit trusted activation synchronously/u);
   assert.match(expression, /range\.toString\(\)\.trim\(\)/u);
   assert.match(expression, /range\.intersectsNode/u);

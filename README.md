@@ -40,6 +40,12 @@ TypeScript and JavaScript family files expose a separate deterministic five-fact
 
 Supported extensions are `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, and `.cjs`. The extractor never executes source, starts a language server, or calls a model. Importers and tests are literal reference evidence, not a complete runtime call graph.
 
+## Dynamic detail refresh
+
+An open workspace detail card now pins the snapshot the user is reading. A bounded background probe checks only the selected file's local stat revision; it does not repeatedly read or re-project full detail. When that revision changes, the same card shows a quiet `内容已更新` notice. Only a trusted `刷新内容` click performs a new authoritative detail read, updates the card in place, and shows at most three changed fields. This path opens no browser, calls no model, and creates no Chat Turn.
+
+If the file is deleted or the probe becomes unavailable, the prior snapshot stays visible with an explicit warning. Task rebinding, expired references, context drift, or capacity exhaustion disable refresh rather than widening authority. The first probe intentionally detects source-file stat changes only; relation-only or Git-only changes may require reopening the detail until a broader lightweight revision contract is qualified.
+
 ## Current fixture
 
 The installed MCP server is deliberately pinned to `fixtures/mini-project`. Every result is marked `FIXTURE-ONLY`; it is not evidence about the active workspace.
@@ -93,7 +99,7 @@ These foundations are implementation assets. Selection is the visual trigger; it
 - The shipped MCP data is fixture-only.
 - The standard MCP App path renders beside a tool result; it does not provide the required ordinary-prose selection hook.
 - The private Desktop selection companion is currently the primary interaction prototype, but remains host/build-specific and must be qualified per Codex build.
-- Further object/Extractor expansion is paused while native-host compatibility, dynamic revision semantics, and scenario-specific summary quality are qualified.
+- Further object/Extractor expansion is paused while cross-build native-host compatibility and scenario-specific summary quality are qualified.
 - Markdown artifact and TypeScript/JavaScript source-module context are implemented; decision, task, abstract-concept, and verification Providers remain later stages.
 - Real Agent work results do not yet systematically emit context references.
 - Source files have a real local module Provider; Agent-known abstract concepts, decisions, tasks, and verification results are not yet connected.
@@ -131,6 +137,7 @@ node host/workspace-companion.mjs bind --workspace-root 'D:\absolute\workspace' 
 node host/workspace-companion.mjs stop --json
 
 # Isolated rendering acceptance for the zero-turn capsule
+pnpm run test:host-browser
 pnpm run test:widget-browser
 ```
 
@@ -149,6 +156,8 @@ P0 is successful only when Quiet Context Reveal:
 - does not call a model to reveal existing facts;
 - uses type-specific information priorities;
 - exposes identity, source, revision, observed time, and freshness;
+- pins an opened snapshot, signals detected file revision drift, and refreshes the same card only after a trusted action;
+- preserves the old snapshot with an explicit warning when the object is deleted or revision status is unavailable;
 - preserves text and structured fallback;
 - closes and restores reading context reliably;
 - contains no semantic-model or "identify more concepts" path.
