@@ -5,7 +5,7 @@ import { randomBytes as randomBytes4, randomUUID as randomUUID4, timingSafeEqual
 import { closeSync, existsSync, openSync } from "node:fs";
 import { mkdir as mkdir2, open as open2, readFile as readFile2, rename as rename2, rm, writeFile as writeFile2 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname as dirname3, isAbsolute as isAbsolute3, join, resolve as resolve4 } from "node:path";
+import { dirname as dirname3, isAbsolute as isAbsolute3, join, resolve as resolve5 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer, request as httpRequest } from "node:http";
 import { spawn } from "node:child_process";
@@ -1680,6 +1680,41 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     state = "detail";
     const { body } = createShell(detail.label);
     body.append(paragraph(detail.summary));
+    const compactState = document.createElement("div");
+    compactState.textContent = `${detail.entityType} \xB7 ${detail.freshness}`;
+    Object.assign(compactState.style, {
+      marginTop: "6px",
+      color: detail.freshness === "current" ? "#64748b" : "#a15c00",
+      fontSize: "11px",
+      overflowWrap: "anywhere"
+    });
+    body.append(compactState);
+    const disclosure = document.createElement("div");
+    disclosure.setAttribute("data-pointable-context-role", "detail-disclosure");
+    Object.assign(disclosure.style, { marginTop: "8px" });
+    const disclosureToggle = document.createElement("button");
+    disclosureToggle.type = "button";
+    disclosureToggle.textContent = "\u67E5\u770B\u8BE6\u60C5";
+    disclosureToggle.setAttribute("aria-label", "\u5C55\u5F00\u4E0A\u4E0B\u6587\u8BE6\u60C5");
+    disclosureToggle.setAttribute("aria-expanded", "false");
+    disclosureToggle.setAttribute("data-pointable-context-role", "detail-toggle");
+    Object.assign(disclosureToggle.style, {
+      border: "0",
+      background: "transparent",
+      padding: "2px 0",
+      width: "fit-content",
+      color: "#52627a",
+      cursor: "pointer",
+      fontSize: "12px",
+      fontWeight: "600",
+      userSelect: "none"
+    });
+    const detailBody = document.createElement("div");
+    detailBody.id = `${cardElement?.id ?? cardIdBase}-detail-body`;
+    detailBody.hidden = true;
+    detailBody.style.display = "none";
+    detailBody.setAttribute("data-pointable-context-role", "detail-body");
+    disclosureToggle.setAttribute("aria-controls", detailBody.id);
     const metadata = document.createElement("div");
     Object.assign(metadata.style, {
       marginTop: "10px",
@@ -1693,14 +1728,14 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       metadataRow("\u4FEE\u8BA2\u7248", detail.revision),
       metadataRow("\u6570\u636E\u65F6\u95F4", detail.observedAt)
     );
-    body.append(metadata);
+    detailBody.append(metadata);
     if (detail.facts.length > 0) {
       const heading = document.createElement("h3");
       heading.textContent = "\u5173\u952E\u4E8B\u5B9E";
       Object.assign(heading.style, { margin: "12px 0 4px", fontSize: "13px" });
       const facts = document.createElement("div");
       for (const fact of detail.facts) facts.append(metadataRow(fact.label, fact.value));
-      body.append(heading, facts);
+      detailBody.append(heading, facts);
     }
     if (detail.sources.length > 0) {
       const heading = document.createElement("h3");
@@ -1713,8 +1748,25 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
         item.textContent = source.label;
         list.append(item);
       }
-      body.append(heading, list);
+      detailBody.append(heading, list);
     }
+    disclosure.append(disclosureToggle, detailBody);
+    disclosureToggle.addEventListener("click", (event) => {
+      if (!event.isTrusted) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const expanded = disclosureToggle.getAttribute("aria-expanded") !== "true";
+      disclosureToggle.setAttribute("aria-expanded", String(expanded));
+      detailBody.hidden = !expanded;
+      detailBody.style.display = expanded ? "block" : "none";
+      disclosureToggle.textContent = expanded ? "\u6536\u8D77\u8BE6\u60C5" : "\u67E5\u770B\u8BE6\u60C5";
+      disclosureToggle.setAttribute(
+        "aria-label",
+        expanded ? "\u6536\u8D77\u4E0A\u4E0B\u6587\u8BE6\u60C5" : "\u5C55\u5F00\u4E0A\u4E0B\u6587\u8BE6\u60C5"
+      );
+      reposition();
+    });
+    body.append(disclosure);
   }
   function mountError(message, retryable) {
     state = "error";
@@ -2036,7 +2088,7 @@ async function readBoundedResponseText(response, maximumBytes, signal) {
 }
 function awaitWithAbort(promise, signal) {
   if (signal.aborted) return Promise.reject(signal.reason);
-  return new Promise((resolve5, reject) => {
+  return new Promise((resolve6, reject) => {
     const aborted = () => {
       cleanup();
       reject(signal.reason);
@@ -2046,7 +2098,7 @@ function awaitWithAbort(promise, signal) {
     promise.then(
       (value) => {
         cleanup();
-        resolve5(value);
+        resolve6(value);
       },
       (error) => {
         cleanup();
@@ -2199,7 +2251,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
   } catch {
     throw new CdpTransportError("cdp_connect_failed", "CDP websocket failed");
   }
-  await new Promise((resolve5, reject) => {
+  await new Promise((resolve6, reject) => {
     const timer = setTimeout(() => {
       cleanup();
       socket.close();
@@ -2213,7 +2265,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
     };
     const opened = () => {
       cleanup();
-      resolve5();
+      resolve6();
     };
     const failed = () => {
       cleanup();
@@ -2336,7 +2388,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
         closeForProtocolError(error, 1009);
         return Promise.reject(error);
       }
-      return new Promise((resolve5, reject) => {
+      return new Promise((resolve6, reject) => {
         const timer = setTimeout(() => {
           pending.delete(id);
           reject(
@@ -2346,7 +2398,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
             )
           );
         }, timeoutMs);
-        pending.set(id, { resolve: resolve5, reject, timer });
+        pending.set(id, { resolve: resolve6, reject, timer });
         try {
           socket.send(serialized);
         } catch (error) {
@@ -2496,7 +2548,7 @@ function lookupError(code, message, retryable) {
   return { kind: "error", code, message, retryable };
 }
 function boundedLookup(callback, timeoutMs, controller) {
-  return new Promise((resolve5, reject) => {
+  return new Promise((resolve6, reject) => {
     let settled = false;
     const timer = setTimeout(() => {
       if (settled) return;
@@ -2509,7 +2561,7 @@ function boundedLookup(callback, timeoutMs, controller) {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        resolve5(value);
+        resolve6(value);
       },
       (error) => {
         if (settled) return;
@@ -2524,7 +2576,7 @@ function waitForMainContext(attachment, signal, timeoutMs = 2e3) {
   if (attachment.mainExecutionContextId !== void 0) {
     return Promise.resolve(attachment.mainExecutionContextId);
   }
-  return new Promise((resolve5, reject) => {
+  return new Promise((resolve6, reject) => {
     let settled = false;
     let timer;
     const cleanup = () => {
@@ -2536,7 +2588,7 @@ function waitForMainContext(attachment, signal, timeoutMs = 2e3) {
       if (settled) return;
       settled = true;
       cleanup();
-      resolve5(contextId);
+      resolve6(contextId);
     };
     const aborted = () => {
       if (settled) return;
@@ -2560,7 +2612,7 @@ function connectWithAbort(connectionPromise, signal) {
     connectionPromise.then((connection) => connection.close(), () => void 0);
     return Promise.reject(signal.reason);
   }
-  return new Promise((resolve5, reject) => {
+  return new Promise((resolve6, reject) => {
     let settled = false;
     const aborted = () => {
       if (settled) return;
@@ -2577,7 +2629,7 @@ function connectWithAbort(connectionPromise, signal) {
         }
         settled = true;
         signal.removeEventListener("abort", aborted);
-        resolve5(connection);
+        resolve6(connection);
       },
       (error) => {
         if (settled) return;
@@ -3074,18 +3126,18 @@ var CodexCdpHostAdapter = class {
 };
 
 // src/host/codex-cdp/workspace-lookup.ts
-import { createHash as createHash5, randomBytes as randomBytes3 } from "node:crypto";
+import { createHash as createHash6, randomBytes as randomBytes3 } from "node:crypto";
 
 // src/adapters/local-workspace.ts
-import { createHash as createHash4 } from "node:crypto";
+import { createHash as createHash5 } from "node:crypto";
 import { open, readdir, realpath as realpath2, stat as stat2 } from "node:fs/promises";
 import {
-  basename,
+  basename as basename2,
   dirname as dirname2,
-  extname,
+  extname as extname2,
   isAbsolute as isAbsolute2,
   relative,
-  resolve as resolve3,
+  resolve as resolve4,
   sep
 } from "node:path";
 
@@ -3315,6 +3367,335 @@ ${staged.kind === "ok" ? staged.stdout : ""}`;
   });
 }
 
+// src/adapters/source-module-artifact.ts
+import { execFile as execFile2 } from "node:child_process";
+import { createHash as createHash4 } from "node:crypto";
+import { basename, extname, resolve as resolve3 } from "node:path";
+var GIT_TIMEOUT_MS2 = 750;
+var MAX_GIT_OUTPUT_BYTES2 = 256 * 1024;
+var MAX_ROLE_CHARS = 360;
+var MAX_SYMBOL_CHARS = 160;
+var MAX_EXPORTS = 5;
+var MAX_DEPENDENCIES = 12;
+var MAX_IMPACT_FILES2 = 3;
+var SOURCE_EXTENSIONS = /* @__PURE__ */ new Set([
+  ".cjs",
+  ".cts",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".mts",
+  ".ts",
+  ".tsx"
+]);
+function sourceModulePath(relativePath) {
+  return SOURCE_EXTENSIONS.has(extname(relativePath).toLocaleLowerCase("en-US"));
+}
+function boundedText2(value, maximum) {
+  const compact = value.replace(/[\p{Cc}\p{Cf}]+/gu, " ").replace(/\s+/gu, " ").trim();
+  if (compact.length === 0) return void 0;
+  return compact.length <= maximum ? compact : `${compact.slice(0, maximum - 1)}\u2026`;
+}
+function addBounded(target, value, maximum) {
+  const safe = value === void 0 ? void 0 : boundedText2(value, MAX_SYMBOL_CHARS);
+  if (safe !== void 0 && !target.includes(safe) && target.length < maximum) target.push(safe);
+}
+function maskCommentsAndStrings(content) {
+  let state = "code";
+  let escaped = false;
+  let result = "";
+  for (let index = 0; index < content.length; index += 1) {
+    const char = content[index] ?? "";
+    const next = content[index + 1] ?? "";
+    if (state === "code") {
+      if (char === "/" && next === "/") {
+        result += "  ";
+        index += 1;
+        state = "line";
+      } else if (char === "/" && next === "*") {
+        result += "  ";
+        index += 1;
+        state = "block";
+      } else if (char === "'") {
+        result += " ";
+        state = "single";
+      } else if (char === '"') {
+        result += " ";
+        state = "double";
+      } else if (char === "`") {
+        result += " ";
+        state = "template";
+      } else {
+        result += char;
+      }
+      continue;
+    }
+    if (state === "line") {
+      if (char === "\n") {
+        result += "\n";
+        state = "code";
+      } else {
+        result += " ";
+      }
+      continue;
+    }
+    if (state === "block") {
+      if (char === "*" && next === "/") {
+        result += "  ";
+        index += 1;
+        state = "code";
+      } else {
+        result += char === "\n" ? "\n" : " ";
+      }
+      continue;
+    }
+    if (escaped) {
+      result += char === "\n" ? "\n" : " ";
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      result += " ";
+      escaped = true;
+      continue;
+    }
+    const closes = state === "single" && char === "'" || state === "double" && char === '"' || state === "template" && char === "`";
+    result += char === "\n" ? "\n" : " ";
+    if (closes) state = "code";
+  }
+  return result;
+}
+function leadingRole(content) {
+  const normalized = content.replace(/\r\n?/gu, "\n").replace(/^#![^\n]*(?:\n|$)/u, "");
+  const block = /^\s*\/\*\*?([\s\S]*?)\*\//u.exec(normalized);
+  const line = /^(?:\s*\/\/[^\n]*(?:\n|$))+/u.exec(normalized);
+  const raw = block?.[1] ?? line?.[0];
+  if (raw === void 0) return void 0;
+  const prose = raw.split("\n").map((value) => value.replace(/^\s*(?:\/\/|\*)?\s?/u, "").trim()).filter(
+    (value) => value.length > 0 && !/^(?:@|eslint|prettier|tslint|copyright|spdx-)/iu.test(value)
+  ).join(" ");
+  return boundedText2(prose, MAX_ROLE_CHARS);
+}
+function declarationName(value) {
+  return /^(?:export\s+)?(?:declare\s+)?(?:default\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/u.exec(value)?.[1] ?? /^(?:export\s+)?(?:declare\s+)?(?:default\s+)?class\s+([A-Za-z_$][\w$]*)\b/u.exec(value)?.[1] ?? /^(?:export\s+)?(?:declare\s+)?interface\s+([A-Za-z_$][\w$]*)\b/u.exec(value)?.[1] ?? /^(?:export\s+)?(?:declare\s+)?type\s+([A-Za-z_$][\w$]*)\s*=/u.exec(value)?.[1] ?? /^(?:export\s+)?(?:declare\s+)?(?:enum|namespace)\s+([A-Za-z_$][\w$]*)\b/u.exec(value)?.[1] ?? /^(?:export\s+)?(?:declare\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=/u.exec(value)?.[1];
+}
+function extractExports(masked) {
+  const exports = [];
+  const declaration = /^\s*export\s+(?:declare\s+)?(?:default\s+)?(?:async\s+)?(?:function|class|interface|type|enum|namespace|const|let|var)\s+([A-Za-z_$][\w$]*)/gmu;
+  for (const match of masked.matchAll(declaration)) addBounded(exports, match[1], MAX_EXPORTS);
+  if (/^\s*export\s+default\b/gmu.test(masked)) addBounded(exports, "default", MAX_EXPORTS);
+  const lists = /^\s*export\s*\{([^}]*)\}/gmu;
+  for (const match of masked.matchAll(lists)) {
+    for (const item of (match[1] ?? "").split(",")) {
+      const name = /(?:^|\s)as\s+([A-Za-z_$][\w$]*)\s*$/u.exec(item)?.[1] ?? /^\s*([A-Za-z_$][\w$]*)/u.exec(item)?.[1];
+      addBounded(exports, name, MAX_EXPORTS);
+    }
+  }
+  if (/^\s*module\.exports\s*=/gmu.test(masked)) addBounded(exports, "default", MAX_EXPORTS);
+  const commonJs = /^\s*exports\.([A-Za-z_$][\w$]*)\s*=/gmu;
+  for (const match of masked.matchAll(commonJs)) addBounded(exports, match[1], MAX_EXPORTS);
+  return exports;
+}
+function extractDeclarations(masked) {
+  const declarations = [];
+  const lines = masked.split("\n");
+  for (let index = 0; index < lines.length && declarations.length < 256; index += 1) {
+    const name = boundedText2(declarationName(lines[index] ?? "") ?? "", MAX_SYMBOL_CHARS);
+    if (name !== void 0 && declarations.length < 256) {
+      declarations.push({ line: index + 1, name });
+    }
+  }
+  return declarations;
+}
+function extractDependencies(content) {
+  const dependencies = [];
+  for (const line of content.replace(/\r\n?/gu, "\n").split("\n")) {
+    if (/^\s*(?:\/\/|\/\*)/u.test(line)) continue;
+    const specifier = /^\s*import(?:\s+type)?(?:\s+[\s\S]*?\s+from\s*)?\s*["']([^"']+)["']/u.exec(line)?.[1] ?? /^\s*export\s+[\s\S]*?\s+from\s*["']([^"']+)["']/u.exec(line)?.[1] ?? /^\s*(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*require\(\s*["']([^"']+)["']\s*\)/u.exec(line)?.[1];
+    addBounded(dependencies, specifier, MAX_DEPENDENCIES);
+  }
+  return dependencies;
+}
+function extractSourceModuleStructure(content, relativePath) {
+  const masked = maskCommentsAndStrings(content);
+  const exports = extractExports(masked);
+  const dependencies = extractDependencies(content);
+  const declarations = extractDeclarations(masked);
+  const entry = /^(?:app|cli|index|main|mod|server)(?:\.[^.]+)+$/iu.test(basename(relativePath));
+  const role = leadingRole(content) ?? boundedText2(
+    exports.length > 0 ? `${entry ? "\u5165\u53E3\u6A21\u5757" : "\u6E90\u4EE3\u7801\u6A21\u5757"}\uFF1B\u516C\u5F00\u5BFC\u51FA ${exports.join("\u3001")}` : `${entry ? "\u5165\u53E3\u6A21\u5757" : "\u5185\u90E8\u6E90\u4EE3\u7801\u6A21\u5757"}\uFF1B\u672A\u68C0\u6D4B\u5230\u516C\u5F00\u5BFC\u51FA`,
+    MAX_ROLE_CHARS
+  ) ?? "\u6E90\u4EE3\u7801\u6A21\u5757";
+  return Object.freeze({
+    role,
+    exports: Object.freeze([...exports]),
+    dependencies: Object.freeze([...dependencies]),
+    declarations: Object.freeze(declarations.map((value) => Object.freeze({ ...value })))
+  });
+}
+function runGit2(root, args, signal) {
+  if (signal?.aborted) return Promise.reject(signal.reason ?? new Error("git operation aborted"));
+  return new Promise((resolveResult, rejectResult) => {
+    execFile2("git", [...args], {
+      cwd: root,
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: GIT_TIMEOUT_MS2,
+      maxBuffer: MAX_GIT_OUTPUT_BYTES2,
+      ...signal === void 0 ? {} : { signal }
+    }, (error, stdout) => {
+      if (signal?.aborted) {
+        rejectResult(signal.reason ?? new Error("git operation aborted"));
+        return;
+      }
+      const output = typeof stdout === "string" ? stdout : "";
+      if (error === null) {
+        resolveResult({ kind: "ok", stdout: output });
+        return;
+      }
+      const code = error.code;
+      resolveResult(code === 1 || code === "1" ? { kind: "no_match", stdout: output } : { kind: "unavailable", stdout: "" });
+    });
+  });
+}
+function samePath2(left, right) {
+  const normalize = (value) => {
+    const absolute = resolve3(value);
+    return process.platform === "win32" ? absolute.toLocaleLowerCase("en-US") : absolute;
+  };
+  return normalize(left) === normalize(right);
+}
+function gitStatus2(value) {
+  if (value.length === 0) return "clean";
+  const code = value.slice(0, 2);
+  if (code === "??") return "untracked";
+  if (/U|AA|DD/u.test(code)) return "conflicted";
+  const staged = code[0] !== " ";
+  const modified = code[1] !== " ";
+  if (staged && modified) return "staged_and_modified";
+  if (staged) return "staged";
+  return modified ? "modified" : "clean";
+}
+function changedSymbols(diff, structure) {
+  const results = [];
+  for (const line of diff.replace(/\r\n?/gu, "\n").split("\n")) {
+    if (/^[+-](?:\+\+|--)/u.test(line)) continue;
+    if (line.startsWith("+") || line.startsWith("-")) {
+      addBounded(results, declarationName(line.slice(1)), 3);
+      continue;
+    }
+    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/u.exec(line);
+    if (hunk === null) continue;
+    const currentLine = Number(hunk[1]);
+    let nearest;
+    for (const declaration of structure.declarations) {
+      if (declaration.line > currentLine) break;
+      nearest = declaration.name;
+    }
+    addBounded(results, nearest, 3);
+  }
+  return results;
+}
+function parseLastCommit2(value) {
+  const [hash, , subject] = value.trim().split("\0");
+  const safeHash = typeof hash === "string" && /^[0-9a-f]{7,64}$/u.test(hash) ? hash.slice(0, 8) : void 0;
+  const safeSubject = typeof subject === "string" ? boundedText2(subject, 220) : void 0;
+  return safeHash === void 0 || safeSubject === void 0 ? void 0 : `${safeHash} \xB7 ${safeSubject}`;
+}
+function testPath(value) {
+  return /(?:^|\/)(?:__tests__|test|tests)(?:\/|$)|\.(?:spec|test)\.[^/]+$/iu.test(value);
+}
+function parseImpactFiles2(value, relativePath) {
+  const tests = [];
+  const importers = [];
+  for (const raw of value.split("\0")) {
+    const path = boundedText2(raw.replace(/\\/gu, "/"), 512);
+    if (path === void 0 || path === relativePath || !sourceModulePath(path) || /^(?:dist|host|mcp|node_modules)\//u.test(path) || /\.min\.[^/]+$/iu.test(path) || tests.includes(path) || importers.includes(path)) continue;
+    (testPath(path) ? tests : importers).push(path);
+  }
+  const stem = basename(relativePath, extname(relativePath)).toLocaleLowerCase("en-US");
+  tests.sort((left, right) => {
+    const leftOwn = basename(left).toLocaleLowerCase("en-US").includes(stem) ? 0 : 1;
+    const rightOwn = basename(right).toLocaleLowerCase("en-US").includes(stem) ? 0 : 1;
+    return leftOwn - rightOwn || left.localeCompare(right, "en");
+  });
+  importers.sort((left, right) => {
+    const leftSource = left.startsWith("src/") ? 0 : 1;
+    const rightSource = right.startsWith("src/") ? 0 : 1;
+    return leftSource - rightSource || left.localeCompare(right, "en");
+  });
+  const selectedTests = tests.slice(0, Math.min(2, MAX_IMPACT_FILES2));
+  const selectedImporters = importers.slice(0, MAX_IMPACT_FILES2 - selectedTests.length);
+  return [
+    ...selectedTests.map((path) => `\u6D4B\u8BD5: ${path}`),
+    ...selectedImporters.map((path) => `\u5F15\u7528: ${path}`)
+  ];
+}
+function statusLabel(status) {
+  switch (status) {
+    case "staged_and_modified":
+      return "staged + modified";
+    default:
+      return status;
+  }
+}
+async function extractSourceModuleArtifactContext(options) {
+  const structure = extractSourceModuleStructure(options.content, options.relativePath);
+  const rootResult = await runGit2(options.root, ["rev-parse", "--show-toplevel"], options.signal);
+  if (rootResult.kind !== "ok" || !samePath2(rootResult.stdout.trim(), options.root)) {
+    const base2 = {
+      role: structure.role,
+      exports: structure.exports,
+      dependencies: structure.dependencies,
+      gitAvailable: false,
+      gitStatus: "unavailable",
+      changeSummary: "Git \u4E0A\u4E0B\u6587\u4E0D\u53EF\u7528",
+      changedSymbols: Object.freeze([]),
+      impactFiles: Object.freeze([])
+    };
+    return Object.freeze({
+      ...base2,
+      contextRevision: createHash4("sha256").update(JSON.stringify(base2), "utf8").digest("hex")
+    });
+  }
+  const stem = basename(options.relativePath, extname(options.relativePath));
+  const [statusResult, unstaged, staged, references, lastCommit] = await Promise.all([
+    runGit2(options.root, [
+      "status",
+      "--porcelain=v1",
+      "-z",
+      "--untracked-files=all",
+      "--",
+      options.relativePath
+    ], options.signal),
+    runGit2(options.root, ["diff", "--no-ext-diff", "--unified=0", "--", options.relativePath], options.signal),
+    runGit2(options.root, ["diff", "--cached", "--no-ext-diff", "--unified=0", "--", options.relativePath], options.signal),
+    runGit2(options.root, ["grep", "-l", "-F", "-z", "-e", stem, "--", "."], options.signal),
+    runGit2(options.root, ["log", "-1", "--format=%H%x00%aI%x00%s", "--", options.relativePath], options.signal)
+  ]);
+  const state = statusResult.kind === "ok" ? gitStatus2(statusResult.stdout) : "unavailable";
+  const diff = `${unstaged.kind === "ok" ? unstaged.stdout : ""}
+${staged.kind === "ok" ? staged.stdout : ""}`;
+  const symbols = changedSymbols(diff, structure);
+  const recentCommit = lastCommit.kind === "ok" ? parseLastCommit2(lastCommit.stdout) : void 0;
+  const changeSummary = state === "clean" ? `clean${recentCommit === void 0 ? "" : ` \xB7 \u6700\u8FD1 ${recentCommit}`}` : state === "unavailable" ? "Git \u4E0A\u4E0B\u6587\u4E0D\u53EF\u7528" : `${statusLabel(state)}${symbols.length === 0 ? "" : ` \xB7 \u6D89\u53CA\uFF1A${symbols.join("\u3001")}`}`;
+  const impactFiles = references.kind === "ok" ? parseImpactFiles2(references.stdout, options.relativePath) : [];
+  const base = {
+    role: structure.role,
+    exports: structure.exports,
+    dependencies: structure.dependencies,
+    gitAvailable: state !== "unavailable",
+    gitStatus: state,
+    changeSummary,
+    changedSymbols: Object.freeze([...symbols]),
+    impactFiles: Object.freeze([...impactFiles])
+  };
+  return Object.freeze({
+    ...base,
+    contextRevision: createHash4("sha256").update(JSON.stringify(base), "utf8").digest("hex")
+  });
+}
+
 // src/adapters/local-workspace.ts
 var DEFAULT_MAX_FILES = 2048;
 var DEFAULT_MAX_DEPTH = 12;
@@ -3358,7 +3739,7 @@ function fileEntityId(relativePath) {
   return `file:${relativePath}`;
 }
 function markdownDocument(relativePath) {
-  const extension = extname(relativePath).toLocaleLowerCase("en-US");
+  const extension = extname2(relativePath).toLocaleLowerCase("en-US");
   return extension === ".md" || extension === ".mdx";
 }
 async function verifiedWorkspaceRoot(binding) {
@@ -3380,8 +3761,8 @@ function safeAlias(value) {
   return trimmed.length >= 2 && trimmed.length <= 512 ? trimmed : void 0;
 }
 function fileAliases(relativePath) {
-  const name = basename(relativePath);
-  const extension = extname(name);
+  const name = basename2(relativePath);
+  const extension = extname2(name);
   const stem = extension.length === 0 ? name : name.slice(0, -extension.length);
   return [...new Set([
     safeAlias(stem)
@@ -3399,7 +3780,7 @@ async function scanWorkspace(root, maxFiles, maxDepth, ignoredDirectories, signa
     for (const entry of entries) {
       if (signal?.aborted) throw signal.reason ?? new Error("workspace scan aborted");
       if (entry.isSymbolicLink()) continue;
-      const absolutePath = resolve3(directory, entry.name);
+      const absolutePath = resolve4(directory, entry.name);
       if (entry.isDirectory()) {
         if (!ignoredDirectories.has(entry.name)) {
           await visit(absolutePath, depth + 1);
@@ -3427,7 +3808,7 @@ async function scanWorkspace(root, maxFiles, maxDepth, ignoredDirectories, signa
   return files;
 }
 function indexRevision(files) {
-  const hash = createHash4("sha256");
+  const hash = createHash5("sha256");
   for (const file of files) {
     hash.update(file.relativePath, "utf8");
     hash.update("\0", "utf8");
@@ -3467,13 +3848,13 @@ var LocalWorkspaceContextIndex = class {
     const revision = indexRevision(files);
     const indexedAt = (/* @__PURE__ */ new Date()).toISOString();
     return files.map((file) => {
-      const name = basename(file.relativePath);
+      const name = basename2(file.relativePath);
       const parent = portablePath(dirname2(file.relativePath));
       return {
         schemaVersion: "1.0",
         scope: { ...binding.scope },
         entityId: fileEntityId(file.relativePath),
-        entityType: markdownDocument(file.relativePath) ? "document" : "file",
+        entityType: markdownDocument(file.relativePath) ? "document" : sourceModulePath(file.relativePath) ? "module" : "file",
         canonicalKey: file.relativePath,
         canonicalName: name,
         aliases: fileAliases(file.relativePath),
@@ -3532,7 +3913,7 @@ var LocalWorkspaceAuthoritativeProvider = class {
   providerId = LOCAL_WORKSPACE_PROVIDER_ID;
   async getDetail(request) {
     if (request.signal?.aborted) return { kind: "unavailable", retryable: true };
-    if (request.entityType !== "file" && request.entityType !== "document") {
+    if (request.entityType !== "file" && request.entityType !== "document" && request.entityType !== "module") {
       return { kind: "not_found" };
     }
     if (request.authorityLocator.length < 1 || request.authorityLocator.length > MAX_RELATIVE_PATH_CHARS || request.authorityLocator.includes("\\") || request.authorityLocator.startsWith("/") || request.authorityLocator.split("/").includes("..") || request.entityId !== fileEntityId(request.authorityLocator)) {
@@ -3541,7 +3922,7 @@ var LocalWorkspaceAuthoritativeProvider = class {
     let handle;
     try {
       const root = await verifiedWorkspaceRoot(request.binding);
-      const requestedPath = resolve3(root, ...request.authorityLocator.split("/"));
+      const requestedPath = resolve4(root, ...request.authorityLocator.split("/"));
       const canonicalFile = await realpath2(requestedPath);
       const relativePath = containedRelative(root, canonicalFile);
       if (relativePath !== request.authorityLocator) return { kind: "not_found" };
@@ -3559,27 +3940,51 @@ var LocalWorkspaceAuthoritativeProvider = class {
         content: decoded,
         ...request.signal === void 0 ? {} : { signal: request.signal }
       }) : void 0;
+      const sourceModuleContext = request.entityType === "module" && decoded !== void 0 ? await extractSourceModuleArtifactContext({
+        root,
+        relativePath,
+        content: decoded,
+        ...request.signal === void 0 ? {} : { signal: request.signal }
+      }) : void 0;
       const after = await handle.stat();
       if (!stableFileStat(before, after) || request.signal?.aborted) {
         return { kind: "unavailable", retryable: true };
       }
-      const statRevision = createHash4("sha256").update(JSON.stringify({
+      const statRevision = createHash5("sha256").update(JSON.stringify({
         path: relativePath,
         size: after.size,
         modifiedMs: after.mtimeMs,
         changedMs: after.ctimeMs,
         inode: after.ino
       }), "utf8").digest("hex");
-      const contentHash = content === void 0 ? void 0 : createHash4("sha256").update(content).digest("hex");
-      const detailRevision = createHash4("sha256").update(contentHash ?? statRevision, "utf8").update("\0", "utf8").update(markdownContext?.contextRevision ?? "file-metadata-v1", "utf8").digest("hex");
-      const extension = extname(relativePath);
+      const contentHash = content === void 0 ? void 0 : createHash5("sha256").update(content).digest("hex");
+      const detailRevision = createHash5("sha256").update(contentHash ?? statRevision, "utf8").update("\0", "utf8").update(
+        markdownContext?.contextRevision ?? sourceModuleContext?.contextRevision ?? "file-metadata-v1",
+        "utf8"
+      ).digest("hex");
+      const extension = extname2(relativePath);
       const preview = content === void 0 ? void 0 : contentPreview(content);
       const observedAt = (/* @__PURE__ */ new Date()).toISOString();
       const markdownFacts = markdownContext === void 0 ? void 0 : {
-        "\u7528\u9014": markdownContext.purpose ?? `${markdownContext.title ?? basename(relativePath)} Markdown \u6587\u6863`,
+        "\u7528\u9014": markdownContext.purpose ?? `${markdownContext.title ?? basename2(relativePath)} Markdown \u6587\u6863`,
         "\u672C\u6B21\u53D8\u5316": markdownContext.changeSummary ?? (markdownContext.gitAvailable ? "\u5F53\u524D\u5DE5\u4F5C\u6811\u672A\u68C0\u6D4B\u5230\u672A\u63D0\u4EA4\u53D8\u66F4" : "Git \u4E0A\u4E0B\u6587\u4E0D\u53EF\u7528"),
         "\u5F71\u54CD\u8303\u56F4": markdownContext.impactFiles.length > 0 ? [...markdownContext.impactFiles] : "\u672A\u53D1\u73B0\u5DF2\u8DDF\u8E2A\u5F15\u7528",
         "Git \u72B6\u6001": gitStatusLabel(markdownContext.gitStatus),
+        "\u8DEF\u5F84": relativePath
+      };
+      const dependencyAndImpact = sourceModuleContext === void 0 ? [] : [
+        ...[...sourceModuleContext.dependencies].sort((left, right) => {
+          const leftLocal = left.startsWith(".") ? 0 : 1;
+          const rightLocal = right.startsWith(".") ? 0 : 1;
+          return leftLocal - rightLocal;
+        }).slice(0, 2).map((value) => `\u4F9D\u8D56: ${value}`),
+        ...sourceModuleContext.impactFiles
+      ].slice(0, 5);
+      const moduleFacts = sourceModuleContext === void 0 ? void 0 : {
+        "\u804C\u8D23": sourceModuleContext.role,
+        "\u516C\u5F00\u5165\u53E3": sourceModuleContext.exports.length > 0 ? [...sourceModuleContext.exports] : "\u672A\u68C0\u6D4B\u5230\u516C\u5F00\u5BFC\u51FA",
+        "\u672C\u6B21\u53D8\u5316": sourceModuleContext.changeSummary,
+        "\u4F9D\u8D56\u4E0E\u5F71\u54CD": dependencyAndImpact.length > 0 ? dependencyAndImpact : "\u672A\u53D1\u73B0\u6709\u754C\u7684\u76F4\u63A5\u4F9D\u8D56\u6216\u5F15\u7528",
         "\u8DEF\u5F84": relativePath
       };
       return {
@@ -3591,9 +3996,9 @@ var LocalWorkspaceAuthoritativeProvider = class {
           entityRevision: `sha256:${detailRevision}`,
           observedAt,
           freshness: "current",
-          facts: markdownFacts ?? {
+          facts: markdownFacts ?? moduleFacts ?? {
             path: relativePath,
-            name: basename(relativePath),
+            name: basename2(relativePath),
             ...preview === void 0 ? {} : { preview },
             extension: extension.length === 0 ? null : extension,
             size_bytes: after.size,
@@ -3606,7 +4011,8 @@ var LocalWorkspaceAuthoritativeProvider = class {
               sourceType: "local_workspace_file",
               sourceId: relativePath
             },
-            ...markdownContext?.gitAvailable === true ? [{ sourceType: "local_git", sourceId: relativePath }] : []
+            ...markdownContext?.gitAvailable === true ? [{ sourceType: "local_git", sourceId: relativePath }] : [],
+            ...sourceModuleContext?.gitAvailable === true ? [{ sourceType: "local_git", sourceId: relativePath }] : []
           ]
         },
         verification: {
@@ -3950,7 +4356,7 @@ function interruptionOutcome(error) {
   return void 0;
 }
 function runBounded(operationName, operation, callerSignal, timeoutMs) {
-  return new Promise((resolve5, reject) => {
+  return new Promise((resolve6, reject) => {
     const controller = new AbortController();
     const deadlineAt = performance.now() + timeoutMs;
     let settled = false;
@@ -3967,7 +4373,7 @@ function runBounded(operationName, operation, callerSignal, timeoutMs) {
       }
       settled = true;
       cleanup();
-      resolve5(value);
+      resolve6(value);
     };
     const settleFailure = (error) => {
       if (settled) return;
@@ -4021,11 +4427,11 @@ function bindingFailure(kind) {
 function sameBinding(left, right) {
   return sameContextScope(left.scope, right.scope) && left.bindingRevision === right.bindingRevision && left.evidence === right.evidence && left.selectionGeneration === right.selectionGeneration && left.threadRef === right.threadRef && left.routeRef === right.routeRef && left.workspaceRoot === right.workspaceRoot;
 }
-function boundedText2(value) {
+function boundedText3(value) {
   return typeof value === "string" && value.trim().length > 0 && value.length <= 4096;
 }
 function optionalBoundedText(value) {
-  return value === void 0 || boundedText2(value);
+  return value === void 0 || boundedText3(value);
 }
 function parseContextScope(value) {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -4036,7 +4442,7 @@ function parseContextScope(value) {
     const kind = raw.kind;
     const namespace = raw.namespace;
     const id = raw.id;
-    if (!isContextScopeKind(kind) || !boundedText2(namespace) || !boundedText2(id)) {
+    if (!isContextScopeKind(kind) || !boundedText3(namespace) || !boundedText3(id)) {
       return void 0;
     }
     return Object.freeze({ kind, namespace, id });
@@ -4075,7 +4481,7 @@ function parseBindingResult(value) {
     const threadRef = raw.threadRef;
     const routeRef = raw.routeRef;
     const workspaceRoot = raw.workspaceRoot;
-    if (!scope || !boundedText2(bindingRevision) || evidence !== "verified_thread" && evidence !== "verified_workspace" && evidence !== "explicit_user" && evidence !== "fixture_manifest" || !Number.isSafeInteger(selectionGeneration) || Number(selectionGeneration) < 0 || !optionalBoundedText(threadRef) || !optionalBoundedText(routeRef) || !optionalBoundedText(workspaceRoot) || evidence === "verified_thread" && threadRef === void 0 || (evidence === "verified_workspace" || evidence === "fixture_manifest") && workspaceRoot === void 0) {
+    if (!scope || !boundedText3(bindingRevision) || evidence !== "verified_thread" && evidence !== "verified_workspace" && evidence !== "explicit_user" && evidence !== "fixture_manifest" || !Number.isSafeInteger(selectionGeneration) || Number(selectionGeneration) < 0 || !optionalBoundedText(threadRef) || !optionalBoundedText(routeRef) || !optionalBoundedText(workspaceRoot) || evidence === "verified_thread" && threadRef === void 0 || (evidence === "verified_workspace" || evidence === "fixture_manifest") && workspaceRoot === void 0) {
       return void 0;
     }
     const binding = {
@@ -4434,7 +4840,7 @@ function truncate(value, maximum) {
   return value.length <= maximum ? value : `${value.slice(0, maximum - 1)}\u2026`;
 }
 function sha2562(value) {
-  return createHash5("sha256").update(value, "utf8").digest("hex");
+  return createHash6("sha256").update(value, "utf8").digest("hex");
 }
 function scopeKey(entry) {
   return `${entry.scope.kind}\0${entry.scope.namespace}\0${entry.scope.id}`;
@@ -4460,8 +4866,11 @@ function candidateView(candidate, candidateRef) {
   };
 }
 function detailView(outcome) {
-  const purpose = outcome.detail.facts["\u7528\u9014"];
-  const summary = typeof purpose === "string" ? truncate(purpose, 1024) : truncate(outcome.candidate.summary, 1024);
+  const purpose = outcome.detail.facts["\u7528\u9014"] ?? outcome.detail.facts["\u804C\u8D23"];
+  const change = outcome.detail.facts["\u672C\u6B21\u53D8\u5316"];
+  const activeChange = typeof change === "string" && /^(?:涉及：|modified\b|staged\b|untracked\b|conflicted\b)/u.test(change);
+  const summaryValue = activeChange ? change : purpose;
+  const summary = typeof summaryValue === "string" ? truncate(summaryValue, 1024) : truncate(outcome.candidate.summary, 1024);
   return {
     entityId: truncate(outcome.detail.entityId, 256),
     entityType: truncate(outcome.detail.entityType, 128),
@@ -4815,7 +5224,7 @@ function record7(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function packageRoot(start) {
-  let current = resolve4(start);
+  let current = resolve5(start);
   for (let depth = 0; depth < 10; depth += 1) {
     const developmentLayout = existsSync(join(current, "src"));
     const packagedLayout = existsSync(join(current, "host", "workspace-companion.mjs"));
@@ -4830,7 +5239,7 @@ function packageRoot(start) {
 }
 function localStateRoot() {
   const local = process.env.LOCALAPPDATA;
-  return resolve4(local && isAbsolute3(local) ? local : homedir(), "PointableContext");
+  return resolve5(local && isAbsolute3(local) ? local : homedir(), "PointableContext");
 }
 function boundedInteger2(value, name) {
   if (!/^\d+$/u.test(value)) fail(`${name} must be an integer`);
@@ -4865,17 +5274,17 @@ function parseArguments(argv) {
     index += 1;
     if (argument === "--state-dir") {
       if (!isAbsolute3(value)) fail("--state-dir must be absolute");
-      stateDir = resolve4(value);
+      stateDir = resolve5(value);
     } else if (argument === "--registry") {
       if (!isAbsolute3(value)) fail("--registry must be absolute");
-      registryPath = resolve4(value);
+      registryPath = resolve5(value);
     } else if (argument === "--endpoint") {
       endpoint = value;
     } else if (argument === "--refresh-ms") {
       refreshIntervalMs = boundedInteger2(value, "--refresh-ms");
     } else if (argument === "--workspace-root") {
       if (!isAbsolute3(value)) fail("--workspace-root must be absolute");
-      workspaceRoot = resolve4(value);
+      workspaceRoot = resolve5(value);
     } else {
       fail(`unknown option: ${argument}`);
     }
@@ -5113,7 +5522,7 @@ async function runServer(arguments_) {
         if (typeof body.workspaceRoot !== "string" || !isAbsolute3(body.workspaceRoot)) {
           throw new Error("workspace_root_invalid");
         }
-        return await companion.bindCurrentTask(resolve4(body.workspaceRoot));
+        return await companion.bindCurrentTask(resolve5(body.workspaceRoot));
       }).then(
         (result) => sendJson(response, 200, { ok: true, ...result }),
         (error) => sendJson(response, 409, {

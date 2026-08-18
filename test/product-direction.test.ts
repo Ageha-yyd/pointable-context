@@ -7,7 +7,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v1.2 freezes selection-triggered Quiet Mode and deterministic Artifact Context", async () => {
+test("v1.4 freezes summary-first disclosure and prioritizes runtime compatibility", async () => {
   const [prd, readme, mainSkill, workspaceSkill] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -15,12 +15,16 @@ test("v1.2 freezes selection-triggered Quiet Mode and deterministic Artifact Con
     text("skills/pointable-context-workspace/SKILL.md"),
   ]);
 
-  assert.match(prd, /版本：v1\.2/u);
+  assert.match(prd, /版本：v1\.4/u);
   assert.match(prd, /默认可视入口是用户选区后的轻量按钮/u);
   assert.match(prd, /selection 本身不读取详情、不调用模型/u);
   assert.match(prd, /产品不存在“识别更多概念”模型分支/u);
   assert.match(prd, /不默认在 Agent 每段输出旁显示胶囊条/u);
   assert.match(prd, /Markdown 用途、变化章节和引用位置均来自有界本地解析\/Git，不调用模型/u);
+  assert.match(prd, /Source Module 的职责、exports、diff 声明、imports 和测试\/引用位置均来自有界本地解析\/Git/u);
+  assert.match(prd, /字段默认全部收起/u);
+  assert.match(prd, /卡片打开时固定 `entityRevision\/observedAt\/freshness`/u);
+  assert.match(prd, /私有 Host Adapter 的兼容性优先级高于继续增加对象类型/u);
 
   assert.match(readme, /primary interaction is \*\*Quiet Context Reveal\*\*/u);
   assert.match(readme, /no "identify more concepts" or semantic-model branch/u);
@@ -28,6 +32,8 @@ test("v1.2 freezes selection-triggered Quiet Mode and deterministic Artifact Con
   assert.match(mainSkill, /Do not offer `识别更多概念`/u);
   assert.match(workspaceSkill, /Selection alone is inert/u);
   assert.match(workspaceSkill, /There is no `识别更多概念`/u);
+  assert.match(workspaceSkill, /source is never executed/u);
+  assert.match(workspaceSkill, /summary-first/u);
 });
 
 test("plugin defaults enable Quiet Mode instead of proactively rendering capsules", async () => {

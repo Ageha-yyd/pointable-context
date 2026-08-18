@@ -27,6 +27,11 @@ import {
   extractMarkdownArtifactContext,
   type MarkdownArtifactContext,
 } from "./markdown-artifact.js";
+import {
+  extractSourceModuleArtifactContext,
+  sourceModulePath,
+  type SourceModuleArtifactContext,
+} from "./source-module-artifact.js";
 
 const DEFAULT_MAX_FILES = 2_048;
 const DEFAULT_MAX_DEPTH = 12;
@@ -233,7 +238,11 @@ export class LocalWorkspaceContextIndex implements ContextIndexPort {
         schemaVersion: "1.0",
         scope: { ...binding.scope },
         entityId: fileEntityId(file.relativePath),
-        entityType: markdownDocument(file.relativePath) ? "document" : "file",
+        entityType: markdownDocument(file.relativePath)
+          ? "document"
+          : sourceModulePath(file.relativePath)
+            ? "module"
+            : "file",
         canonicalKey: file.relativePath,
         canonicalName: name,
         aliases: fileAliases(file.relativePath),
@@ -270,7 +279,9 @@ function utf8Content(content: Buffer): string | undefined {
   }
 }
 
-function gitStatusLabel(status: MarkdownArtifactContext["gitStatus"]): string {
+function gitStatusLabel(
+  status: MarkdownArtifactContext["gitStatus"] | SourceModuleArtifactContext["gitStatus"],
+): string {
   switch (status) {
     case "clean": return "clean";
     case "modified": return "modified";
@@ -306,7 +317,11 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
     signal?: AbortSignal;
   }): Promise<AuthorityResult> {
     if (request.signal?.aborted) return { kind: "unavailable", retryable: true };
-    if (request.entityType !== "file" && request.entityType !== "document") {
+    if (
+      request.entityType !== "file" &&
+      request.entityType !== "document" &&
+      request.entityType !== "module"
+    ) {
       return { kind: "not_found" };
     }
     if (
@@ -343,6 +358,15 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
               ...(request.signal === undefined ? {} : { signal: request.signal }),
             })
           : undefined;
+      const sourceModuleContext =
+        request.entityType === "module" && decoded !== undefined
+          ? await extractSourceModuleArtifactContext({
+              root,
+              relativePath,
+              content: decoded,
+              ...(request.signal === undefined ? {} : { signal: request.signal }),
+            })
+          : undefined;
       const after = await handle.stat();
       if (!stableFileStat(before, after) || request.signal?.aborted) {
         return { kind: "unavailable", retryable: true };
@@ -362,7 +386,12 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
       const detailRevision = createHash("sha256")
         .update(contentHash ?? statRevision, "utf8")
         .update("\u0000", "utf8")
-        .update(markdownContext?.contextRevision ?? "file-metadata-v1", "utf8")
+        .update(
+          markdownContext?.contextRevision ??
+            sourceModuleContext?.contextRevision ??
+            "file-metadata-v1",
+          "utf8",
+        )
         .digest("hex");
       const extension = extname(relativePath);
       const preview = content === undefined ? undefined : contentPreview(content);
@@ -382,6 +411,32 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
             "Git 状态": gitStatusLabel(markdownContext.gitStatus),
             "路径": relativePath,
           };
+      const dependencyAndImpact = sourceModuleContext === undefined
+        ? []
+        : [
+            ...[...sourceModuleContext.dependencies]
+              .sort((left, right) => {
+                const leftLocal = left.startsWith(".") ? 0 : 1;
+                const rightLocal = right.startsWith(".") ? 0 : 1;
+                return leftLocal - rightLocal;
+              })
+              .slice(0, 2)
+              .map((value) => `依赖: ${value}`),
+            ...sourceModuleContext.impactFiles,
+          ].slice(0, 5);
+      const moduleFacts = sourceModuleContext === undefined
+        ? undefined
+        : {
+            "职责": sourceModuleContext.role,
+            "公开入口": sourceModuleContext.exports.length > 0
+              ? [...sourceModuleContext.exports]
+              : "未检测到公开导出",
+            "本次变化": sourceModuleContext.changeSummary,
+            "依赖与影响": dependencyAndImpact.length > 0
+              ? dependencyAndImpact
+              : "未发现有界的直接依赖或引用",
+            "路径": relativePath,
+          };
       return {
         kind: "snapshot",
         snapshot: {
@@ -391,7 +446,7 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
           entityRevision: `sha256:${detailRevision}`,
           observedAt,
           freshness: "current",
-          facts: markdownFacts ?? {
+          facts: markdownFacts ?? moduleFacts ?? {
               path: relativePath,
               name: basename(relativePath),
               ...(preview === undefined ? {} : { preview }),
@@ -407,6 +462,9 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
               sourceId: relativePath,
             },
             ...(markdownContext?.gitAvailable === true
+              ? [{ sourceType: "local_git", sourceId: relativePath }]
+              : []),
+            ...(sourceModuleContext?.gitAvailable === true
               ? [{ sourceType: "local_git", sourceId: relativePath }]
               : []),
           ],

@@ -100,6 +100,37 @@ test("workspace lookup returns current detail only after explicit task binding",
   }
 });
 
+test("workspace lookup projects a source module into the five-field code card", async () => {
+  const item = await fixture();
+  try {
+    await mkdir(join(item.workspace, "src"));
+    await writeFile(
+      join(item.workspace, "src", "module.ts"),
+      "/** Provides deterministic module context. */\nexport const moduleValue = 1;\n",
+      "utf8",
+    );
+    const activeTask = task();
+    await item.registry.bind(activeTask, item.workspace);
+    const callback = createWorkspaceLookupCallback({ registry: item.registry });
+    const result = await invoke(callback, request(activeTask, "src/module.ts"));
+
+    assert.equal(result.kind, "detail");
+    if (result.kind !== "detail") return;
+    assert.equal(result.detail.entityType, "module");
+    assert.match(result.detail.summary, /Provides deterministic module context/u);
+    assert.deepEqual(result.detail.facts.map((fact) => fact.label), [
+      "职责",
+      "公开入口",
+      "本次变化",
+      "依赖与影响",
+      "路径",
+    ]);
+    assert.match(result.detail.facts[2]?.value ?? "", /Git 上下文不可用/u);
+  } finally {
+    await rm(item.root, { recursive: true, force: true });
+  }
+});
+
 test("workspace candidate references are one-shot and bound to task plus registry revision", async () => {
   const item = await fixture();
   try {

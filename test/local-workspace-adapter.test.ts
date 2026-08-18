@@ -192,6 +192,119 @@ test("Markdown Git enrichment treats option-like file names as data", async () =
   }
 });
 
+test("source module detail exposes responsibility, exports, changes, dependencies, and impact", async () => {
+  const fixture = await workspaceFixture();
+  try {
+    await git(fixture.root, "init", "--quiet");
+    await git(fixture.root, "config", "user.email", "pointable@example.invalid");
+    await git(fixture.root, "config", "user.name", "Pointable Test");
+    await mkdir(join(fixture.root, "src"));
+    await mkdir(join(fixture.root, "test"));
+    await writeFile(
+      join(fixture.root, "src", "counter.ts"),
+      `/** Maintains the bounded example counter used by the host. */
+import { EventEmitter } from "node:events";
+
+export function increment(value: number): number {
+  return value + 1;
+}
+
+export const counterEvents = new EventEmitter();
+`,
+      "utf8",
+    );
+    await writeFile(
+      join(fixture.root, "src", "consumer.ts"),
+      `import { increment } from "./counter.js";\nexport const next = increment(1);\n`,
+      "utf8",
+    );
+    await writeFile(
+      join(fixture.root, "test", "counter.test.ts"),
+      `import { increment } from "../src/counter.js";\nvoid increment(1);\n`,
+      "utf8",
+    );
+    await git(fixture.root, "add", ".");
+    await git(fixture.root, "commit", "--quiet", "-m", "seed source module");
+    await writeFile(
+      join(fixture.root, "src", "counter.ts"),
+      `/** Maintains the bounded example counter used by the host. */
+import { EventEmitter } from "node:events";
+
+export function increment(value: number): number {
+  return value + 2;
+}
+
+export const counterEvents = new EventEmitter();
+`,
+      "utf8",
+    );
+
+    const records = await new LocalWorkspaceContextIndex().list(fixture.binding);
+    const record = records.find((candidate) => candidate.canonicalKey === "src/counter.ts");
+    assert.ok(record);
+    assert.equal(record.entityType, "module");
+    const result = await new LocalWorkspaceAuthoritativeProvider().getDetail({
+      binding: fixture.binding,
+      entityId: record.entityId,
+      entityType: record.entityType,
+      authorityLocator: record.authorityRef.locator,
+      revisionPolicy: "current-or-explicit-stale",
+    });
+
+    assert.equal(result.kind, "snapshot");
+    if (result.kind !== "snapshot") return;
+    assert.match(String(result.snapshot.facts["职责"]), /Maintains the bounded example counter/u);
+    assert.deepEqual(result.snapshot.facts["公开入口"], ["increment", "counterEvents"]);
+    assert.match(String(result.snapshot.facts["本次变化"]), /modified.*increment/u);
+    assert.deepEqual(result.snapshot.facts["依赖与影响"], [
+      "依赖: node:events",
+      "测试: test/counter.test.ts",
+      "引用: src/consumer.ts",
+    ]);
+    assert.equal(result.snapshot.facts["路径"], "src/counter.ts");
+    assert.deepEqual(result.snapshot.sourceRefs.map((source) => source.sourceType), [
+      "local_workspace_file",
+      "local_git",
+    ]);
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("source module enrichment keeps option-like paths as Git data", async () => {
+  const fixture = await workspaceFixture();
+  try {
+    await git(fixture.root, "init", "--quiet");
+    await git(fixture.root, "config", "user.email", "pointable@example.invalid");
+    await git(fixture.root, "config", "user.name", "Pointable Test");
+    await writeFile(
+      join(fixture.root, "--eval.ts"),
+      "/** Option-like source paths remain inert data. */\nexport const safe = true;\n",
+      "utf8",
+    );
+    await git(fixture.root, "add", "--", "--eval.ts");
+    await git(fixture.root, "commit", "--quiet", "-m", "add safe source path");
+    const records = await new LocalWorkspaceContextIndex().list(fixture.binding);
+    const record = records.find((candidate) => candidate.canonicalKey === "--eval.ts");
+    assert.ok(record);
+    assert.equal(record.entityType, "module");
+    const result = await new LocalWorkspaceAuthoritativeProvider().getDetail({
+      binding: fixture.binding,
+      entityId: record.entityId,
+      entityType: record.entityType,
+      authorityLocator: record.authorityRef.locator,
+      revisionPolicy: "current-or-explicit-stale",
+    });
+    assert.equal(result.kind, "snapshot");
+    if (result.kind === "snapshot") {
+      assert.match(String(result.snapshot.facts["本次变化"]), /^clean/u);
+      assert.match(String(result.snapshot.facts["职责"]), /Option-like source paths/u);
+    }
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
 test("workspace provider rejects traversal and authority tuple tampering", async () => {
   const fixture = await workspaceFixture();
   try {

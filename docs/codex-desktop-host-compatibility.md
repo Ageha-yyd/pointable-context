@@ -27,11 +27,13 @@ Inline MCP App work is tracked as a separate host gate. It must not be inferred 
 ## Qualification evidence
 
 - `pnpm run check`: pass.
-- `pnpm test`: `186 / 186 PASS` after the v1.2 Artifact Context increment, including packaged-layout start, deterministic Markdown parsing, Git enrichment, non-Git fallback, and option-like path regression coverage.
-- `pnpm run test:host-browser`: trusted drag → detail → close; native selection cleared and no remount after 250 ms.
+- `pnpm test`: `192 / 192 PASS` after the v1.4 summary-first increment, including packaged-layout start, deterministic Markdown/source parsing, Git enrichment, non-Git fallback, bounded declaration projection, product-direction freeze, and renderer contracts.
+- `pnpm run test:host-browser`: trusted drag → compact detail; detail body initially has zero layout height; trusted in-card disclosure expands in place; close clears native selection and prevents remount after 250 ms.
 - Real repository Artifact probe: `docs/PRD-inline-pointable-widgets.md` returned purpose, current changed sections, three bounded literal references, Git status, and relative path in 128 ms total on the qualified machine (16 ms index + 112 ms detail). This is one local probe, not a population latency claim.
+- Real repository Source Module probe: `src/adapters/local-workspace.ts` returned responsibility, public exports, changed declarations, prioritized local dependencies, test/importer references, and relative path in 140 ms total on the qualified machine (14 ms index + 126 ms detail). This is one local probe, not a population latency claim.
 - User manual gate: three visible workspace keywords produced live details; the repaired close action worked.
 - User manual Artifact Context gate (2026-08-18): after binding the active Codex task to this repository, selecting `PRD-inline-pointable-widgets.md` in the native Chat Lane exposed the v1.2 purpose, current change, impact, Git status, and path fields in place, without opening a browser or adding a Chat Turn.
+- User manual summary-first gate (2026-08-18): the v1.4 native Chat Lane card was accepted with its compact summary-first presentation and card-internal detail disclosure; the heavier facts remain hidden until the user explicitly expands them.
 - Live management gate: persisted binding read-back, explicit `unbind`, empty binding status, explicit `bind`, and `replaced: true` rebind all passed.
 - Plugin cache: the current `pointable-context@personal` cachebuster version is read back after each local reinstall, with all three Skills and the rebuilt companion bundle required in the installed cache.
 

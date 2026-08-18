@@ -1,7 +1,7 @@
 # PRD：Quiet Context Reveal（选区式上下文速览）
 
-- 版本：v1.2
-- 状态：Quiet Mode 原生链路已验收；进入确定性 Artifact Context 与真实信息效用阶段
+- 版本：v1.4
+- 状态：停止扩展对象类型；进入摘要优先、动态 revision 与宿主兼容性阶段
 - 日期：2026-08-18
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
@@ -133,7 +133,7 @@ P0 不提供“识别更多概念”、自然语言语义扩展、LLM 候选生�
 
 ### 6.2 模块或项目内概念
 
-选中 `ContextScopeRef` 后，卡片显示：定义、责任、引入原因、替代对象、接口/依赖、成熟度和风险。
+选中 `src/adapters/local-workspace.ts` 等 TypeScript/JavaScript 模块后，卡片显示：职责、公开入口、本次变化、直接依赖与字面引用/测试关联、路径。选中 `ContextScopeRef` 等尚无文件身份的抽象概念时，仍需等待独立的 Agent-known Context Index Provider。
 
 ### 6.3 架构或产品决策
 
@@ -171,15 +171,14 @@ P0 不提供“识别更多概念”、自然语言语义扩展、LLM 候选生�
 
 ### 7.3 详情卡
 
-首屏预算：
+默认首屏预算：
 
 - 类型与稳定名称；
-- 一句话摘要；
-- 3–7 个类型化关键事实；
-- revision、observedAt、freshness；
-- fixture/partial/stale 等显式警告。
+- 一句话、与当前状态最相关的摘要；
+- 紧凑类型与 freshness；
+- 一个低显著性的卡内“查看详情”入口。
 
-卡片内部可以本地展开“变化”“影响与关系”“来源与验证”，但不得调用模型、创建 Chat Turn 或打开浏览器。
+职责、公开入口、本次变化、依赖与影响、路径、revision、observedAt、来源等字段默认全部收起。用户点击卡内“查看详情”后，才在同一卡片内展开这些字段；再次点击“收起详情”恢复摘要态。展开/收起只是本地 UI 状态，不重新查询 Provider，不调用模型、不创建 Chat Turn、不打开浏览器。stale/partial/unavailable 不能被收起隐藏，必须在摘要态可见。
 
 ### 7.4 关闭与恢复
 
@@ -217,6 +216,47 @@ Markdown/开发文档在用户点击后可按需组合三类只读事实：
 3. 确定性引用：工作区内直接提及该文件名的已跟踪文件，最多 3 项。
 
 这些信息用于回答“用途、本次变化、影响范围”，不使用 LLM、embedding 或自然语言推断。Git 不可用时仍返回文件用途、路径和 freshness，并明确把 Git 状态标为 unavailable。引用结果只代表字面引用位置，不冒充完整语义依赖图。
+
+### 8.5 Deterministic Source Module Context
+
+TypeScript/JavaScript 模块在用户点击后按需组合四类只读事实：
+
+1. 源码结构：文件头说明、公开 `export`/CommonJS 入口与有限的顶层声明；
+2. 直接依赖：静态 `import`、re-export 和有界 CommonJS `require`；
+3. Git：当前状态、diff 对应的有限声明，以及 clean 状态下的最近提交；
+4. 依赖与影响：最多 3 个字面引用该模块 stem 的源码或测试文件，测试关联优先显示。
+
+详情数据固定为“职责、公开入口、本次变化、依赖与影响、路径”五项。Git 状态并入“本次变化”，避免额外占用信息槽。解析范围只覆盖 `.ts/.tsx/.mts/.cts/.js/.jsx/.mjs/.cjs`；不执行源码、不解析运行时依赖图、不调用语言服务器或模型。文件头说明缺失时，只根据入口文件名与公开导出生成保守描述。字面引用不等于完整调用关系，解析失败或 Git 不可用时必须显式降级。
+
+这里的“五项”是详情数据合同，不是默认视觉合同。默认只显示一个按场景选择的摘要；五项在卡内 disclosure 中按需展开。
+
+### 8.6 Dynamic snapshot semantics
+
+长任务中对象可能在卡片打开后继续变化。产品必须区分“用户正在阅读的快照”和“Provider 最新状态”：
+
+1. 卡片打开时固定 `entityRevision/observedAt/freshness`，不得在用户阅读中静默替换字段；
+2. 后台只做轻量 revision 失效检测，不持续重取完整详情；
+3. 发现 revision 变化时，在摘要态显示“内容已更新”及显式刷新入口；
+4. 刷新保持同一卡片、同一选区和零 Chat Turn，并突出从旧 revision 到新 revision 的有限差异；
+5. 对象被删除、Provider 不可用或 binding 漂移时，保留旧快照但明确标记 stale/unavailable，不能冒充 current；
+6. 若没有历史 revision 数据，只能显示“当前状态”，不能编造“消息当时状态”。
+
+### 8.7 Scenario relevance policy
+
+默认摘要只回答当前场景最可能需要的一个问题：
+
+| 场景 | 默认摘要 | 展开后 |
+|---|---|---|
+| 新建模块 | 职责或公开入口 | exports、依赖、引用、路径 |
+| 已修改模块 | 本次变化及影响数量 | 职责、exports、依赖、测试/调用方、路径 |
+| clean 模块 | 职责 | 最近提交、exports、依赖、引用、路径 |
+| 已修改文档 | 本次变化章节 | 用途、引用、Git 状态、路径 |
+| clean 文档 | 用途 | 最近提交、章节、引用、路径 |
+| stale/partial 对象 | freshness 警告 | 固定 revision、来源、可用事实 |
+| 未来测试结果 | PASS/FAIL 与未覆盖边界 | 命令、修订、失败项、证据 |
+| 未来决策/配置 | 决策结果或变化键 | 原因、约束、影响、证据 |
+
+场景策略是投影优先级，不是新增 Provider 的理由。没有可靠数据时宁可少显示，也不填充通用字段凑满卡片。
 
 ## 9. P0 功能需求
 
@@ -288,6 +328,10 @@ Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知�
 
 浏览器 App Server harness、Dashboard 和 CWA 仅用于研究、协议调试或复杂任务升级。任何默认要求用户离开当前 Codex 任务的路线均不满足 P0。
 
+### 11.4 Codex Desktop compatibility gate
+
+私有 Host Adapter 的兼容性优先级高于继续增加对象类型。每个 Codex Desktop build 必须重新通过：目标与主 execution context 识别、消息表面资格判断、trusted click、摘要卡挂载、卡内 disclosure、关闭/焦点恢复、滚动/虚拟化、导航重装和 stale-response 清理。启动自检失败时保持 Chat Lane 原样并在 companion status 中报告不兼容；不得留下半挂载入口或要求用户转到浏览器。单个当前 build 的 PASS 不能外推为跨版本支持。
+
 ## 12. 成功指标与实验
 
 ### 12.1 对照条件
@@ -334,6 +378,7 @@ Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知�
 - [ ] 只使用确定性 key/name/path/alias；
 - [ ] 产品不存在“识别更多概念”模型分支；
 - [ ] Markdown 用途、变化章节和引用位置均来自有界本地解析/Git，不调用模型；
+- [ ] Source Module 的职责、exports、diff 声明、imports 和测试/引用位置均来自有界本地解析/Git，不执行源码、不调用模型；
 - [ ] opaque ref 绑定完整 context 和对象身份；
 - [ ] 点击后读取当前 authoritative snapshot；
 - [ ] index/provider/context 漂移 fail closed；
@@ -373,6 +418,8 @@ Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知�
 - task/route/context/selection/lifecycle fence；
 - fixture 与显式绑定 workspace 的只读 Provider；
 - Markdown Artifact Context Extractor：用途、变化章节、确定性引用、Git 状态和路径；
+- Source Module Context Extractor：职责、公开入口、变化声明、直接依赖、测试/引用关联和路径；
+- 摘要优先的卡内 progressive disclosure：默认隐藏事实/元数据/来源，保留类型与 freshness；
 - Artifact、Module/Concept、Decision/Task 类型化详情；
 - 来源、修订、新鲜度、观察时间和文本 fallback；
 - 关闭、Escape、外点、导航清理与 stale-response 防护；
@@ -382,16 +429,17 @@ Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知�
 
 - 让当前 workspace 文件之外的 Module/Decision/Task 获得可靠 Provider；
 - 把 Agent 工作结果增量写入轻量 Context Index；
+- revision 漂移检测、显式零-turn 刷新和有限差异投影；
 - 证明不同 Codex Desktop 版本中的 Host Adapter 兼容性；
 - 完成受控效率研究。
 
 ## 16. 推荐实施顺序
 
-1. 完成真实 Markdown Artifact Context 的当前 Codex Desktop 人工验收；
-2. 增加 TypeScript 模块的 exports/importers/测试关联确定性提取；
-3. 让 Agent 工作结果增量写入 Module/Decision/Task Context Index；
-4. 做跨版本资格化与失败降级；
-5. 最后开展 A/B 效率研究。
+1. 完成摘要态、卡内展开/收起和关闭的当前 Codex Desktop 人工验收；
+2. 做当前 build 的完整兼容性自检与失败降级；
+3. 实现 revision 失效提示、显式零-turn 刷新和有限差异；
+4. 用模块、文档、测试、决策/配置场景验证默认摘要是否命中重点；
+5. 最后开展 A/B 效率研究，再决定是否扩展 Provider。
 
 ## 17. 已冻结决策
 
@@ -408,6 +456,8 @@ Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知�
 
 ## 18. 变更记录
 
+- v1.4：把五项事实从默认首屏改为卡内渐进披露；默认只保留场景摘要、类型和 freshness；冻结新增 Extractor，优先解决动态 revision 语义、场景信息优先级和 Codex Desktop 兼容性。
+- v1.3：加入 TypeScript/JavaScript Source Module Context Extractor；通过文件头说明、公开导出、静态依赖、Git diff/status/log 和有界字面引用提供五项代码模块速览，保持零执行、零模型、零 Chat Turn。
 - v1.2：在已验收的 Quiet Mode 原生链路上加入 Markdown Artifact Context Extractor；通过文件结构、Git diff/status/log 和有界字面引用提供“用途、本次变化、影响范围”，保持零模型、零 Chat Turn 和非 Git 显式降级。
 - v1.1：把默认入口从 Agent 输出旁主动胶囊改为 Selection-triggered Quiet Context Reveal；Agent-known 退回数据层；彻底删除“识别更多概念”与选区语义模型；保留类型化胶囊作为点击后的详情投影和可选 MCP 渲染参考。
 - v1.0：以 Agent-known 原生 Context Capsules 为主入口，建立零-turn 类型化详情，但默认可见程度过高。

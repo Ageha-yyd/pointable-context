@@ -15,6 +15,8 @@ Manage the private Codex Desktop companion that keeps normal Chat visually uncha
 - One exact match opens detail directly after the click; 2–3 matches show candidates; broader/mixed results fail closed.
 - Detail is read-only, current, type-specific, and displayed beside the selection.
 - A Markdown document detail prioritizes `用途`, `本次变化`, `影响范围`, `Git 状态`, and `路径`. These fields come from bounded file structure, Git, and literal references, never a model.
+- A TypeScript/JavaScript module detail prioritizes `职责`, `公开入口`, `本次变化`, `依赖与影响`, and `路径`. These fields come from bounded source declarations, static imports, Git, and literal test/importer references; source is never executed.
+- The card is summary-first: facts, revision, observed time, and sources remain inside a collapsed in-card `查看详情` disclosure. Keep type and freshness visible even while collapsed.
 
 ## Boundaries
 
@@ -61,4 +63,4 @@ node $companion stop --json
 - If selected text has no exact file identity, leave Chat/copy behavior unchanged; do not send it to a model.
 - If task, route, workspace root, binding revision, selection digest, renderer generation, index, or Provider drifts, discard the result and require a fresh explicit action.
 - Present `current` only for a verified live read. Preserve stale/unavailable states exactly as returned.
-- Treat `影响范围` as bounded literal reference evidence, not a semantic dependency or impact claim. Preserve `Git 状态: unavailable` when the workspace is not a qualifying Git root.
+- Treat Markdown `影响范围` and module `依赖与影响` as bounded literal evidence, not a semantic dependency or runtime impact claim. Preserve explicit Git-unavailable wording when the workspace is not a qualifying Git root.

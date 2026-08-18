@@ -947,6 +947,42 @@ export function installPointableContextRenderer(
     state = "detail";
     const { body } = createShell(detail.label);
     body.append(paragraph(detail.summary));
+    const compactState = document.createElement("div");
+    compactState.textContent = `${detail.entityType} · ${detail.freshness}`;
+    Object.assign(compactState.style, {
+      marginTop: "6px",
+      color: detail.freshness === "current" ? "#64748b" : "#a15c00",
+      fontSize: "11px",
+      overflowWrap: "anywhere",
+    });
+    body.append(compactState);
+
+    const disclosure = document.createElement("div");
+    disclosure.setAttribute("data-pointable-context-role", "detail-disclosure");
+    Object.assign(disclosure.style, { marginTop: "8px" });
+    const disclosureToggle = document.createElement("button");
+    disclosureToggle.type = "button";
+    disclosureToggle.textContent = "查看详情";
+    disclosureToggle.setAttribute("aria-label", "展开上下文详情");
+    disclosureToggle.setAttribute("aria-expanded", "false");
+    disclosureToggle.setAttribute("data-pointable-context-role", "detail-toggle");
+    Object.assign(disclosureToggle.style, {
+      border: "0",
+      background: "transparent",
+      padding: "2px 0",
+      width: "fit-content",
+      color: "#52627a",
+      cursor: "pointer",
+      fontSize: "12px",
+      fontWeight: "600",
+      userSelect: "none",
+    });
+    const detailBody = document.createElement("div");
+    detailBody.id = `${cardElement?.id ?? cardIdBase}-detail-body`;
+    detailBody.hidden = true;
+    detailBody.style.display = "none";
+    detailBody.setAttribute("data-pointable-context-role", "detail-body");
+    disclosureToggle.setAttribute("aria-controls", detailBody.id);
     const metadata = document.createElement("div");
     Object.assign(metadata.style, {
       marginTop: "10px",
@@ -960,14 +996,14 @@ export function installPointableContextRenderer(
       metadataRow("修订版", detail.revision),
       metadataRow("数据时间", detail.observedAt),
     );
-    body.append(metadata);
+    detailBody.append(metadata);
     if (detail.facts.length > 0) {
       const heading = document.createElement("h3");
       heading.textContent = "关键事实";
       Object.assign(heading.style, { margin: "12px 0 4px", fontSize: "13px" });
       const facts = document.createElement("div");
       for (const fact of detail.facts) facts.append(metadataRow(fact.label, fact.value));
-      body.append(heading, facts);
+      detailBody.append(heading, facts);
     }
     if (detail.sources.length > 0) {
       const heading = document.createElement("h3");
@@ -980,8 +1016,25 @@ export function installPointableContextRenderer(
         item.textContent = source.label;
         list.append(item);
       }
-      body.append(heading, list);
+      detailBody.append(heading, list);
     }
+    disclosure.append(disclosureToggle, detailBody);
+    disclosureToggle.addEventListener("click", (event) => {
+      if (!event.isTrusted) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const expanded = disclosureToggle.getAttribute("aria-expanded") !== "true";
+      disclosureToggle.setAttribute("aria-expanded", String(expanded));
+      detailBody.hidden = !expanded;
+      detailBody.style.display = expanded ? "block" : "none";
+      disclosureToggle.textContent = expanded ? "收起详情" : "查看详情";
+      disclosureToggle.setAttribute(
+        "aria-label",
+        expanded ? "收起上下文详情" : "展开上下文详情",
+      );
+      reposition();
+    });
+    body.append(disclosure);
   }
 
   function mountError(message: string, retryable: boolean): void {

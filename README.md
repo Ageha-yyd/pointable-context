@@ -28,6 +28,18 @@ For an explicitly bound local Git workspace, Markdown documents now expose a det
 
 The extractor runs on demand, uses bounded local file/Git reads, and makes no model call. If Git is unavailable, the file remains readable and the Git state is shown as unavailable. Literal references are evidence of mention, not a semantic dependency graph.
 
+## Live source-module context
+
+TypeScript and JavaScript family files expose a separate deterministic five-fact view:
+
+- responsibility from a bounded leading source comment, with a conservative export-based fallback;
+- public exports;
+- current Git state plus at most three changed declarations;
+- at most two prioritized direct static dependencies combined with at most three bounded test/importer references, projected into one compact field;
+- workspace-relative path.
+
+Supported extensions are `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, and `.cjs`. The extractor never executes source, starts a language server, or calls a model. Importers and tests are literal reference evidence, not a complete runtime call graph.
+
 ## Current fixture
 
 The installed MCP server is deliberately pinned to `fixtures/mini-project`. Every result is marked `FIXTURE-ONLY`; it is not evidence about the active workspace.
@@ -50,6 +62,8 @@ The fixture MCP server exposes:
 
 The default Desktop companion keeps the lane clean until selection. A trusted click reveals 3–7 prioritized facts, revision, observed time, freshness, relations, sources, and verification. All progressive disclosure is local UI state. The optional MCP resource contains no question form, `ui/message`, model-context update, network request, or navigation.
 
+The native detail card is summary-first: it initially shows only the object name, one contextual summary, type, freshness, and a quiet in-card `查看详情` disclosure. Facts, revision, observation time, and sources stay collapsed until requested. This avoids turning a successful point lookup into another dense information surface.
+
 ## Reused foundations
 
 - Pure pre-click eligibility with no project-data request.
@@ -68,9 +82,10 @@ These foundations are implementation assets. Selection is the visual trigger; it
 - The shipped MCP data is fixture-only.
 - The standard MCP App path renders beside a tool result; it does not provide the required ordinary-prose selection hook.
 - The private Desktop selection companion is currently the primary interaction prototype, but remains host/build-specific and must be qualified per Codex build.
-- Markdown artifact context is implemented; code-module, decision, task, and verification Providers remain later stages.
+- Further object/Extractor expansion is paused while native-host compatibility, dynamic revision semantics, and scenario-specific summary quality are qualified.
+- Markdown artifact and TypeScript/JavaScript source-module context are implemented; decision, task, abstract-concept, and verification Providers remain later stages.
 - Real Agent work results do not yet systematically emit context references.
-- Real module, decision, task, and verification Providers are not yet connected.
+- Source files have a real local module Provider; Agent-known abstract concepts, decisions, tasks, and verification results are not yet connected.
 - A persistent multi-object capsule strip is no longer a default product goal.
 - No formal user study has yet proven the expected efficiency gain.
 

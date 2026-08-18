@@ -107,9 +107,13 @@ function candidateView(candidate: CandidateMatch, candidateRef: string): Pointab
 }
 
 function detailView(outcome: Extract<LookupOutcome, { kind: "detail" }>): PointableDetailView {
-  const purpose = outcome.detail.facts["用途"];
-  const summary = typeof purpose === "string"
-    ? truncate(purpose, 1_024)
+  const purpose = outcome.detail.facts["用途"] ?? outcome.detail.facts["职责"];
+  const change = outcome.detail.facts["本次变化"];
+  const activeChange = typeof change === "string" &&
+    /^(?:涉及：|modified\b|staged\b|untracked\b|conflicted\b)/u.test(change);
+  const summaryValue = activeChange ? change : purpose;
+  const summary = typeof summaryValue === "string"
+    ? truncate(summaryValue, 1_024)
     : truncate(outcome.candidate.summary, 1_024);
   return {
     entityId: truncate(outcome.detail.entityId, 256),

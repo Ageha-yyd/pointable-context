@@ -119,6 +119,11 @@ test("install expression is namespaced, generic, click-gated, text-only, and cle
   assert.match(expression, /removeAllRanges\(\)/u);
   assert.match(expression, /addEventListener\("mousedown", dismissPointer\)/u);
   assert.match(expression, /state === "resolving"/u);
+  assert.match(expression, /detailBody\.hidden = true/u);
+  assert.match(expression, /detailBody\.style\.display = "none"/u);
+  assert.match(expression, /data-pointable-context-role", "detail-disclosure"/u);
+  assert.match(expression, /disclosureToggle\.textContent = "查看详情"/u);
+  assert.match(expression, /expanded \? "收起详情" : "查看详情"/u);
   assert.match(expression, /Commit the explicit trusted activation synchronously/u);
   assert.match(expression, /range\.toString\(\)\.trim\(\)/u);
   assert.match(expression, /range\.intersectsNode/u);

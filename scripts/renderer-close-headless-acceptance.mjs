@@ -220,6 +220,36 @@ try {
     createDeliverPointableResultExpression(response, lifecycleId),
   );
   if (delivered?.outcome !== "applied") throw new Error("detail was not applied");
+  const collapsed = await evaluate(connection, `(() => {
+    const disclosure = document.querySelector('[data-pointable-context-role="detail-disclosure"]');
+    const toggle = document.querySelector('[data-pointable-context-role="detail-toggle"]');
+    const body = document.querySelector('[data-pointable-context-role="detail-body"]');
+    if (!(disclosure instanceof HTMLElement) || !(toggle instanceof HTMLButtonElement) || !(body instanceof HTMLElement)) return null;
+    const rect = toggle.getBoundingClientRect();
+    const bodyRect = body.getBoundingClientRect();
+    return {
+      expanded: toggle.getAttribute('aria-expanded'),
+      bodyHeight: bodyRect.height,
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+  })()`);
+  if (collapsed === null || collapsed.expanded !== 'false' || collapsed.bodyHeight !== 0) {
+    throw new Error(`detail disclosure was not initially collapsed: ${JSON.stringify(collapsed)}`);
+  }
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mousePressed", x: collapsed.x, y: collapsed.y, button: "left", clickCount: 1,
+  });
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mouseReleased", x: collapsed.x, y: collapsed.y, button: "left", clickCount: 1,
+  });
+  const expanded = await waitFor(connection, `(() => {
+    const disclosure = document.querySelector('[data-pointable-context-role="detail-disclosure"]');
+    const body = document.querySelector('[data-pointable-context-role="detail-body"]');
+    const toggle = document.querySelector('[data-pointable-context-role="detail-toggle"]');
+    return disclosure instanceof HTMLElement && toggle instanceof HTMLButtonElement && body instanceof HTMLElement && toggle.getAttribute('aria-expanded') === 'true' && body.getBoundingClientRect().height > 0;
+  })()`);
+  if (expanded !== true) throw new Error("trusted disclosure did not expand in place");
   const close = await waitFor(connection, `(() => {
     const button = document.querySelector('button[aria-label="关闭上下文详情"]');
     if (!(button instanceof HTMLElement)) return null;
@@ -252,6 +282,8 @@ try {
     browser: "Microsoft Edge headless",
     selectedText: intent.selectionText,
     trustedActionProducedDetail: true,
+    detailInitiallyCollapsed: true,
+    trustedDisclosureExpandedInPlace: true,
     closeClearedSelection: true,
     closePreventedRemountAfterMs: 250,
   }, null, 2)}\n`);

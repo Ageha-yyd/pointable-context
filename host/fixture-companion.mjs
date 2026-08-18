@@ -1750,6 +1750,41 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     state = "detail";
     const { body } = createShell(detail.label);
     body.append(paragraph(detail.summary));
+    const compactState = document.createElement("div");
+    compactState.textContent = `${detail.entityType} \xB7 ${detail.freshness}`;
+    Object.assign(compactState.style, {
+      marginTop: "6px",
+      color: detail.freshness === "current" ? "#64748b" : "#a15c00",
+      fontSize: "11px",
+      overflowWrap: "anywhere"
+    });
+    body.append(compactState);
+    const disclosure = document.createElement("div");
+    disclosure.setAttribute("data-pointable-context-role", "detail-disclosure");
+    Object.assign(disclosure.style, { marginTop: "8px" });
+    const disclosureToggle = document.createElement("button");
+    disclosureToggle.type = "button";
+    disclosureToggle.textContent = "\u67E5\u770B\u8BE6\u60C5";
+    disclosureToggle.setAttribute("aria-label", "\u5C55\u5F00\u4E0A\u4E0B\u6587\u8BE6\u60C5");
+    disclosureToggle.setAttribute("aria-expanded", "false");
+    disclosureToggle.setAttribute("data-pointable-context-role", "detail-toggle");
+    Object.assign(disclosureToggle.style, {
+      border: "0",
+      background: "transparent",
+      padding: "2px 0",
+      width: "fit-content",
+      color: "#52627a",
+      cursor: "pointer",
+      fontSize: "12px",
+      fontWeight: "600",
+      userSelect: "none"
+    });
+    const detailBody = document.createElement("div");
+    detailBody.id = `${cardElement?.id ?? cardIdBase}-detail-body`;
+    detailBody.hidden = true;
+    detailBody.style.display = "none";
+    detailBody.setAttribute("data-pointable-context-role", "detail-body");
+    disclosureToggle.setAttribute("aria-controls", detailBody.id);
     const metadata = document.createElement("div");
     Object.assign(metadata.style, {
       marginTop: "10px",
@@ -1763,14 +1798,14 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       metadataRow("\u4FEE\u8BA2\u7248", detail.revision),
       metadataRow("\u6570\u636E\u65F6\u95F4", detail.observedAt)
     );
-    body.append(metadata);
+    detailBody.append(metadata);
     if (detail.facts.length > 0) {
       const heading = document.createElement("h3");
       heading.textContent = "\u5173\u952E\u4E8B\u5B9E";
       Object.assign(heading.style, { margin: "12px 0 4px", fontSize: "13px" });
       const facts = document.createElement("div");
       for (const fact of detail.facts) facts.append(metadataRow(fact.label, fact.value));
-      body.append(heading, facts);
+      detailBody.append(heading, facts);
     }
     if (detail.sources.length > 0) {
       const heading = document.createElement("h3");
@@ -1783,8 +1818,25 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
         item.textContent = source.label;
         list.append(item);
       }
-      body.append(heading, list);
+      detailBody.append(heading, list);
     }
+    disclosure.append(disclosureToggle, detailBody);
+    disclosureToggle.addEventListener("click", (event) => {
+      if (!event.isTrusted) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const expanded = disclosureToggle.getAttribute("aria-expanded") !== "true";
+      disclosureToggle.setAttribute("aria-expanded", String(expanded));
+      detailBody.hidden = !expanded;
+      detailBody.style.display = expanded ? "block" : "none";
+      disclosureToggle.textContent = expanded ? "\u6536\u8D77\u8BE6\u60C5" : "\u67E5\u770B\u8BE6\u60C5";
+      disclosureToggle.setAttribute(
+        "aria-label",
+        expanded ? "\u6536\u8D77\u4E0A\u4E0B\u6587\u8BE6\u60C5" : "\u5C55\u5F00\u4E0A\u4E0B\u6587\u8BE6\u60C5"
+      );
+      reposition();
+    });
+    body.append(disclosure);
   }
   function mountError(message, retryable) {
     state = "error";
