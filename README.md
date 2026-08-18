@@ -64,6 +64,17 @@ The default Desktop companion keeps the lane clean until selection. A trusted cl
 
 The native detail card is summary-first: it initially shows only the object name, one contextual summary, type, freshness, and a quiet in-card `查看详情` disclosure. Facts, revision, observation time, and sources stay collapsed until requested. This avoids turning a successful point lookup into another dense information surface.
 
+## Codex Desktop compatibility self-check
+
+The workspace companion now reports one explicit private-host compatibility state in `status --json`:
+
+- `qualified`: the exact `app://-/index.html` target, main frame, default main execution context, and renderer lifecycle all passed;
+- `unavailable`: the local debug endpoint or transport could not be checked;
+- `incompatible`: Codex was reachable but a required private host contract did not match;
+- `unchecked`: no refresh has run yet.
+
+Only `qualified` permits the current runtime to be described as attached. `unavailable` and `incompatible` leave the Chat Lane unchanged and expose a bounded diagnostic code. This startup check does not replace the per-build manual selection, disclosure, close, focus, navigation, and virtualization gate.
+
 ## Reused foundations
 
 - Pure pre-click eligibility with no project-data request.
@@ -114,9 +125,10 @@ node mcp/server.mjs --fixture-root ./fixtures/mini-project --project-id PRJ-01
 "PRD-inline-pointable-widgets.md" | node dist/src/cli.js lookup --stdin --project-dir ./fixtures/mini-project
 
 # Primary Quiet Context Reveal prototype in a controlled Desktop build
-node host/fixture-companion.mjs start
-node host/fixture-companion.mjs status
-node host/fixture-companion.mjs stop
+node host/workspace-companion.mjs start --json
+node host/workspace-companion.mjs status --json
+node host/workspace-companion.mjs bind --workspace-root 'D:\absolute\workspace' --json
+node host/workspace-companion.mjs stop --json
 
 # Isolated rendering acceptance for the zero-turn capsule
 pnpm run test:widget-browser

@@ -1,7 +1,7 @@
 # PRD：Quiet Context Reveal（选区式上下文速览）
 
-- 版本：v1.4
-- 状态：停止扩展对象类型；进入摘要优先、动态 revision 与宿主兼容性阶段
+- 版本：v1.5
+- 状态：摘要优先与当前 build 启动兼容性自检完成；进入动态 revision 阶段
 - 日期：2026-08-18
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
@@ -332,6 +332,15 @@ Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知�
 
 私有 Host Adapter 的兼容性优先级高于继续增加对象类型。每个 Codex Desktop build 必须重新通过：目标与主 execution context 识别、消息表面资格判断、trusted click、摘要卡挂载、卡内 disclosure、关闭/焦点恢复、滚动/虚拟化、导航重装和 stale-response 清理。启动自检失败时保持 Chat Lane 原样并在 companion status 中报告不兼容；不得留下半挂载入口或要求用户转到浏览器。单个当前 build 的 PASS 不能外推为跨版本支持。
 
+启动自检固定检查四层私有合同：精确 `app://-/index.html` 主目标、主 frame、默认主 execution context、renderer lifecycle。`status --json` 必须返回：
+
+- `qualified`：四层全部通过；
+- `unavailable`：本地 debug endpoint/transport 无法检查；
+- `incompatible`：宿主可达，但目标或 renderer 私有合同不匹配；
+- `unchecked`：尚未完成一次 refresh。
+
+`unavailable/incompatible` 必须 fail closed，不绑定 workspace、不残留 action/card/binding，并保留有界诊断 code。该启动自检只能证明可安装性，不能替代每个 build 的真实 selection、trusted click、展开/收起、关闭、焦点、导航与虚拟化人工门禁。
+
 ## 12. 成功指标与实验
 
 ### 12.1 对照条件
@@ -435,9 +444,9 @@ Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知�
 
 ## 16. 推荐实施顺序
 
-1. 完成摘要态、卡内展开/收起和关闭的当前 Codex Desktop 人工验收；
-2. 做当前 build 的完整兼容性自检与失败降级；
-3. 实现 revision 失效提示、显式零-turn 刷新和有限差异；
+1. 已完成摘要态、卡内展开/收起和关闭的当前 Codex Desktop 人工验收；
+2. 已完成当前 build 的四层启动兼容性自检与失败降级；
+3. 下一步实现 revision 失效提示、显式零-turn 刷新和有限差异；
 4. 用模块、文档、测试、决策/配置场景验证默认摘要是否命中重点；
 5. 最后开展 A/B 效率研究，再决定是否扩展 Provider。
 
@@ -456,6 +465,7 @@ Artifact、Module/Concept、Decision/Task 使用不同字段优先级。未知�
 
 ## 18. 变更记录
 
+- v1.5：为 workspace companion 增加 `qualified/unavailable/incompatible/unchecked` 四态兼容性自检；按精确主目标、主 frame、默认主 execution context 与 renderer lifecycle fail closed，并明确启动检查不替代人工交互门禁。
 - v1.4：把五项事实从默认首屏改为卡内渐进披露；默认只保留场景摘要、类型和 freshness；冻结新增 Extractor，优先解决动态 revision 语义、场景信息优先级和 Codex Desktop 兼容性。
 - v1.3：加入 TypeScript/JavaScript Source Module Context Extractor；通过文件头说明、公开导出、静态依赖、Git diff/status/log 和有界字面引用提供五项代码模块速览，保持零执行、零模型、零 Chat Turn。
 - v1.2：在已验收的 Quiet Mode 原生链路上加入 Markdown Artifact Context Extractor；通过文件结构、Git diff/status/log 和有界字面引用提供“用途、本次变化、影响范围”，保持零模型、零 Chat Turn 和非 Git 显式降级。

@@ -26,6 +26,25 @@ export interface WorkspaceCompanionOptions {
   actionLabel?: string;
 }
 
+export type CodexDesktopCompatibilityGate =
+  | "pass"
+  | "fail"
+  | "unavailable"
+  | "unchecked";
+
+export interface CodexDesktopCompatibilityStatus {
+  contract: "private-codex-chat-lane-v1";
+  state: "unchecked" | "qualified" | "unavailable" | "incompatible";
+  code: string;
+  checkedAt?: string;
+  gates: {
+    exactMainTarget: CodexDesktopCompatibilityGate;
+    mainFrame: CodexDesktopCompatibilityGate;
+    mainExecutionContext: CodexDesktopCompatibilityGate;
+    rendererLifecycle: CodexDesktopCompatibilityGate;
+  };
+}
+
 export interface WorkspaceCompanionStatus {
   state: "idle" | "running" | "stopping" | "stopped";
   mode: "live-local-workspace";
@@ -36,6 +55,8 @@ export interface WorkspaceCompanionStatus {
   activeTaskCount: number;
   activeBinding?: CodexTaskWorkspaceBindingEntry;
   lastError?: string;
+  lastErrorCode?: string;
+  compatibility: CodexDesktopCompatibilityStatus;
   adapter: CodexCdpHostAdapterStatus;
 }
 
@@ -69,6 +90,106 @@ function publicError(error: unknown): string {
     : "workspace companion refresh failed";
 }
 
+function publicErrorCode(error: unknown): string {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string" &&
+    /^[a-z0-9_:-]{1,128}$/u.test(error.code)
+  ) {
+    return error.code;
+  }
+  if (
+    error instanceof Error &&
+    /^[a-z0-9_:-]{1,128}$/u.test(error.message)
+  ) {
+    return error.message;
+  }
+  return "workspace_companion_refresh_failed";
+}
+
+function compatibilityStatus(input: {
+  state: WorkspaceCompanionStatus["state"];
+  refreshCount: number;
+  lastRefreshAt?: string;
+  lastErrorCode?: string;
+  adapter: CodexCdpHostAdapterStatus;
+}): CodexDesktopCompatibilityStatus {
+  const result = (
+    state: CodexDesktopCompatibilityStatus["state"],
+    code: string,
+    gates: CodexDesktopCompatibilityStatus["gates"],
+  ): CodexDesktopCompatibilityStatus => ({
+    contract: "private-codex-chat-lane-v1",
+    state,
+    code,
+    ...(input.lastRefreshAt === undefined
+      ? {}
+      : { checkedAt: input.lastRefreshAt }),
+    gates,
+  });
+  const all = (gate: CodexDesktopCompatibilityGate) => ({
+    exactMainTarget: gate,
+    mainFrame: gate,
+    mainExecutionContext: gate,
+    rendererLifecycle: gate,
+  });
+
+  if (input.state === "idle" || input.refreshCount === 0) {
+    return result("unchecked", "not_checked", all("unchecked"));
+  }
+  if (input.state === "stopping" || input.state === "stopped") {
+    return result("unavailable", "companion_stopped", all("unavailable"));
+  }
+  if (
+    input.adapter.targetCount > 0 &&
+    input.adapter.targets.length === input.adapter.targetCount
+  ) {
+    return result("qualified", "qualified_current_runtime", all("pass"));
+  }
+
+  const code = input.lastErrorCode;
+  if (code === undefined) {
+    return result("incompatible", "qualified_target_missing", {
+      exactMainTarget: "fail",
+      mainFrame: "unchecked",
+      mainExecutionContext: "unchecked",
+      rendererLifecycle: "unchecked",
+    });
+  }
+  if (code === "pointable_main_frame_unverified") {
+    return result("incompatible", code, {
+      exactMainTarget: "pass",
+      mainFrame: "fail",
+      mainExecutionContext: "unchecked",
+      rendererLifecycle: "unchecked",
+    });
+  }
+  if (code.startsWith("pointable_main_context_")) {
+    return result("incompatible", code, {
+      exactMainTarget: "pass",
+      mainFrame: "pass",
+      mainExecutionContext: "fail",
+      rendererLifecycle: "unchecked",
+    });
+  }
+  if (code.startsWith("pointable_renderer_")) {
+    return result("incompatible", code, {
+      exactMainTarget: "pass",
+      mainFrame: "pass",
+      mainExecutionContext: "pass",
+      rendererLifecycle: "fail",
+    });
+  }
+  return result("unavailable", code, {
+    exactMainTarget: "unavailable",
+    mainFrame: "unavailable",
+    mainExecutionContext: "unavailable",
+    rendererLifecycle: "unavailable",
+  });
+}
+
 function immutableStatus(status: WorkspaceCompanionStatus): WorkspaceCompanionStatus {
   return Object.freeze({
     ...status,
@@ -85,6 +206,10 @@ function immutableStatus(status: WorkspaceCompanionStatus): WorkspaceCompanionSt
       targets: Object.freeze(
         status.adapter.targets.map((target) => Object.freeze({ ...target })),
       ),
+    }),
+    compatibility: Object.freeze({
+      ...status.compatibility,
+      gates: Object.freeze({ ...status.compatibility.gates }),
     }),
   }) as WorkspaceCompanionStatus;
 }
@@ -123,22 +248,34 @@ export function createWorkspaceCompanion(
   let activeTaskCount = 0;
   let activeBinding: CodexTaskWorkspaceBindingEntry | undefined;
   let lastError: string | undefined;
+  let lastErrorCode: string | undefined;
   let refreshPromise: Promise<WorkspaceCompanionStatus> | undefined;
   let stopPromise: Promise<WorkspaceCompanionStatus> | undefined;
   let timer: NodeJS.Timeout | undefined;
 
-  const status = (): WorkspaceCompanionStatus => immutableStatus({
-    state,
-    mode: "live-local-workspace",
-    experimentalHostAdapter: true,
-    ...(startedAt === undefined ? {} : { startedAt }),
-    ...(lastRefreshAt === undefined ? {} : { lastRefreshAt }),
-    refreshCount,
-    activeTaskCount,
-    ...(activeBinding === undefined ? {} : { activeBinding }),
-    ...(lastError === undefined ? {} : { lastError }),
-    adapter: adapter.status(),
-  });
+  const status = (): WorkspaceCompanionStatus => {
+    const adapterStatus = adapter.status();
+    return immutableStatus({
+      state,
+      mode: "live-local-workspace",
+      experimentalHostAdapter: true,
+      ...(startedAt === undefined ? {} : { startedAt }),
+      ...(lastRefreshAt === undefined ? {} : { lastRefreshAt }),
+      refreshCount,
+      activeTaskCount,
+      ...(activeBinding === undefined ? {} : { activeBinding }),
+      ...(lastError === undefined ? {} : { lastError }),
+      ...(lastErrorCode === undefined ? {} : { lastErrorCode }),
+      compatibility: compatibilityStatus({
+        state,
+        refreshCount,
+        ...(lastRefreshAt === undefined ? {} : { lastRefreshAt }),
+        ...(lastErrorCode === undefined ? {} : { lastErrorCode }),
+        adapter: adapterStatus,
+      }),
+      adapter: adapterStatus,
+    });
+  };
 
   const schedule = (): void => {
     if (state !== "running") return;
@@ -161,10 +298,12 @@ export function createWorkspaceCompanion(
           ? await options.registry.find(tasks[0]!)
           : undefined;
         lastError = undefined;
+        lastErrorCode = undefined;
       } catch (error) {
         activeTaskCount = 0;
         activeBinding = undefined;
         lastError = publicError(error);
+        lastErrorCode = publicErrorCode(error);
       } finally {
         refreshCount += 1;
         lastRefreshAt = new Date().toISOString();

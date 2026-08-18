@@ -145,9 +145,16 @@ try {
   await connection.send("Input.dispatchMouseEvent", {
     type: "mousePressed", x: drag.startX, y: drag.startY, button: "left", clickCount: 1,
   });
-  await connection.send("Input.dispatchMouseEvent", {
-    type: "mouseMoved", x: drag.endX, y: drag.endY, button: "left", buttons: 1,
-  });
+  for (let step = 1; step <= 8; step += 1) {
+    const progress = step / 8;
+    await connection.send("Input.dispatchMouseEvent", {
+      type: "mouseMoved",
+      x: drag.startX + (drag.endX - drag.startX) * progress,
+      y: drag.startY + (drag.endY - drag.startY) * progress,
+      button: "left",
+      buttons: 1,
+    });
+  }
   await connection.send("Input.dispatchMouseEvent", {
     type: "mouseReleased", x: drag.endX, y: drag.endY, button: "left", clickCount: 1,
   });
@@ -220,6 +227,9 @@ try {
     createDeliverPointableResultExpression(response, lifecycleId),
   );
   if (delivered?.outcome !== "applied") throw new Error("detail was not applied");
+  await evaluate(connection, `new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
+  })`);
   const collapsed = await evaluate(connection, `(() => {
     const disclosure = document.querySelector('[data-pointable-context-role="detail-disclosure"]');
     const toggle = document.querySelector('[data-pointable-context-role="detail-toggle"]');
@@ -250,6 +260,12 @@ try {
     return disclosure instanceof HTMLElement && toggle instanceof HTMLButtonElement && body instanceof HTMLElement && toggle.getAttribute('aria-expanded') === 'true' && body.getBoundingClientRect().height > 0;
   })()`);
   if (expanded !== true) throw new Error("trusted disclosure did not expand in place");
+  // Disclosure changes the card height and schedules one reposition frame.
+  // Wait until that frame and the following paint boundary before sampling the
+  // close button, otherwise the button can move between mousePressed/released.
+  await evaluate(connection, `new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
+  })`);
   const close = await waitFor(connection, `(() => {
     const button = document.querySelector('button[aria-label="关闭上下文详情"]');
     if (!(button instanceof HTMLElement)) return null;

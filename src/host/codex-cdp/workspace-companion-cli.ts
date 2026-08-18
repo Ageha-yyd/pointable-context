@@ -548,8 +548,17 @@ function print(value: Record<string, unknown>, json: boolean): void {
       : "inactive";
   const targets = typeof adapter?.targetCount === "number" ? adapter.targetCount : 0;
   const tasks = typeof companion?.activeTaskCount === "number" ? companion.activeTaskCount : 0;
+  const compatibility = companion && record(companion.compatibility)
+    ? companion.compatibility
+    : undefined;
+  const compatibilityState = typeof compatibility?.state === "string"
+    ? compatibility.state
+    : "unchecked";
+  const compatibilityCode = typeof compatibility?.code === "string"
+    ? compatibility.code
+    : "not_checked";
   process.stdout.write(
-    `Pointable Context workspace companion: ${state}; targets=${targets}; activeTasks=${tasks}\n`,
+    `Pointable Context workspace companion: ${state}; targets=${targets}; activeTasks=${tasks}; compatibility=${compatibilityState}(${compatibilityCode})\n`,
   );
 }
 

@@ -38,11 +38,11 @@ $companion = Join-Path $pluginRoot 'host\workspace-companion.mjs'
 
 ## Workflow
 
-1. Run `status --json` first. Reuse a healthy running companion; do not start a duplicate.
+1. Run `status --json` first. Reuse a running companion only when `compatibility.state` is `qualified`; do not start a duplicate.
 2. Run `start --json` only after an explicit user request to enable Quiet Mode.
 3. Require an explicit absolute workspace root or an unambiguous current workspace root exposed by the host.
 4. Run `bind --workspace-root <absolute-path> --json`. Binding must fail unless exactly one Codex task is host-visible.
-5. Read back `status --json`. Report mode, process state, target count, active task count, and `activeBinding` root/revision without exposing the control token.
+5. Read back `status --json`. Report mode, process state, `compatibility.state/code`, target count, active task count, and `activeBinding` root/revision without exposing the control token.
 6. Ask the user to select an exact visible file name/path, such as `README.md`, and click `查看上下文`.
 7. Verify that selection alone produces no detail request; the trusted click produces one direct detail or a bounded candidate menu.
 8. Run `unbind --json` only when explicitly requested. Verify that `activeBinding` disappears before binding another root.
@@ -59,6 +59,7 @@ node $companion stop --json
 ## Fail closed
 
 - If no target is visible, ask the user to open Codex Desktop with its local CDP endpoint available; do not weaken target/origin checks.
+- Treat `compatibility.state=unavailable` as a host that could not be checked and `compatibility.state=incompatible` as a private host-contract mismatch. Do not bind, inject a fallback selector, or describe either state as qualified.
 - If binding sees zero or multiple active tasks, ask the user to focus exactly one task and retry.
 - If selected text has no exact file identity, leave Chat/copy behavior unchanged; do not send it to a model.
 - If task, route, workspace root, binding revision, selection digest, renderer generation, index, or Provider drifts, discard the result and require a fresh explicit action.

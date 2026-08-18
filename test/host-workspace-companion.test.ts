@@ -12,6 +12,7 @@ class CompanionConnection implements CdpConnection {
   #closes = new Set<(error: Error) => void | Promise<void>>();
   #closed = false;
   #bindingName = "";
+  rendererInstallValid = true;
 
   async send(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
     if (method === "Page.getFrameTree") {
@@ -32,7 +33,7 @@ class CompanionConnection implements CdpConnection {
       const expression = String(params.expression);
       if (expression.includes("const install =")) {
         return this.value({
-          installed: true,
+          installed: this.rendererInstallValid,
           bindingName: this.#bindingName,
           lifecycleId: "lifecycle-workspace",
           state: "idle",
@@ -110,6 +111,20 @@ test("workspace companion binds exactly one active Codex task to a live workspac
     assert.equal(started.mode, "live-local-workspace");
     assert.equal(started.activeTaskCount, 1);
     assert.equal(started.activeBinding, undefined);
+    assert.deepEqual(started.compatibility, {
+      contract: "private-codex-chat-lane-v1",
+      state: "qualified",
+      code: "qualified_current_runtime",
+      checkedAt: started.lastRefreshAt,
+      gates: {
+        exactMainTarget: "pass",
+        mainFrame: "pass",
+        mainExecutionContext: "pass",
+        rendererLifecycle: "pass",
+      },
+    });
+    assert.ok(Object.isFrozen(started.compatibility));
+    assert.ok(Object.isFrozen(started.compatibility.gates));
     const first = await companion.bindCurrentTask(workspace);
     assert.equal(first.replaced, false);
     const entry = first.binding;
@@ -143,12 +158,91 @@ test("workspace companion refuses binding when no active task is host-visible", 
   });
   try {
     await companion.start();
+    assert.deepEqual(companion.status().compatibility, {
+      contract: "private-codex-chat-lane-v1",
+      state: "incompatible",
+      code: "qualified_target_missing",
+      checkedAt: companion.status().lastRefreshAt,
+      gates: {
+        exactMainTarget: "fail",
+        mainFrame: "unchecked",
+        mainExecutionContext: "unchecked",
+        rendererLifecycle: "unchecked",
+      },
+    });
     await assert.rejects(
       () => companion.bindCurrentTask(workspace),
       /active_codex_task_unavailable/u,
     );
   } finally {
     await companion.stop();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("workspace companion reports renderer contract mismatch without leaving an attachment", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pointable-workspace-companion-"));
+  const connection = new CompanionConnection();
+  connection.rendererInstallValid = false;
+  const companion = createWorkspaceCompanion({
+    registry: new CodexTaskWorkspaceBindingRegistry(join(root, "bindings.json")),
+    refreshIntervalMs: 60_000,
+    fetch: async () => targetResponse(),
+    connect: async () => connection,
+  });
+  try {
+    const started = await companion.start();
+    assert.equal(started.state, "running");
+    assert.equal(started.adapter.targetCount, 0);
+    assert.equal(started.lastErrorCode, "pointable_renderer_install_unverified");
+    assert.deepEqual(started.compatibility, {
+      contract: "private-codex-chat-lane-v1",
+      state: "incompatible",
+      code: "pointable_renderer_install_unverified",
+      checkedAt: started.lastRefreshAt,
+      gates: {
+        exactMainTarget: "pass",
+        mainFrame: "pass",
+        mainExecutionContext: "pass",
+        rendererLifecycle: "fail",
+      },
+    });
+    assert.equal(connection.isClosed(), true);
+  } finally {
+    await companion.stop();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("workspace companion distinguishes unavailable discovery from host incompatibility", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pointable-workspace-companion-"));
+  const companion = createWorkspaceCompanion({
+    registry: new CodexTaskWorkspaceBindingRegistry(join(root, "bindings.json")),
+    refreshIntervalMs: 60_000,
+    fetch: async () => {
+      throw new Error("endpoint offline");
+    },
+  });
+  try {
+    const started = await companion.start();
+    assert.equal(started.adapter.targetCount, 0);
+    assert.equal(started.lastErrorCode, "target_list_unavailable");
+    assert.deepEqual(started.compatibility, {
+      contract: "private-codex-chat-lane-v1",
+      state: "unavailable",
+      code: "target_list_unavailable",
+      checkedAt: started.lastRefreshAt,
+      gates: {
+        exactMainTarget: "unavailable",
+        mainFrame: "unavailable",
+        mainExecutionContext: "unavailable",
+        rendererLifecycle: "unavailable",
+      },
+    });
+  } finally {
+    const stopped = await companion.stop();
+    assert.equal(stopped.compatibility.state, "unavailable");
+    assert.equal(stopped.compatibility.code, "companion_stopped");
     await rm(root, { recursive: true, force: true });
   }
 });

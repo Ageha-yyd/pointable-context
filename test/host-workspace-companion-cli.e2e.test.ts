@@ -58,6 +58,9 @@ test("detached workspace companion supports lifecycle without guessing an active
     assert.equal(companion.state, "running");
     assert.equal(companion.mode, "live-local-workspace");
     assert.equal(companion.activeTaskCount, 0);
+    const compatibility = companion.compatibility as Record<string, unknown>;
+    assert.equal(compatibility.state, "incompatible");
+    assert.equal(compatibility.code, "qualified_target_missing");
     const stopped = await runCli("stop", stateDir, registry, endpoint);
     assert.equal(stopped.stopped, true);
     assert.equal(stopped.wasRunning, true);

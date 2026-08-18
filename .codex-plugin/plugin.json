@@ -1,6 +1,6 @@
 {
   "name": "pointable-context",
-  "version": "0.1.0+codex.20260818081453",
+  "version": "0.1.0+codex.20260818094433",
   "description": "Selection-triggered, zero-turn development context reveal in the native Codex Chat Lane.",
   "author": {
     "name": "Local developer"
@@ -26,6 +26,7 @@
       "Bind Pointable Context Quiet Mode to my current local workspace.",
       "Start the fixture Quiet Mode so I can select ARCH-7 in this task.",
       "Check whether the Pointable Context selection companion is running.",
+      "Check whether this Codex Desktop build passes the Pointable Context compatibility gate.",
       "Use the optional capsule renderer only as an explicit fixture diagnostic."
     ]
   }

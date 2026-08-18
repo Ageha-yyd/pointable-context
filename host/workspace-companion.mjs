@@ -5059,6 +5059,78 @@ function refreshInterval(value) {
 function publicError(error) {
   return error instanceof Error && error.message.length > 0 ? error.message.slice(0, 512) : "workspace companion refresh failed";
 }
+function publicErrorCode(error) {
+  if (typeof error === "object" && error !== null && "code" in error && typeof error.code === "string" && /^[a-z0-9_:-]{1,128}$/u.test(error.code)) {
+    return error.code;
+  }
+  if (error instanceof Error && /^[a-z0-9_:-]{1,128}$/u.test(error.message)) {
+    return error.message;
+  }
+  return "workspace_companion_refresh_failed";
+}
+function compatibilityStatus(input) {
+  const result = (state, code2, gates) => ({
+    contract: "private-codex-chat-lane-v1",
+    state,
+    code: code2,
+    ...input.lastRefreshAt === void 0 ? {} : { checkedAt: input.lastRefreshAt },
+    gates
+  });
+  const all = (gate) => ({
+    exactMainTarget: gate,
+    mainFrame: gate,
+    mainExecutionContext: gate,
+    rendererLifecycle: gate
+  });
+  if (input.state === "idle" || input.refreshCount === 0) {
+    return result("unchecked", "not_checked", all("unchecked"));
+  }
+  if (input.state === "stopping" || input.state === "stopped") {
+    return result("unavailable", "companion_stopped", all("unavailable"));
+  }
+  if (input.adapter.targetCount > 0 && input.adapter.targets.length === input.adapter.targetCount) {
+    return result("qualified", "qualified_current_runtime", all("pass"));
+  }
+  const code = input.lastErrorCode;
+  if (code === void 0) {
+    return result("incompatible", "qualified_target_missing", {
+      exactMainTarget: "fail",
+      mainFrame: "unchecked",
+      mainExecutionContext: "unchecked",
+      rendererLifecycle: "unchecked"
+    });
+  }
+  if (code === "pointable_main_frame_unverified") {
+    return result("incompatible", code, {
+      exactMainTarget: "pass",
+      mainFrame: "fail",
+      mainExecutionContext: "unchecked",
+      rendererLifecycle: "unchecked"
+    });
+  }
+  if (code.startsWith("pointable_main_context_")) {
+    return result("incompatible", code, {
+      exactMainTarget: "pass",
+      mainFrame: "pass",
+      mainExecutionContext: "fail",
+      rendererLifecycle: "unchecked"
+    });
+  }
+  if (code.startsWith("pointable_renderer_")) {
+    return result("incompatible", code, {
+      exactMainTarget: "pass",
+      mainFrame: "pass",
+      mainExecutionContext: "pass",
+      rendererLifecycle: "fail"
+    });
+  }
+  return result("unavailable", code, {
+    exactMainTarget: "unavailable",
+    mainFrame: "unavailable",
+    mainExecutionContext: "unavailable",
+    rendererLifecycle: "unavailable"
+  });
+}
 function immutableStatus(status) {
   return Object.freeze({
     ...status,
@@ -5073,6 +5145,10 @@ function immutableStatus(status) {
       targets: Object.freeze(
         status.adapter.targets.map((target) => Object.freeze({ ...target }))
       )
+    }),
+    compatibility: Object.freeze({
+      ...status.compatibility,
+      gates: Object.freeze({ ...status.compatibility.gates })
     })
   });
 }
@@ -5100,21 +5176,33 @@ function createWorkspaceCompanion(options) {
   let activeTaskCount = 0;
   let activeBinding;
   let lastError;
+  let lastErrorCode;
   let refreshPromise;
   let stopPromise;
   let timer;
-  const status = () => immutableStatus({
-    state,
-    mode: "live-local-workspace",
-    experimentalHostAdapter: true,
-    ...startedAt === void 0 ? {} : { startedAt },
-    ...lastRefreshAt === void 0 ? {} : { lastRefreshAt },
-    refreshCount,
-    activeTaskCount,
-    ...activeBinding === void 0 ? {} : { activeBinding },
-    ...lastError === void 0 ? {} : { lastError },
-    adapter: adapter.status()
-  });
+  const status = () => {
+    const adapterStatus = adapter.status();
+    return immutableStatus({
+      state,
+      mode: "live-local-workspace",
+      experimentalHostAdapter: true,
+      ...startedAt === void 0 ? {} : { startedAt },
+      ...lastRefreshAt === void 0 ? {} : { lastRefreshAt },
+      refreshCount,
+      activeTaskCount,
+      ...activeBinding === void 0 ? {} : { activeBinding },
+      ...lastError === void 0 ? {} : { lastError },
+      ...lastErrorCode === void 0 ? {} : { lastErrorCode },
+      compatibility: compatibilityStatus({
+        state,
+        refreshCount,
+        ...lastRefreshAt === void 0 ? {} : { lastRefreshAt },
+        ...lastErrorCode === void 0 ? {} : { lastErrorCode },
+        adapter: adapterStatus
+      }),
+      adapter: adapterStatus
+    });
+  };
   const schedule = () => {
     if (state !== "running") return;
     timer = setTimeout(() => {
@@ -5133,10 +5221,12 @@ function createWorkspaceCompanion(options) {
         activeTaskCount = tasks.length;
         activeBinding = tasks.length === 1 ? await options.registry.find(tasks[0]) : void 0;
         lastError = void 0;
+        lastErrorCode = void 0;
       } catch (error) {
         activeTaskCount = 0;
         activeBinding = void 0;
         lastError = publicError(error);
+        lastErrorCode = publicErrorCode(error);
       } finally {
         refreshCount += 1;
         lastRefreshAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -5662,8 +5752,11 @@ function print(value, json) {
   const state = typeof companion?.state === "string" ? companion.state : value.stopped === true ? "stopped" : "inactive";
   const targets = typeof adapter?.targetCount === "number" ? adapter.targetCount : 0;
   const tasks = typeof companion?.activeTaskCount === "number" ? companion.activeTaskCount : 0;
+  const compatibility = companion && record7(companion.compatibility) ? companion.compatibility : void 0;
+  const compatibilityState = typeof compatibility?.state === "string" ? compatibility.state : "unchecked";
+  const compatibilityCode = typeof compatibility?.code === "string" ? compatibility.code : "not_checked";
   process.stdout.write(
-    `Pointable Context workspace companion: ${state}; targets=${targets}; activeTasks=${tasks}
+    `Pointable Context workspace companion: ${state}; targets=${targets}; activeTasks=${tasks}; compatibility=${compatibilityState}(${compatibilityCode})
 `
   );
 }

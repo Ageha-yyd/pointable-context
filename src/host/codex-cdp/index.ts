@@ -43,6 +43,8 @@ export {
 } from "./workspace-lookup.js";
 export {
   createWorkspaceCompanion,
+  type CodexDesktopCompatibilityGate,
+  type CodexDesktopCompatibilityStatus,
   type WorkspaceCompanion,
   type WorkspaceCompanionOptions,
   type WorkspaceCompanionStatus,
