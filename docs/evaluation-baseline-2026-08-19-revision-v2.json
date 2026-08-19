@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "kind": "technical_latency_only",
+  "workspaceMode": "git",
+  "revisionContract": "workspace-context-v2",
+  "machineTime": "2026-08-19T12:11:02.580Z",
+  "runsPerExactScenario": 20,
+  "target": {
+    "exactDetailMedianMs": 500
+  },
+  "targetMet": true,
+  "results": {
+    "document": {
+      "runs": 20,
+      "medianMs": 202.83,
+      "p95Ms": 227.5,
+      "minMs": 180.04,
+      "maxMs": 260.92
+    },
+    "module": {
+      "runs": 20,
+      "medianMs": 195.82,
+      "p95Ms": 241.66,
+      "minMs": 175.88,
+      "maxMs": 252.56
+    },
+    "verification_source": {
+      "runs": 20,
+      "medianMs": 186.98,
+      "p95Ms": 203.25,
+      "minMs": 168.51,
+      "maxMs": 819.73
+    },
+    "configuration": {
+      "runs": 20,
+      "medianMs": 86.38,
+      "p95Ms": 101.34,
+      "minMs": 77.18,
+      "maxMs": 103.88
+    },
+    "decision": {
+      "runs": 20,
+      "medianMs": 184.72,
+      "p95Ms": 202.11,
+      "minMs": 166.97,
+      "maxMs": 213.05
+    },
+    "revision_check_unchanged": {
+      "runs": 20,
+      "medianMs": 81.23,
+      "p95Ms": 94.55,
+      "minMs": 75.44,
+      "maxMs": 97.36
+    }
+  },
+  "changedRevisionCheckMs": 93.47,
+  "explicitRefreshMs": 195.99,
+  "refreshDiffCount": 3,
+  "modelCalls": 0,
+  "chatTurnsCreated": 0,
+  "caveat": "This is component latency, not human time_to_verified_fact."
+}

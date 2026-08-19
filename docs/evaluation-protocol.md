@@ -107,8 +107,8 @@ Run:
 pnpm run benchmark:workspace
 ```
 
-The benchmark creates an isolated temporary workspace, measures document/module/test/config/ADR exact detail, measures unchanged revision probes, then changes one file and measures update detection plus explicit refresh. It invokes no model and creates no Chat Turn. Its JSON output includes the explicit caveat that the result is component latency only.
+The benchmark creates an isolated temporary Git workspace, measures document/module/test/config/ADR exact detail, measures unchanged revision v2 probes (file stat + selected-file Git state/commit + bounded literal-relation membership), then changes one file and measures update detection plus explicit refresh. It invokes no model and creates no Chat Turn. Its JSON output identifies `workspace-context-v2` and includes the explicit caveat that the result is component latency only.
 
 The PRD target for local exact detail is median below 500 ms on the qualified machine. A result above that threshold is a technical performance warning, not a user-study result.
 
-The first recorded qualified-machine snapshot is [evaluation-baseline-2026-08-18.json](evaluation-baseline-2026-08-18.json). Its five exact-detail medians ranged from 3.22 ms to 40.71 ms, unchanged revision check median was 1.74 ms, and explicit refresh took 43.47 ms. These values passed the component target for that isolated workspace only; they do not establish a human-efficiency effect.
+The first recorded qualified-machine snapshot is [evaluation-baseline-2026-08-18.json](evaluation-baseline-2026-08-18.json). It predates revision v2 and used a non-Git temporary workspace, so its 1.74 ms unchanged revision figure must not be used as a Git-v2 latency claim. The first Git-v2 snapshot is [evaluation-baseline-2026-08-19-revision-v2.json](evaluation-baseline-2026-08-19-revision-v2.json): unchanged revision median/p95 were 81.23/94.55 ms, changed detection was 93.47 ms, and explicit refresh was 195.99 ms. All component values remain machine-local and do not establish a human-efficiency effect.

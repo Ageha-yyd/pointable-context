@@ -1,6 +1,6 @@
 {
   "name": "pointable-context",
-  "version": "0.1.0+codex.20260819091042",
+  "version": "0.1.0+codex.20260819121214",
   "description": "Selection-triggered, zero-turn development context reveal in the native Codex Chat Lane.",
   "author": {
     "name": "Local developer"

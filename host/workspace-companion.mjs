@@ -3591,6 +3591,7 @@ var CodexCdpHostAdapter = class {
 import { createHash as createHash7, randomBytes as randomBytes3 } from "node:crypto";
 
 // src/adapters/local-workspace.ts
+import { execFile as execFile3 } from "node:child_process";
 import { createHash as createHash6 } from "node:crypto";
 import { open, readdir, realpath as realpath2, stat as stat2 } from "node:fs/promises";
 import {
@@ -4423,6 +4424,8 @@ var DEFAULT_MAX_FILES = 2048;
 var DEFAULT_MAX_DEPTH = 12;
 var MAX_RELATIVE_PATH_CHARS = 512;
 var MAX_PREVIEW_FILE_BYTES = 1024 * 1024;
+var REVISION_GIT_TIMEOUT_MS = 750;
+var MAX_REVISION_GIT_OUTPUT_BYTES = 256 * 1024;
 var DEFAULT_IGNORED_DIRECTORIES = /* @__PURE__ */ new Set([
   ".git",
   ".hg",
@@ -4681,6 +4684,134 @@ async function verifyArtifactEvidence(root, artifact, signal) {
     await handle?.close().catch(() => void 0);
   }
 }
+function runRevisionGit(root, args, signal) {
+  if (signal?.aborted) {
+    return Promise.reject(signal.reason ?? new Error("revision probe aborted"));
+  }
+  return new Promise((resolveResult, rejectResult) => {
+    execFile3("git", [...args], {
+      cwd: root,
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: REVISION_GIT_TIMEOUT_MS,
+      maxBuffer: MAX_REVISION_GIT_OUTPUT_BYTES,
+      ...signal === void 0 ? {} : { signal }
+    }, (error, stdout) => {
+      if (signal?.aborted) {
+        rejectResult(signal.reason ?? new Error("revision probe aborted"));
+        return;
+      }
+      const output = typeof stdout === "string" ? stdout : "";
+      if (error === null) {
+        resolveResult({ kind: "ok", stdout: output });
+        return;
+      }
+      const code = error.code;
+      resolveResult(code === 1 || code === "1" ? { kind: "no_match", stdout: output } : { kind: "unavailable", stdout: "" });
+    });
+  });
+}
+function revisionRelationPaths(value, locator, entityType) {
+  const paths = [];
+  for (const raw of value.split("\0")) {
+    const path = raw.replace(/\\/gu, "/").trim();
+    if (path.length < 1 || path.length > MAX_RELATIVE_PATH_CHARS || path === locator || path.startsWith("../") || /^(?:dist|host|mcp|node_modules)\//u.test(path) || (entityType === "module" || entityType === "verification") && !sourceModulePath(path) || paths.includes(path)) {
+      continue;
+    }
+    paths.push(path);
+  }
+  return paths.sort((left, right) => left.localeCompare(right, "en"));
+}
+async function gitRevisionFingerprint(root, locator, entityType, signal) {
+  try {
+    const marker = await stat2(resolve4(root, ".git"));
+    if (!marker.isDirectory() && !marker.isFile()) {
+      return { kind: "current", fingerprint: "not-repository" };
+    }
+  } catch (error) {
+    const code = error.code;
+    return code === "ENOENT" || code === "ENOTDIR" ? { kind: "current", fingerprint: "not-repository" } : { kind: "unavailable" };
+  }
+  const rootResult = await runRevisionGit(root, ["rev-parse", "--show-toplevel"], signal);
+  if (rootResult.kind !== "ok" || !pathsEqual2(resolve4(rootResult.stdout.trim()), resolve4(root))) {
+    return { kind: "unavailable" };
+  }
+  const relationNeedle = entityType === "module" || entityType === "verification" ? basename3(locator, extname3(locator)) : basename3(locator);
+  const [statusResult, relationsResult, lastCommitResult] = await Promise.all([
+    runRevisionGit(root, [
+      "status",
+      "--porcelain=v1",
+      "-z",
+      "--untracked-files=all",
+      "--",
+      locator
+    ], signal),
+    runRevisionGit(root, [
+      "grep",
+      "-l",
+      "-F",
+      "-z",
+      "-e",
+      relationNeedle,
+      "--",
+      "."
+    ], signal),
+    runRevisionGit(root, [
+      "log",
+      "-1",
+      "--format=%H%x00%s",
+      "--",
+      locator
+    ], signal)
+  ]);
+  if (statusResult.kind !== "ok" || relationsResult.kind !== "ok" && relationsResult.kind !== "no_match" || lastCommitResult.kind !== "ok") {
+    return { kind: "unavailable" };
+  }
+  const base = {
+    status: statusResult.stdout,
+    relations: revisionRelationPaths(relationsResult.stdout, locator, entityType),
+    lastCommit: lastCommitResult.stdout
+  };
+  return {
+    kind: "current",
+    fingerprint: createHash6("sha256").update(JSON.stringify(base), "utf8").digest("hex")
+  };
+}
+async function evidenceRevisionFingerprint(root, canonicalFile, locator, entityType, signal) {
+  const explicitArtifact = entityType === "concept" || entityType === "change" || contextDecisionDocumentPath(locator);
+  if (!explicitArtifact) return "none";
+  let handle;
+  try {
+    handle = await open(canonicalFile, "r");
+    const before = await handle.stat();
+    if (!before.isFile() || before.size > MAX_PREVIEW_FILE_BYTES) return "artifact-unavailable";
+    const content = await handle.readFile();
+    const after = await handle.stat();
+    if (!stableFileStat(before, after) || signal?.aborted) return "artifact-unavailable";
+    const decoded = utf8Content(content);
+    const artifact = decoded === void 0 ? void 0 : entityType === "concept" ? extractContextConceptArtifact(decoded) : entityType === "change" ? extractContextChangeArtifact(decoded) : extractContextDecisionArtifact(decoded);
+    if (artifact === void 0) return "artifact-invalid";
+    const sourcePath = resolve4(root, ...artifact.evidence.sourcePath.split("/"));
+    const canonicalSource = await realpath2(sourcePath);
+    if (containedRelative(root, canonicalSource) !== artifact.evidence.sourcePath) {
+      return "evidence-outside-scope";
+    }
+    const sourceInfo = await stat2(canonicalSource);
+    if (!sourceInfo.isFile()) return "evidence-not-file";
+    return createHash6("sha256").update(JSON.stringify({
+      path: artifact.evidence.sourcePath,
+      size: sourceInfo.size,
+      modifiedMs: sourceInfo.mtimeMs,
+      changedMs: sourceInfo.ctimeMs,
+      inode: sourceInfo.ino
+    }), "utf8").digest("hex");
+  } catch (error) {
+    const code = error.code;
+    return code === "ENOENT" || code === "ENOTDIR" ? "evidence-not-found" : "artifact-unavailable";
+  } finally {
+    await handle?.close().catch(() => void 0);
+  }
+}
 var LocalWorkspaceRevisionProbe = class {
   async probe(request) {
     const observedAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -4711,16 +4842,38 @@ var LocalWorkspaceRevisionProbe = class {
       if (!info.isFile() || request.signal?.aborted) {
         return { kind: "unavailable", observedAt, retryable: true };
       }
+      const git = await gitRevisionFingerprint(
+        root,
+        locator,
+        request.entityType,
+        request.signal
+      );
+      if (git.kind !== "current" || request.signal?.aborted) {
+        return { kind: "unavailable", observedAt, retryable: true };
+      }
+      const evidence = await evidenceRevisionFingerprint(
+        root,
+        canonicalFile,
+        locator,
+        request.entityType,
+        request.signal
+      );
+      if (request.signal?.aborted) {
+        return { kind: "unavailable", observedAt, retryable: true };
+      }
       const revision2 = createHash6("sha256").update(JSON.stringify({
+        schema: "workspace-context-revision-v2",
         path: locator,
         size: info.size,
         modifiedMs: info.mtimeMs,
         changedMs: info.ctimeMs,
-        inode: info.ino
+        inode: info.ino,
+        git: git.fingerprint,
+        evidence
       }), "utf8").digest("hex");
       return {
         kind: "current",
-        revision: `workspace-file-stat:${revision2}`,
+        revision: `workspace-context-v2:${revision2}`,
         observedAt
       };
     } catch (error) {

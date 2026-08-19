@@ -1,13 +1,16 @@
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
+import { promisify } from "node:util";
 import { createWorkspaceLookupCallback } from "../dist/src/host/codex-cdp/workspace-lookup.js";
 import { CodexTaskWorkspaceBindingRegistry } from "../dist/src/host/codex-cdp/task-workspace-binding.js";
 import { validatePointableLookupPresentation } from "../dist/src/host/codex-cdp/protocol.js";
 
 const requestedRuns = Number(process.env.POINTABLE_BENCH_RUNS ?? "20");
+const execFileAsync = promisify(execFile);
 if (!Number.isSafeInteger(requestedRuns) || requestedRuns < 5 || requestedRuns > 100) {
   throw new Error("POINTABLE_BENCH_RUNS must be an integer from 5 to 100");
 }
@@ -71,6 +74,15 @@ async function invoke(callback, value) {
   return { presentation, elapsedMs: performance.now() - started };
 }
 
+async function git(root, ...args) {
+  await execFileAsync("git", args, {
+    cwd: root,
+    windowsHide: true,
+    timeout: 5_000,
+    maxBuffer: 512 * 1024,
+  });
+}
+
 const root = await mkdtemp(join(tmpdir(), "pointable-benchmark-"));
 try {
   const workspace = join(root, "workspace");
@@ -82,6 +94,11 @@ try {
   await writeFile(join(workspace, "test", "cache.test.ts"), 'test("evicts the oldest entry", () => {});\n', "utf8");
   await writeFile(join(workspace, "package.json"), JSON.stringify({ name: "benchmark", private: true, scripts: { test: "node --test" } }), "utf8");
   await writeFile(join(workspace, "docs", "adr", "ADR-001-refresh.md"), "# ADR-001\n## Status\nAccepted\n## Decision\nRefresh only after a trusted action.\n", "utf8");
+  await git(workspace, "init", "--quiet");
+  await git(workspace, "config", "user.email", "pointable-benchmark@example.invalid");
+  await git(workspace, "config", "user.name", "Pointable Benchmark");
+  await git(workspace, "add", "--", ".");
+  await git(workspace, "commit", "--quiet", "-m", "seed benchmark workspace");
 
   const registry = new CodexTaskWorkspaceBindingRegistry(join(root, "bindings.json"));
   const activeTask = task();
@@ -156,6 +173,8 @@ try {
   process.stdout.write(`${JSON.stringify({
     schemaVersion: 1,
     kind: "technical_latency_only",
+    workspaceMode: "git",
+    revisionContract: "workspace-context-v2",
     machineTime: new Date().toISOString(),
     runsPerExactScenario: requestedRuns,
     target: { exactDetailMedianMs: 500 },

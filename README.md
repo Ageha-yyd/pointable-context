@@ -42,9 +42,9 @@ Supported extensions are `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, a
 
 ## Dynamic detail refresh
 
-An open workspace detail card now pins the snapshot the user is reading. A bounded background probe checks only the selected file's local stat revision; it does not repeatedly read or re-project full detail. When that revision changes, the same card shows a quiet `内容已更新` notice. Only a trusted `刷新内容` click performs a new authoritative detail read, updates the card in place, and shows at most three changed fields. This path opens no browser, calls no model, and creates no Chat Turn.
+An open workspace detail card pins the snapshot the user is reading. The bounded v2 background probe fingerprints the selected file stat and, for a verified Git root, its porcelain status, latest selected-file commit, and the bounded literal-reference path set used by the Provider. Explicit concept/change/decision artifacts also bind the stat of their declared workspace evidence source. These signals never enter the card and the probe does not re-project full detail. When the fingerprint changes, the same card shows a quiet `内容已更新` notice. Only a trusted `刷新内容` click performs a new authoritative detail read, updates the card in place, and shows at most three changed fields. This path opens no browser, calls no model, and creates no Chat Turn.
 
-If the file is deleted or the probe becomes unavailable, the prior snapshot stays visible with an explicit warning. Task rebinding, expired references, context drift, or capacity exhaustion disable refresh rather than widening authority. The first probe intentionally detects source-file stat changes only; relation-only or Git-only changes may require reopening the detail until a broader lightweight revision contract is qualified.
+If the file is deleted or the probe becomes unavailable, the prior snapshot stays visible with an explicit warning. Task rebinding, expired references, context drift, or capacity exhaustion disable refresh rather than widening authority. Non-Git workspaces degrade to stat-only. Each Git process is capped at 750ms and 256KiB; a qualifying Git root that cannot be checked reports unavailable. The relation fingerprint detects literal reference membership changes, not runtime dependencies or arbitrary semantic impact.
 
 ## Scenario-specific safe projections
 
@@ -125,7 +125,7 @@ These foundations are implementation assets. Selection is the visual trigger; it
 - Further object/Extractor expansion is paused while cross-build native-host compatibility and scenario-specific summary quality are qualified.
 - Markdown artifact, TypeScript/JavaScript module, static test-definition, known JSON configuration, path-qualified ADR, and explicitly authored concept context are implemented. Actual test-run results, task state, and concepts without an explicit identity remain later stages.
 - Real Agent work results do not yet systematically emit context references.
-- Source files and strict `docs/concepts/*.md` artifacts have real local Providers; other Agent-known concepts, tasks, and verification results are not yet connected.
+- Source files and strict `docs/concepts/*.md`, `docs/changes/*.md`, and `docs/decisions/*.md` artifacts have real local Providers; other Agent-known concepts, tasks, and verification results are not yet connected.
 - A persistent multi-object capsule strip is no longer a default product goal.
 - No formal user study has yet proven the expected efficiency gain.
 

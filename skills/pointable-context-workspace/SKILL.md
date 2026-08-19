@@ -75,6 +75,6 @@ node $companion stop --json
 - If selected text has no exact file identity, leave Chat/copy behavior unchanged; do not send it to a model.
 - A mental model without a strict `docs/concepts/*.md`, `docs/changes/*.md`, or `docs/decisions/*.md` identity is still a no-match. A missing required section, concept current step, source line, or exact evidence match must fail closed.
 - If task, route, workspace root, binding revision, selection digest, renderer generation, index, or Provider drifts, discard the result and require a fresh explicit action.
-- Treat the current lightweight revision probe as source-file-stat evidence only. Do not claim it detects relation-only or Git-only drift.
+- Treat revision v2 as a bounded invalidation fingerprint: selected-file stat plus verified-root Git status/latest selected-file commit/literal relation membership, and explicit mental-model evidence-source stat. It does not prove runtime dependencies or semantic impact, and only a trusted refresh may re-read full detail.
 - Present `current` only for a verified live read. Preserve stale/unavailable states exactly as returned.
 - Treat Markdown `影响范围` and module `依赖与影响` as bounded literal evidence, not a semantic dependency or runtime impact claim. Preserve explicit Git-unavailable wording when the workspace is not a qualifying Git root.

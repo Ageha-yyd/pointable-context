@@ -1,7 +1,7 @@
 # PRD：Quiet Context Reveal（选区式上下文速览）
 
-- 版本：v2.1
-- 状态：Quiet Reveal 主链、动态刷新与 P-C 默认已完成；概念、变更、决策三类显式微型心智模型进入真实场景人工校准
+- 版本：v2.2
+- 状态：Quiet Reveal 主链、P-C 默认与三类样例已获人工采用；动态 revision v2 进入当前 Codex 真实场景验收
 - 日期：2026-08-19
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
@@ -266,14 +266,17 @@ TypeScript/JavaScript 模块在用户点击后按需组合四类只读事实：
 5. 对象被删除、Provider 不可用或 binding 漂移时，保留旧快照但明确标记 stale/unavailable，不能冒充 current；
 6. 若没有历史 revision 数据，只能显示“当前状态”，不能编造“消息当时状态”。
 
-v1.6 首个实现切片把上述原则收窄为可验证的文件语义：
+v2.2 把首个 stat-only 切片扩展为可验证、仍然轻量的动态上下文指纹：
 
 - 卡片签发短期 `detailRef`，绑定 task、route、workspace scope、binding revision、selection digest/generation、对象身份与打开时快照；
-- 打开后后台只读取目标文件的有界 stat revision，不重复解析全文、Git 或关系引用；
+- 所有文件都纳入目标文件 stat；没有 `.git` 的工作区稳定退化为 stat-only；
+- 对可信 Git 根额外散列目标文件 porcelain 状态、该文件最近提交，以及与 Provider 同口径的有界字面引用路径集合；这些值不进入卡片；
+- 显式 concept/change/decision 制品额外绑定其声明的 workspace evidence source stat，证据源变化不再依赖重新打开卡片；
+- 后台不执行完整 Provider 投影，不读取引用文件内容，不建立语义依赖图；Git 子进程各自限制为 750ms/256KiB，可信 Git 根探针失败时返回 unavailable；
 - revision 未变时仅续期，不改变卡片；变化时只显示 `内容已更新`；
 - 用户可信点击 `刷新内容` 后才重新执行完整 Provider 读取，并在同一卡片显示最多 3 项 `before → after` 差异；
 - 删除或探针不可用时保留旧卡并明确警告；过期、重新绑定、上下文漂移和容量耗尽均 fail closed；
-- 当前轻量探针不声称捕获只发生于 Git 状态或外部引用关系的变化，这些变化在后续 revision contract 资格化前需要重新打开详情。
+- 引用指纹只证明字面引用成员集合变化；它不证明运行时调用关系，也不对成员集合未变化时的任意语义影响作推断。
 
 ### 8.7 Scenario relevance policy
 
@@ -503,7 +506,7 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 
 ## 15. 当前实现状态与缺口
 
-截至 2026-08-18，已有：
+截至 2026-08-19，已有：
 
 - 原生 Chat Lane 选区资格判断与锚定按钮；
 - selection inert、trusted click 查询、0/1/2–3/>3 路由；
@@ -521,7 +524,7 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 - 来源、修订、新鲜度、观察时间和文本 fallback；
 - 关闭、Escape、外点、导航清理与 stale-response 防护；
 - 现有 MCP App 胶囊零 `ui/message`、零浏览器导航。
-- 文件卡片的 pinned snapshot、轻量 stat revision 探测、`内容已更新` 提示、显式原位刷新和最多 3 项差异；
+- 文件卡片的 pinned snapshot、stat/Git/字面关系/evidence-source revision v2 探测、`内容已更新` 提示、显式原位刷新和最多 3 项差异；
 - revision detail ref 的过期、task 重绑定、context 与容量 fail-closed 约束；
 - 无后台遥测的可重复技术延迟基准，以及 counterbalanced 人工 A/B 协议；
 
@@ -531,7 +534,6 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 - 接入真实测试运行证据；测试源码卡本身永远不能替代运行结果；
 - 把 Agent 工作结果增量写入轻量 Context Index；
 - 证明不同 Codex Desktop 版本中的 Host Adapter 兼容性；
-- 扩展 revision contract 以覆盖只有 Git 状态或外部引用关系变化、而源文件 stat 未变化的场景；
 - 完成受控效率研究。
 
 ## 16. 推荐实施顺序
@@ -541,7 +543,9 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 3. 已完成首个文件 revision 失效提示、显式零-turn 刷新、有限差异和真实 Edge 零-turn 验收；
 4. 已完成文档、模块、测试源码、已知 JSON 配置与 path-qualified ADR 的摘要策略和真实仓库 Provider 验证；
 5. 已完成隔离技术延迟基准和正式 A/B 协议；
-6. 当前阶段：P-C 已作为形成性产品默认；以 `pilot`、`presentation-default`、`native-chat-lane` 校准概念/变更/决策三种信息结构，再以 P-A/P-B 为研究基线运行 counterbalanced presentation pilot，随后才进入线性 Chat 对照的效率研究。
+6. 已完成人工采用 P-C 的 concept/change/decision 三种首批信息结构；P-A/P-B 继续只作为研究基线；
+7. 当前阶段：完成 stat/Git/字面关系/evidence-source revision v2 的真实 Chat Lane 动态变化验收；
+8. 下一阶段：让 Agent 工作结果以轻量、显式、可验证的 Task/Verification 记录增量进入 Context Index，再进行 counterbalanced pilot 与线性 Chat 对照效率研究。
 
 ## 17. 已冻结决策
 
@@ -557,9 +561,11 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 10. 未完成用户研究前，只陈述假设和测量目标。
 11. 概念卡普通启动默认使用 P-C 微型心智模型；P-A/P-B 只作为显式研究基线，单用户偏好不得写成效率结论。
 12. P-C 首批只资格化显式 concept/change/decision 制品；普通 prose、任意 Git diff 和隐含决策均不做语义推断。
+13. 后台 revision v2 只散列有界 stat、Git 与字面关系信号；详情重读仍必须由可信刷新动作触发。
 
 ## 18. 变更记录
 
+- v2.2：记录三类 P-C 样例获产品负责人采用但不外推效率结论；把动态 revision 从 stat-only 扩展到目标 Git 状态/最近提交、Provider 同口径的字面引用成员集合，以及显式心智模型的 evidence source stat；完整详情仍只在可信刷新后读取。
 - v2.1：把 P-C 从单一 `pilot` 概念扩展为三种显式、证据绑定的微型心智模型：concept 的“定义/语境/流程/边界”、change 的“Before/After/Impact”、decision 的“问题/选择/后果”；加入 `presentation-default` 与 `native-chat-lane` 真实样例，仍保持无模型、零 Chat Turn 和普通 prose 不推断。
 - v2.0：记录同一 `pilot` 的单用户形成性比较结果（P-C 优于 P-A/P-B，P-A 与 P-B 接近），将 `mental-model` 收敛为普通启动默认；保留 P-A/P-B 作为固定研究基线，并明确该选择不是理解速度、正确率或 Chat Turn 效果证据。
 - v1.9：把卡片目标从“有界记录摘要”推进到“类型匹配的微型心智模型”；新增严格、无模型的 `docs/concepts/*.md` 概念制品与证据行复验；为同一 `pilot` 数据加入固定 `record/narrative/mental-model` 三种原生呈现条件、卡内证据展开和 8–12 人非推断性 pilot 协议。
