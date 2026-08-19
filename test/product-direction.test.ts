@@ -7,7 +7,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v2.3 keeps Quiet Context Reveal available while composing a reply", async () => {
+test("v2.4 preserves the live card across composing and explicit refresh", async () => {
   const [prd, readme, mainSkill, workspaceSkill] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -15,7 +15,7 @@ test("v2.3 keeps Quiet Context Reveal available while composing a reply", async 
     text("skills/pointable-context-workspace/SKILL.md"),
   ]);
 
-  assert.match(prd, /版本：v2\.3/u);
+  assert.match(prd, /版本：v2\.4/u);
   assert.match(prd, /默认可视入口是用户选区后的轻量按钮/u);
   assert.match(prd, /selection 本身不读取详情、不调用模型/u);
   assert.match(prd, /产品不存在“识别更多概念”模型分支/u);
@@ -42,6 +42,10 @@ test("v2.3 keeps Quiet Context Reveal available while composing a reply", async 
   assert.match(prd, /不建立语义依赖图/u);
   assert.match(prd, /聚焦当前 Chat composer 不关闭卡片/u);
   assert.match(prd, /后台 revision 检查不中断/u);
+  assert.match(prd, /复用现有卡片 DOM/u);
+  assert.match(prd, /保持当前位置、滚动位置与详情\/证据 disclosure 状态/u);
+  assert.match(prd, /卡片 DOM 身份、left\/top、scrollTop/u);
+  assert.match(prd, /没有显示伪造的字段差异/u);
 
   assert.match(readme, /primary interaction is \*\*Quiet Context Reveal\*\*/u);
   assert.match(readme, /no "identify more concepts" or semantic-model branch/u);
@@ -57,6 +61,7 @@ test("v2.3 keeps Quiet Context Reveal available while composing a reply", async 
   assert.match(readme, /bounded v2 background probe/u);
   assert.match(readme, /detects literal reference membership changes, not runtime dependencies/u);
   assert.match(readme, /keeps an open card visible when the user focuses the current Chat composer/u);
+  assert.match(readme, /reuses the same card DOM in place/u);
   assert.match(mainSkill, /Use MCP `render_context_capsule` only when the user explicitly asks/u);
   assert.match(mainSkill, /Do not offer `识别更多概念`/u);
   assert.match(workspaceSkill, /Selection alone is inert/u);
@@ -72,6 +77,7 @@ test("v2.3 keeps Quiet Context Reveal available while composing a reply", async 
   assert.match(workspaceSkill, /revision v2 as a bounded invalidation fingerprint/u);
   assert.match(workspaceSkill, /Use `mental-model` as the ordinary product default/u);
   assert.match(workspaceSkill, /Keep an open card visible when the user focuses the current Chat composer/u);
+  assert.match(workspaceSkill, /reuse the same card DOM/u);
   assert.match(workspaceSkill, /`compatibility\.state` is `qualified`/u);
 });
 

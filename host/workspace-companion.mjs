@@ -1360,6 +1360,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   let actionElement;
   let cardElement;
   let revisionTimer;
+  let holdCardPlacementUntil = 0;
   let uninstalled = false;
   const activeObserver = new MutationObserver(() => {
     if (candidate !== void 0) scheduleReconcile();
@@ -1702,34 +1703,41 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       }
     }
   }
-  function createShell(titleText) {
+  function createShell(titleText, reuseExisting = false) {
+    const existing2 = reuseExisting ? connectedOwnedElement("card") : null;
+    const preservedScrollTop = existing2?.scrollTop ?? 0;
     removeOwned("action");
-    removeOwned("card");
+    if (existing2 === null) removeOwned("card");
     if (restoreFocus === void 0 && document.activeElement instanceof HTMLElement) {
       restoreFocus = document.activeElement;
     }
-    const shell = document.createElement("section");
-    shell.id = availableOwnedId(cardIdBase);
-    shell.tabIndex = -1;
-    shell.setAttribute("role", "dialog");
-    shell.setAttribute("aria-modal", "false");
-    shell.setAttribute("aria-labelledby", `${shell.id}-title`);
-    shell.setAttribute("data-pointable-context-owned", lifecycleId);
-    shell.setAttribute("data-pointable-context-role", "card");
-    shell.setAttribute("data-pointable-context-presentation", presentationMode);
-    Object.assign(shell.style, {
-      position: "fixed",
-      zIndex: "2147482999",
-      width: "min(380px, calc(100vw - 24px))",
-      maxHeight: "min(480px, calc(100vh - 24px))",
-      overflow: "auto",
-      border: "1px solid rgba(45, 91, 255, .32)",
-      borderRadius: "12px",
-      background: "#ffffff",
-      color: "#172033",
-      boxShadow: "0 18px 48px rgba(15, 23, 42, .24)",
-      font: "13px/1.45 system-ui, sans-serif"
-    });
+    const shell = existing2 ?? document.createElement("section");
+    if (existing2 === null) {
+      shell.id = availableOwnedId(cardIdBase);
+      shell.tabIndex = -1;
+      shell.setAttribute("role", "dialog");
+      shell.setAttribute("aria-modal", "false");
+      shell.setAttribute("aria-labelledby", `${shell.id}-title`);
+      shell.setAttribute("data-pointable-context-owned", lifecycleId);
+      shell.setAttribute("data-pointable-context-role", "card");
+      shell.setAttribute("data-pointable-context-presentation", presentationMode);
+      Object.assign(shell.style, {
+        position: "fixed",
+        zIndex: "2147482999",
+        width: "min(380px, calc(100vw - 24px))",
+        maxHeight: "min(480px, calc(100vh - 24px))",
+        overflow: "auto",
+        border: "1px solid rgba(45, 91, 255, .32)",
+        borderRadius: "12px",
+        background: "#ffffff",
+        color: "#172033",
+        boxShadow: "0 18px 48px rgba(15, 23, 42, .24)",
+        font: "13px/1.45 system-ui, sans-serif"
+      });
+    } else {
+      shell.replaceChildren();
+      holdCardPlacementUntil = performance.now() + 250;
+    }
     const header = document.createElement("div");
     Object.assign(header.style, {
       display: "flex",
@@ -1774,14 +1782,23 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     Object.assign(body.style, { padding: "12px" });
     shell.append(header, body);
     cardElement = shell;
-    document.body.append(shell);
+    if (existing2 === null) document.body.append(shell);
     installOutsideHandler();
-    resizeObserver?.disconnect();
-    resizeObserver?.observe(shell);
-    window.queueMicrotask(() => {
-      if (shell.isConnected) shell.focus({ preventScroll: true });
-    });
-    reposition();
+    if (existing2 === null) {
+      resizeObserver?.disconnect();
+      resizeObserver?.observe(shell);
+      window.queueMicrotask(() => {
+        if (shell.isConnected) shell.focus({ preventScroll: true });
+      });
+      reposition();
+    } else {
+      window.queueMicrotask(() => {
+        if (shell.isConnected) {
+          shell.scrollTop = preservedScrollTop;
+          shell.focus({ preventScroll: true });
+        }
+      });
+    }
     return { shell, body };
   }
   function paragraph(text, muted = false) {
@@ -1932,7 +1949,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     else shell.insertBefore(notice, header?.nextSibling ?? shell.firstChild);
     reposition();
   }
-  function mountComprehension(body, model) {
+  function mountComprehension(body, model, evidenceExpanded = false) {
     const surface = document.createElement("div");
     surface.setAttribute("data-pointable-context-role", "comprehension-model");
     surface.setAttribute("data-pointable-context-kind", model.kind);
@@ -2036,8 +2053,8 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     Object.assign(evidenceDisclosure.style, { marginTop: "8px" });
     const evidenceToggle = document.createElement("button");
     evidenceToggle.type = "button";
-    evidenceToggle.textContent = "\u4E3A\u4EC0\u4E48\u8FD9\u6837\u8BF4";
-    evidenceToggle.setAttribute("aria-expanded", "false");
+    evidenceToggle.textContent = evidenceExpanded ? "\u6536\u8D77\u4F9D\u636E" : "\u4E3A\u4EC0\u4E48\u8FD9\u6837\u8BF4";
+    evidenceToggle.setAttribute("aria-expanded", String(evidenceExpanded));
     evidenceToggle.setAttribute("data-pointable-context-role", "evidence-toggle");
     Object.assign(evidenceToggle.style, {
       border: "0",
@@ -2050,8 +2067,8 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     });
     const evidenceBody = document.createElement("div");
     evidenceBody.id = `${cardElement?.id ?? cardIdBase}-evidence-body`;
-    evidenceBody.hidden = true;
-    evidenceBody.style.display = "none";
+    evidenceBody.hidden = !evidenceExpanded;
+    evidenceBody.style.display = evidenceExpanded ? "block" : "none";
     evidenceBody.setAttribute("data-pointable-context-role", "evidence-body");
     evidenceToggle.setAttribute("aria-controls", evidenceBody.id);
     for (const item of model.evidence) {
@@ -2083,12 +2100,15 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     surface.append(evidenceDisclosure);
     body.append(surface);
   }
-  function mountDetail(detail) {
+  function mountDetail(detail, preserveUiState = false) {
     clearRevisionTimer();
+    const previousCard = preserveUiState ? connectedOwnedElement("card") : null;
+    const detailExpanded = previousCard?.querySelector('[data-pointable-context-role="detail-toggle"]')?.getAttribute("aria-expanded") === "true";
+    const evidenceExpanded = previousCard?.querySelector('[data-pointable-context-role="evidence-toggle"]')?.getAttribute("aria-expanded") === "true";
     state = "detail";
-    const { body } = createShell(detail.label);
+    const { body } = createShell(detail.label, preserveUiState);
     if (presentationMode === "mental-model" && detail.comprehension !== void 0) {
-      mountComprehension(body, detail.comprehension);
+      mountComprehension(body, detail.comprehension, evidenceExpanded);
     } else {
       const summary = presentationMode === "record" ? detail.summary : detail.humanSummary ?? detail.summary;
       body.append(paragraph(summary));
@@ -2130,9 +2150,9 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     Object.assign(disclosure.style, { marginTop: "8px" });
     const disclosureToggle = document.createElement("button");
     disclosureToggle.type = "button";
-    disclosureToggle.textContent = "\u67E5\u770B\u8BE6\u60C5";
+    disclosureToggle.textContent = detailExpanded ? "\u6536\u8D77\u8BE6\u60C5" : "\u67E5\u770B\u8BE6\u60C5";
     disclosureToggle.setAttribute("aria-label", "\u5C55\u5F00\u4E0A\u4E0B\u6587\u8BE6\u60C5");
-    disclosureToggle.setAttribute("aria-expanded", "false");
+    disclosureToggle.setAttribute("aria-expanded", String(detailExpanded));
     disclosureToggle.setAttribute("data-pointable-context-role", "detail-toggle");
     Object.assign(disclosureToggle.style, {
       border: "0",
@@ -2147,8 +2167,8 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     });
     const detailBody = document.createElement("div");
     detailBody.id = `${cardElement?.id ?? cardIdBase}-detail-body`;
-    detailBody.hidden = true;
-    detailBody.style.display = "none";
+    detailBody.hidden = !detailExpanded;
+    detailBody.style.display = detailExpanded ? "block" : "none";
     detailBody.setAttribute("data-pointable-context-role", "detail-body");
     disclosureToggle.setAttribute("aria-controls", detailBody.id);
     const metadata = document.createElement("div");
@@ -2280,7 +2300,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     if (response.presentation.kind === "candidates") {
       mountCandidates(response.presentation.candidates);
     } else if (response.presentation.kind === "detail") {
-      mountDetail(response.presentation.detail);
+      mountDetail(response.presentation.detail, request.operation === "refresh");
     } else if (response.presentation.kind === "revision") {
       const revision2 = response.presentation.revision;
       state = "detail";
@@ -2340,6 +2360,9 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       const current = candidate;
       const target = connectedOwnedElement("card") ?? connectedOwnedElement("action");
       if (current === void 0 || !(target instanceof HTMLElement)) return;
+      if (target.getAttribute("data-pointable-context-role") === "card" && performance.now() < holdCardPlacementUntil) {
+        return;
+      }
       if (readContextFingerprint() !== current.contextFingerprint || !candidateAnchorIsCurrent()) {
         cleanup(true, false);
         return;
@@ -2371,6 +2394,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   }
   function cleanup(clearCandidate, restore) {
     clearRevisionTimer();
+    holdCardPlacementUntil = 0;
     removeOwned("action");
     removeOwned("card");
     resizeObserver?.disconnect();
@@ -5091,7 +5115,7 @@ import {
   randomUUID as randomUUID3,
   timingSafeEqual
 } from "node:crypto";
-import { performance } from "node:perf_hooks";
+import { performance as performance2 } from "node:perf_hooks";
 
 // src/resolver.ts
 function toCandidate(record8, attempt) {
@@ -5410,7 +5434,7 @@ function interruptionOutcome(error) {
 function runBounded(operationName, operation, callerSignal, timeoutMs) {
   return new Promise((resolve6, reject) => {
     const controller = new AbortController();
-    const deadlineAt = performance.now() + timeoutMs;
+    const deadlineAt = performance2.now() + timeoutMs;
     let settled = false;
     let timer;
     const cleanup = () => {
@@ -5419,7 +5443,7 @@ function runBounded(operationName, operation, callerSignal, timeoutMs) {
     };
     const settleSuccess = (value) => {
       if (settled) return;
-      if (performance.now() >= deadlineAt) {
+      if (performance2.now() >= deadlineAt) {
         abortAndFail(new OperationTimeoutError(operationName));
         return;
       }
@@ -5429,7 +5453,7 @@ function runBounded(operationName, operation, callerSignal, timeoutMs) {
     };
     const settleFailure = (error) => {
       if (settled) return;
-      if (performance.now() >= deadlineAt) {
+      if (performance2.now() >= deadlineAt) {
         abortAndFail(new OperationTimeoutError(operationName));
         return;
       }

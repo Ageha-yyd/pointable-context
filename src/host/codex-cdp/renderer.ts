@@ -440,6 +440,7 @@ export function installPointableContextRenderer(
   let actionElement: HTMLButtonElement | undefined;
   let cardElement: HTMLElement | undefined;
   let revisionTimer: number | undefined;
+  let holdCardPlacementUntil = 0;
   let uninstalled = false;
   const activeObserver = new MutationObserver(() => {
     if (candidate !== undefined) scheduleReconcile();
@@ -898,34 +899,44 @@ export function installPointableContextRenderer(
     }
   }
 
-  function createShell(titleText: string): { shell: HTMLElement; body: HTMLElement } {
+  function createShell(
+    titleText: string,
+    reuseExisting = false,
+  ): { shell: HTMLElement; body: HTMLElement } {
+    const existing = reuseExisting ? connectedOwnedElement("card") : null;
+    const preservedScrollTop = existing?.scrollTop ?? 0;
     removeOwned("action");
-    removeOwned("card");
+    if (existing === null) removeOwned("card");
     if (restoreFocus === undefined && document.activeElement instanceof HTMLElement) {
       restoreFocus = document.activeElement;
     }
-    const shell = document.createElement("section");
-    shell.id = availableOwnedId(cardIdBase);
-    shell.tabIndex = -1;
-    shell.setAttribute("role", "dialog");
-    shell.setAttribute("aria-modal", "false");
-    shell.setAttribute("aria-labelledby", `${shell.id}-title`);
-    shell.setAttribute("data-pointable-context-owned", lifecycleId);
-    shell.setAttribute("data-pointable-context-role", "card");
-    shell.setAttribute("data-pointable-context-presentation", presentationMode);
-    Object.assign(shell.style, {
-      position: "fixed",
-      zIndex: "2147482999",
-      width: "min(380px, calc(100vw - 24px))",
-      maxHeight: "min(480px, calc(100vh - 24px))",
-      overflow: "auto",
-      border: "1px solid rgba(45, 91, 255, .32)",
-      borderRadius: "12px",
-      background: "#ffffff",
-      color: "#172033",
-      boxShadow: "0 18px 48px rgba(15, 23, 42, .24)",
-      font: "13px/1.45 system-ui, sans-serif",
-    });
+    const shell = existing ?? document.createElement("section");
+    if (existing === null) {
+      shell.id = availableOwnedId(cardIdBase);
+      shell.tabIndex = -1;
+      shell.setAttribute("role", "dialog");
+      shell.setAttribute("aria-modal", "false");
+      shell.setAttribute("aria-labelledby", `${shell.id}-title`);
+      shell.setAttribute("data-pointable-context-owned", lifecycleId);
+      shell.setAttribute("data-pointable-context-role", "card");
+      shell.setAttribute("data-pointable-context-presentation", presentationMode);
+      Object.assign(shell.style, {
+        position: "fixed",
+        zIndex: "2147482999",
+        width: "min(380px, calc(100vw - 24px))",
+        maxHeight: "min(480px, calc(100vh - 24px))",
+        overflow: "auto",
+        border: "1px solid rgba(45, 91, 255, .32)",
+        borderRadius: "12px",
+        background: "#ffffff",
+        color: "#172033",
+        boxShadow: "0 18px 48px rgba(15, 23, 42, .24)",
+        font: "13px/1.45 system-ui, sans-serif",
+      });
+    } else {
+      shell.replaceChildren();
+      holdCardPlacementUntil = performance.now() + 250;
+    }
     const header = document.createElement("div");
     Object.assign(header.style, {
       display: "flex",
@@ -973,14 +984,23 @@ export function installPointableContextRenderer(
     Object.assign(body.style, { padding: "12px" });
     shell.append(header, body);
     cardElement = shell;
-    document.body.append(shell);
+    if (existing === null) document.body.append(shell);
     installOutsideHandler();
-    resizeObserver?.disconnect();
-    resizeObserver?.observe(shell);
-    window.queueMicrotask(() => {
-      if (shell.isConnected) shell.focus({ preventScroll: true });
-    });
-    reposition();
+    if (existing === null) {
+      resizeObserver?.disconnect();
+      resizeObserver?.observe(shell);
+      window.queueMicrotask(() => {
+        if (shell.isConnected) shell.focus({ preventScroll: true });
+      });
+      reposition();
+    } else {
+      window.queueMicrotask(() => {
+        if (shell.isConnected) {
+          shell.scrollTop = preservedScrollTop;
+          shell.focus({ preventScroll: true });
+        }
+      });
+    }
     return { shell, body };
   }
 
@@ -1169,6 +1189,7 @@ export function installPointableContextRenderer(
   function mountComprehension(
     body: HTMLElement,
     model: PointableComprehensionView,
+    evidenceExpanded = false,
   ): void {
     const surface = document.createElement("div");
     surface.setAttribute("data-pointable-context-role", "comprehension-model");
@@ -1282,8 +1303,8 @@ export function installPointableContextRenderer(
     Object.assign(evidenceDisclosure.style, { marginTop: "8px" });
     const evidenceToggle = document.createElement("button");
     evidenceToggle.type = "button";
-    evidenceToggle.textContent = "为什么这样说";
-    evidenceToggle.setAttribute("aria-expanded", "false");
+    evidenceToggle.textContent = evidenceExpanded ? "收起依据" : "为什么这样说";
+    evidenceToggle.setAttribute("aria-expanded", String(evidenceExpanded));
     evidenceToggle.setAttribute("data-pointable-context-role", "evidence-toggle");
     Object.assign(evidenceToggle.style, {
       border: "0",
@@ -1296,8 +1317,8 @@ export function installPointableContextRenderer(
     });
     const evidenceBody = document.createElement("div");
     evidenceBody.id = `${cardElement?.id ?? cardIdBase}-evidence-body`;
-    evidenceBody.hidden = true;
-    evidenceBody.style.display = "none";
+    evidenceBody.hidden = !evidenceExpanded;
+    evidenceBody.style.display = evidenceExpanded ? "block" : "none";
     evidenceBody.setAttribute("data-pointable-context-role", "evidence-body");
     evidenceToggle.setAttribute("aria-controls", evidenceBody.id);
     for (const item of model.evidence) {
@@ -1330,12 +1351,19 @@ export function installPointableContextRenderer(
     body.append(surface);
   }
 
-  function mountDetail(detail: PointableDetailView): void {
+  function mountDetail(detail: PointableDetailView, preserveUiState = false): void {
     clearRevisionTimer();
+    const previousCard = preserveUiState ? connectedOwnedElement("card") : null;
+    const detailExpanded = previousCard
+      ?.querySelector('[data-pointable-context-role="detail-toggle"]')
+      ?.getAttribute("aria-expanded") === "true";
+    const evidenceExpanded = previousCard
+      ?.querySelector('[data-pointable-context-role="evidence-toggle"]')
+      ?.getAttribute("aria-expanded") === "true";
     state = "detail";
-    const { body } = createShell(detail.label);
+    const { body } = createShell(detail.label, preserveUiState);
     if (presentationMode === "mental-model" && detail.comprehension !== undefined) {
-      mountComprehension(body, detail.comprehension);
+      mountComprehension(body, detail.comprehension, evidenceExpanded);
     } else {
       const summary = presentationMode === "record"
         ? detail.summary
@@ -1380,9 +1408,9 @@ export function installPointableContextRenderer(
     Object.assign(disclosure.style, { marginTop: "8px" });
     const disclosureToggle = document.createElement("button");
     disclosureToggle.type = "button";
-    disclosureToggle.textContent = "查看详情";
+    disclosureToggle.textContent = detailExpanded ? "收起详情" : "查看详情";
     disclosureToggle.setAttribute("aria-label", "展开上下文详情");
-    disclosureToggle.setAttribute("aria-expanded", "false");
+    disclosureToggle.setAttribute("aria-expanded", String(detailExpanded));
     disclosureToggle.setAttribute("data-pointable-context-role", "detail-toggle");
     Object.assign(disclosureToggle.style, {
       border: "0",
@@ -1397,8 +1425,8 @@ export function installPointableContextRenderer(
     });
     const detailBody = document.createElement("div");
     detailBody.id = `${cardElement?.id ?? cardIdBase}-detail-body`;
-    detailBody.hidden = true;
-    detailBody.style.display = "none";
+    detailBody.hidden = !detailExpanded;
+    detailBody.style.display = detailExpanded ? "block" : "none";
     detailBody.setAttribute("data-pointable-context-role", "detail-body");
     disclosureToggle.setAttribute("aria-controls", detailBody.id);
     const metadata = document.createElement("div");
@@ -1549,7 +1577,7 @@ export function installPointableContextRenderer(
     if (response.presentation.kind === "candidates") {
       mountCandidates(response.presentation.candidates);
     } else if (response.presentation.kind === "detail") {
-      mountDetail(response.presentation.detail);
+      mountDetail(response.presentation.detail, request.operation === "refresh");
     } else if (response.presentation.kind === "revision") {
       const revision = response.presentation.revision;
       state = "detail";
@@ -1637,6 +1665,12 @@ export function installPointableContextRenderer(
       const target = connectedOwnedElement("card") ?? connectedOwnedElement("action");
       if (current === undefined || !(target instanceof HTMLElement)) return;
       if (
+        target.getAttribute("data-pointable-context-role") === "card" &&
+        performance.now() < holdCardPlacementUntil
+      ) {
+        return;
+      }
+      if (
         readContextFingerprint() !== current.contextFingerprint ||
         !candidateAnchorIsCurrent()
       ) {
@@ -1671,6 +1705,7 @@ export function installPointableContextRenderer(
 
   function cleanup(clearCandidate: boolean, restore: boolean): void {
     clearRevisionTimer();
+    holdCardPlacementUntil = 0;
     removeOwned("action");
     removeOwned("card");
     resizeObserver?.disconnect();

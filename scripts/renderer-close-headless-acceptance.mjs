@@ -353,11 +353,37 @@ try {
   await evaluate(connection, `new Promise((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
   })`);
+  const detailToggleBeforeRefresh = await waitFor(connection, `(() => {
+    const toggle = document.querySelector('[data-pointable-context-role="detail-toggle"]');
+    if (!(toggle instanceof HTMLButtonElement)) return null;
+    toggle.scrollIntoView({ block: 'nearest' });
+    const rect = toggle.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  })()`);
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mousePressed", x: detailToggleBeforeRefresh.x, y: detailToggleBeforeRefresh.y,
+    button: "left", clickCount: 1,
+  });
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mouseReleased", x: detailToggleBeforeRefresh.x, y: detailToggleBeforeRefresh.y,
+    button: "left", clickCount: 1,
+  });
+  await waitFor(connection, `(() => {
+    const toggle = document.querySelector('[data-pointable-context-role="detail-toggle"]');
+    const body = document.querySelector('[data-pointable-context-role="detail-body"]');
+    return toggle instanceof HTMLButtonElement && body instanceof HTMLElement &&
+      toggle.getAttribute('aria-expanded') === 'true' && body.getBoundingClientRect().height > 0;
+  })()`);
   const refresh = await waitFor(connection, `(() => {
     const notice = document.querySelector('[data-pointable-context-role="revision-notice"]');
     if (!(notice instanceof HTMLElement) || !notice.textContent.includes('内容已更新')) return null;
     const button = Array.from(notice.querySelectorAll('button')).find((node) => node.textContent === '刷新内容');
     if (!(button instanceof HTMLButtonElement)) return null;
+    button.scrollIntoView({ block: 'nearest' });
+    const card = document.querySelector('[data-pointable-context-role="card"]');
+    if (!(card instanceof HTMLElement)) return null;
+    window.__pointableHeadlessRefreshCard = card;
+    window.__pointableHeadlessRefreshPosition = { left: card.style.left, top: card.style.top };
     const rect = button.getBoundingClientRect();
     return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
   })()`);
@@ -418,37 +444,33 @@ try {
   await evaluate(connection, `new Promise((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
   })`);
-  const collapsed = await evaluate(connection, `(() => {
+  const preserved = await evaluate(connection, `(() => {
+    const card = document.querySelector('[data-pointable-context-role="card"]');
     const disclosure = document.querySelector('[data-pointable-context-role="detail-disclosure"]');
     const toggle = document.querySelector('[data-pointable-context-role="detail-toggle"]');
     const body = document.querySelector('[data-pointable-context-role="detail-body"]');
-    if (!(disclosure instanceof HTMLElement) || !(toggle instanceof HTMLButtonElement) || !(body instanceof HTMLElement)) return null;
-    toggle.scrollIntoView({ block: 'nearest' });
-    const rect = toggle.getBoundingClientRect();
-    const bodyRect = body.getBoundingClientRect();
+    const evidenceToggle = document.querySelector('[data-pointable-context-role="evidence-toggle"]');
+    const evidenceBody = document.querySelector('[data-pointable-context-role="evidence-body"]');
+    if (!(card instanceof HTMLElement) || !(disclosure instanceof HTMLElement) ||
+        !(toggle instanceof HTMLButtonElement) || !(body instanceof HTMLElement) ||
+        !(evidenceToggle instanceof HTMLButtonElement) || !(evidenceBody instanceof HTMLElement)) return null;
     return {
-      expanded: toggle.getAttribute('aria-expanded'),
-      bodyHeight: bodyRect.height,
-      x: rect.left + rect.width / 2,
-      y: rect.top + rect.height / 2,
+      sameNode: card === window.__pointableHeadlessRefreshCard,
+      samePosition: card.style.left === window.__pointableHeadlessRefreshPosition?.left &&
+        card.style.top === window.__pointableHeadlessRefreshPosition?.top,
+      detailExpanded: toggle.getAttribute('aria-expanded'),
+      detailBodyHeight: body.getBoundingClientRect().height,
+      evidenceExpanded: evidenceToggle.getAttribute('aria-expanded'),
+      evidenceBodyHeight: evidenceBody.getBoundingClientRect().height,
     };
   })()`);
-  if (collapsed === null || collapsed.expanded !== 'false' || collapsed.bodyHeight !== 0) {
-    throw new Error(`detail disclosure was not initially collapsed: ${JSON.stringify(collapsed)}`);
+  if (
+    preserved === null || preserved.sameNode !== true || preserved.samePosition !== true ||
+    preserved.detailExpanded !== 'true' || preserved.detailBodyHeight <= 0 ||
+    preserved.evidenceExpanded !== 'true' || preserved.evidenceBodyHeight <= 0
+  ) {
+    throw new Error(`refresh did not preserve the live card UI state: ${JSON.stringify(preserved)}`);
   }
-  await connection.send("Input.dispatchMouseEvent", {
-    type: "mousePressed", x: collapsed.x, y: collapsed.y, button: "left", clickCount: 1,
-  });
-  await connection.send("Input.dispatchMouseEvent", {
-    type: "mouseReleased", x: collapsed.x, y: collapsed.y, button: "left", clickCount: 1,
-  });
-  const expanded = await waitFor(connection, `(() => {
-    const disclosure = document.querySelector('[data-pointable-context-role="detail-disclosure"]');
-    const body = document.querySelector('[data-pointable-context-role="detail-body"]');
-    const toggle = document.querySelector('[data-pointable-context-role="detail-toggle"]');
-    return disclosure instanceof HTMLElement && toggle instanceof HTMLButtonElement && body instanceof HTMLElement && toggle.getAttribute('aria-expanded') === 'true' && body.getBoundingClientRect().height > 0;
-  })()`);
-  if (expanded !== true) throw new Error("trusted disclosure did not expand in place");
   // Disclosure changes the card height and schedules one reposition frame.
   // Wait until that frame and the following paint boundary before sampling the
   // close button, otherwise the button can move between mousePressed/released.
@@ -492,9 +514,8 @@ try {
     evidenceExpandedInPlace: true,
     backgroundRevisionDetected: true,
     trustedRefreshUpdatedInPlace: true,
+    refreshPreservedCardUiState: true,
     refreshAddedChatTurns: 0,
-    detailInitiallyCollapsed: true,
-    trustedDisclosureExpandedInPlace: true,
     closeClearedSelection: true,
     closePreventedRemountAfterMs: 250,
   }, null, 2)}\n`);

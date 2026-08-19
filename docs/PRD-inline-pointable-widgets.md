@@ -1,7 +1,7 @@
 # PRD：Quiet Context Reveal（选区式上下文速览）
 
-- 版本：v2.3
-- 状态：Quiet Reveal 主链、P-C 默认与三类样例已获人工采用；动态 revision v2 与“边读边回复”进入当前 Codex 真实场景验收
+- 版本：v2.4
+- 状态：Quiet Reveal 主链、P-C 默认与三类样例已获人工采用；动态 revision v2、“边读边回复”与稳定原位刷新进入当前 Codex 真实场景验收
 - 日期：2026-08-19
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
@@ -265,6 +265,7 @@ TypeScript/JavaScript 模块在用户点击后按需组合四类只读事实：
 2. 后台只做轻量 revision 失效检测，不持续重取完整详情；
 3. 发现 revision 变化时，在摘要态显示“内容已更新”及显式刷新入口；
 4. 刷新保持同一卡片、同一选区和零 Chat Turn，并突出从旧 revision 到新 revision 的有限差异；
+   “同一卡片”要求复用现有卡片 DOM，保持当前位置、滚动位置与详情/证据 disclosure 状态；不得先移除旧卡再创建默认折叠的新卡；
 5. 对象被删除、Provider 不可用或 binding 漂移时，保留旧快照但明确标记 stale/unavailable，不能冒充 current；
 6. 若没有历史 revision 数据，只能显示“当前状态”，不能编造“消息当时状态”。
 
@@ -279,6 +280,8 @@ v2.2 把首个 stat-only 切片扩展为可验证、仍然轻量的动态上下�
 - 用户可信点击 `刷新内容` 后才重新执行完整 Provider 读取，并在同一卡片显示最多 3 项 `before → after` 差异；
 - 删除或探针不可用时保留旧卡并明确警告；过期、重新绑定、上下文漂移和容量耗尽均 fail closed；
 - 引用指纹只证明字面引用成员集合变化；它不证明运行时调用关系，也不对成员集合未变化时的任意语义影响作推断。
+
+2026-08-19 当前 Codex 任务的形成性验收使用 `local-workspace.ts` 做 relation-only 变化：目标模块保持不变，另一个已跟踪源码引用的移除触发了 `内容已更新`；可信刷新后，卡片 DOM 身份、left/top、scrollTop 与已展开的详情 disclosure 均保持，提示被清除且没有新增 Chat Turn。因为变化没有进入有界首屏字段，本次没有显示伪造的字段差异。该结果证明当前 build 的交互连续性，不证明用户效率提升或跨版本兼容性。
 
 ### 8.7 Scenario relevance policy
 
@@ -457,6 +460,7 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 - [ ] 不打开浏览器或 Dashboard；
 - [ ] 打开、展开、关闭新增 Chat Turn 为 0；
 - [ ] revision 变化只出现卡内提示，可信刷新在原卡完成且新增 Chat Turn 为 0；
+- [ ] 刷新复用同一卡片 DOM，保持位置、滚动和 disclosure 状态，不出现视觉消失或跳回默认折叠；
 - [ ] 详情打开后聚焦当前 Chat composer 不关闭卡片，输入框获得焦点且 revision 检查继续；
 - [ ] 关闭按钮、Escape、普通外点和焦点恢复可用；
 - [ ] 普通复制、高亮、terminal、browser、diff 不误触。
@@ -566,9 +570,11 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 12. P-C 首批只资格化显式 concept/change/decision 制品；普通 prose、任意 Git diff 和隐含决策均不做语义推断。
 13. 后台 revision v2 只散列有界 stat、Git 与字面关系信号；详情重读仍必须由可信刷新动作触发。
 14. 打开的卡片是回复时的临时阅读参照；聚焦当前 Chat composer 不关闭卡片，其他外点仍按 Quiet Reveal 规则清理。
+15. 显式刷新必须复用当前卡片 DOM，并保留位置、滚动与渐进披露状态；数据更新不等于重建界面上下文。
 
 ## 18. 变更记录
 
+- v2.4：修正真实关系变化刷新时的界面连续性；显式刷新改为复用同一卡片 DOM，保留位置、滚动、详情与证据展开状态，并加入真实 Edge 的对象身份和 UI 状态回归。
 - v2.3：把“边读边回复”纳入原生交互合同；详情卡打开时聚焦当前 Chat composer 保留卡片及后台 revision 检查，入口态或普通外点仍关闭，并加入真实 Edge 焦点/持久性验收。
 - v2.2：记录三类 P-C 样例获产品负责人采用但不外推效率结论；把动态 revision 从 stat-only 扩展到目标 Git 状态/最近提交、Provider 同口径的字面引用成员集合，以及显式心智模型的 evidence source stat；完整详情仍只在可信刷新后读取。
 - v2.1：把 P-C 从单一 `pilot` 概念扩展为三种显式、证据绑定的微型心智模型：concept 的“定义/语境/流程/边界”、change 的“Before/After/Impact”、decision 的“问题/选择/后果”；加入 `presentation-default` 与 `native-chat-lane` 真实样例，仍保持无模型、零 Chat Turn 和普通 prose 不推断。
