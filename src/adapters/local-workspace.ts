@@ -367,7 +367,7 @@ function stableFileStat(
   );
 }
 
-async function verifyArtifactEvidence(
+export async function verifyContextArtifactEvidence(
   root: string,
   artifact: { evidence: ContextArtifactEvidence },
   signal?: AbortSignal,
@@ -830,7 +830,7 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
         taskContext ?? explicitVerificationContext;
       const artifactEvidence = mentalModelContext === undefined
         ? undefined
-        : await verifyArtifactEvidence(root, mentalModelContext, request.signal);
+        : await verifyContextArtifactEvidence(root, mentalModelContext, request.signal);
       if (mentalModelContext !== undefined && artifactEvidence === undefined) {
         return { kind: "not_found" };
       }

@@ -71,6 +71,12 @@ Agent-known work results can now enter the same lightweight Context Index throug
 
 These are author-supplied records, not automatic conclusions. Ordinary Chat prose, TODOs, commits, test filenames, and static test definitions never become “completed” or PASS/FAIL by inference. Missing fields, invalid timestamps, or evidence drift fail closed. The current implementation re-reads these files on demand; it does not require a Dashboard or persistent semantic index. In P-C, Task foregrounds current status and next action, while Verification foregrounds result and the boundary it still does not prove. Exact evidence remains locally collapsible.
 
+### Opt-in production policy and record check
+
+Agent record maintenance is opt-in, either for one explicit create/update request or for one bounded long-running task. Authorization does not carry to another task or workspace. A record is created or updated only when it has a stable selectable identity, is likely to matter after the current turn, changes a decision/status/handoff or captures an observed verification, and has one exact workspace evidence line. Stable milestones include a user-visible deliverable, a state/Gate change, a real command/review/human acceptance result, and handoff. Existing identities are updated instead of duplicated; routine turns and file edits produce nothing.
+
+`pointable-context-record-check` is a read-only post-write gate. It scans only `docs/tasks/*.md` and `docs/verifications/*.md`, validates their strict schema and timestamps, rechecks exact evidence, and rejects duplicate file stems across both types. It does not infer, repair, or write records. Invalid records remain unavailable to the usable Context Index.
+
 ## Current fixture
 
 The installed MCP server is deliberately pinned to `fixtures/mini-project`. Every result is marked `FIXTURE-ONLY`; it is not evidence about the active workspace.
@@ -158,6 +164,7 @@ They remain useful for protocol, security, and fallback research. They are not P
 pnpm install
 pnpm run check
 pnpm test
+pnpm run records:check
 
 # Headless fixture MCP server
 node mcp/server.mjs --fixture-root ./fixtures/mini-project --project-id PRJ-01

@@ -159,6 +159,26 @@ function documentSections(content: string): {
   return { ...(title === undefined ? {} : { title }), sections };
 }
 
+function exactSectionOrder(content: string, expected: readonly string[]): boolean {
+  const headings: string[] = [];
+  let h1Count = 0;
+  let inFence = false;
+  for (const line of content.replace(/\r\n?/gu, "\n").split("\n")) {
+    const trimmed = line.trim();
+    if (/^(?:```|~~~)/u.test(trimmed)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const match = /^(#{1,2})[ \t]+(.+?)\s*$/u.exec(line);
+    if (match?.[1] === "#") h1Count += 1;
+    if (match?.[1] === "##") headings.push((match[2] ?? "").trim());
+  }
+  return h1Count === 1 &&
+    headings.length === expected.length &&
+    headings.every((heading, index) => heading === expected[index]);
+}
+
 function artifactEvidence(
   sections: ReadonlyMap<string, readonly string[]>,
 ): ContextArtifactEvidence | undefined {
@@ -288,6 +308,9 @@ export function extractContextDecisionArtifact(
 export function extractContextTaskArtifact(
   content: string,
 ): ContextTaskArtifact | undefined {
+  if (!exactSectionOrder(content, [
+    "目标", "当前状态", "已完成", "下一步", "阻塞", "更新时间", "证据", "来源",
+  ])) return undefined;
   const { title, sections } = documentSections(content);
   const goal = sectionText(sections.get("目标") ?? []);
   const status = sectionText(sections.get("当前状态") ?? []);
@@ -318,6 +341,9 @@ export function extractContextTaskArtifact(
 export function extractContextVerificationArtifact(
   content: string,
 ): ContextVerificationArtifact | undefined {
+  if (!exactSectionOrder(content, [
+    "要证明什么", "结果", "尚未证明", "验证方式", "验证修订", "执行时间", "证据", "来源",
+  ])) return undefined;
   const { title, sections } = documentSections(content);
   const claim = sectionText(sections.get("要证明什么") ?? []);
   const result = sectionText(sections.get("结果") ?? []);

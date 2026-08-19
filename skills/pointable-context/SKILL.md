@@ -10,7 +10,7 @@ The product-default interaction keeps the Chat Lane unchanged until the user sel
 ## Choose the correct mode
 
 1. For the active local workspace, prefer the companion workflow in `$pointable-context-workspace` and require an explicit workspace binding.
-2. When the user explicitly asks to preserve a stable task status or observed verification result, use `$pointable-context-records`; do not turn ordinary conversation into records automatically.
+2. When the user explicitly asks to preserve a stable result, or explicitly opts the current bounded task into milestone record maintenance, use `$pointable-context-records`; do not turn ordinary conversation into records automatically.
 3. For a self-contained demonstration, use the bundled fixture companion. Preserve its `FIXTURE-ONLY` status.
 4. Use MCP `render_context_capsule` only when the user explicitly asks to diagnose the optional inline renderer. Do not use it as the default product surface.
 5. Never route an ordinary request to the browser App Server harness or a Dashboard.

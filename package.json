@@ -6,6 +6,7 @@
   "type": "module",
   "bin": {
     "pointable": "./dist/src/cli.js",
+    "pointable-context-record-check": "./dist/src/records/check-cli.js",
     "pointable-context-mcp-fixture": "./dist/src/mcp/stdio.js",
     "pointable-context-fixture-companion": "./host/fixture-companion.mjs",
     "pointable-context-workspace-companion": "./host/workspace-companion.mjs",
@@ -24,6 +25,7 @@
     "test:widget-browser": "node scripts/mcp-widget-browser-acceptance.mjs",
     "test:conversation-browser": "node scripts/conversation-client-browser-acceptance.mjs",
     "benchmark:workspace": "pnpm run build:ts && node scripts/workspace-lookup-benchmark.mjs",
+    "records:check": "pnpm run build:ts && node dist/src/records/check-cli.js --workspace-root . --json",
     "probe:app-server-referent": "node scripts/probe-app-server-referent.mjs",
     "probe:app-server-conversation": "node scripts/probe-app-server-conversation.mjs",
     "client:app-server": "node dist/src/app-server/conversation-cli.js --workspace-root .",

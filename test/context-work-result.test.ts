@@ -128,6 +128,7 @@ test("task and verification records require frozen paths, complete fields, and e
   assert.equal(verification?.executedAt, "2026-08-19T05:05:00.000Z");
 
   assert.equal(extractContextTaskArtifact("# Task\n\n## 当前状态\n完成"), undefined);
+  assert.equal(extractContextTaskArtifact(`${taskArtifact()}\n## Owner\nNobody\n`), undefined);
   assert.equal(extractContextVerificationArtifact(
     verificationArtifact().replace("2026-08-19T13:05:00+08:00", "今天"),
   ), undefined);

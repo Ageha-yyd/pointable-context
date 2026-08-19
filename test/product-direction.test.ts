@@ -7,7 +7,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v2.5 preserves quiet refresh while adding explicit work-result records", async () => {
+test("v2.6 freezes opt-in milestone records behind a read-only check", async () => {
   const [prd, readme, mainSkill, workspaceSkill] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -15,7 +15,7 @@ test("v2.5 preserves quiet refresh while adding explicit work-result records", a
     text("skills/pointable-context-workspace/SKILL.md"),
   ]);
 
-  assert.match(prd, /版本：v2\.5/u);
+  assert.match(prd, /版本：v2\.6/u);
   assert.match(prd, /默认可视入口是用户选区后的轻量按钮/u);
   assert.match(prd, /selection 本身不读取详情、不调用模型/u);
   assert.match(prd, /产品不存在“识别更多概念”模型分支/u);
@@ -40,6 +40,9 @@ test("v2.5 preserves quiet refresh while adding explicit work-result records", a
   assert.match(prd, /`docs\/tasks\/\*\.md`/u);
   assert.match(prd, /`docs\/verifications\/\*\.md`/u);
   assert.match(prd, /普通 Chat 和测试源码仍不得自动产生完成\/PASS 结论/u);
+  assert.match(prd, /一次性创建\/更新指定记录/u);
+  assert.match(prd, /当前有界长任务内维护 Pointable Context 记录/u);
+  assert.match(prd, /只有 `valid: true` 的集合才可视为可用索引输入/u);
   assert.match(prd, /普通 prose、任意 Git diff 和隐含决策均不做语义推断/u);
   assert.match(prd, /stat\/Git\/字面关系\/evidence-source revision v2/u);
   assert.match(prd, /不建立语义依赖图/u);
@@ -61,12 +64,15 @@ test("v2.5 preserves quiet refresh while adding explicit work-result records", a
   assert.match(readme, /design preference, not efficiency evidence/u);
   assert.match(readme, /before\/after\/impact/u);
   assert.match(readme, /problem\/choice\/consequence/u);
+  assert.match(readme, /Agent record maintenance is opt-in/u);
+  assert.match(readme, /read-only post-write gate/u);
   assert.match(readme, /bounded v2 background probe/u);
   assert.match(readme, /detects literal reference membership changes, not runtime dependencies/u);
   assert.match(readme, /keeps an open card visible when the user focuses the current Chat composer/u);
   assert.match(readme, /reuses the same card DOM in place/u);
   assert.match(mainSkill, /Use MCP `render_context_capsule` only when the user explicitly asks/u);
   assert.match(mainSkill, /Do not offer `识别更多概念`/u);
+  assert.match(mainSkill, /opts the current bounded task into milestone record maintenance/u);
   assert.match(workspaceSkill, /Selection alone is inert/u);
   assert.match(workspaceSkill, /There is no `识别更多概念`/u);
   assert.match(workspaceSkill, /source is never executed/u);

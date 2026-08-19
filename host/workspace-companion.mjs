@@ -4004,6 +4004,23 @@ function documentSections(content) {
   }
   return { ...title === void 0 ? {} : { title }, sections };
 }
+function exactSectionOrder(content, expected) {
+  const headings = [];
+  let h1Count = 0;
+  let inFence = false;
+  for (const line of content.replace(/\r\n?/gu, "\n").split("\n")) {
+    const trimmed = line.trim();
+    if (/^(?:```|~~~)/u.test(trimmed)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const match = /^(#{1,2})[ \t]+(.+?)\s*$/u.exec(line);
+    if (match?.[1] === "#") h1Count += 1;
+    if (match?.[1] === "##") headings.push((match[2] ?? "").trim());
+  }
+  return h1Count === 1 && headings.length === expected.length && headings.every((heading, index) => heading === expected[index]);
+}
 function artifactEvidence(sections) {
   const excerpt = sectionText(sections.get("\u8BC1\u636E") ?? []);
   const source = sourceReference(sectionText(sections.get("\u6765\u6E90") ?? []) ?? "");
@@ -4078,6 +4095,16 @@ function extractContextDecisionArtifact(content) {
   return revision({ title, problem, choice, consequence, evidence });
 }
 function extractContextTaskArtifact(content) {
+  if (!exactSectionOrder(content, [
+    "\u76EE\u6807",
+    "\u5F53\u524D\u72B6\u6001",
+    "\u5DF2\u5B8C\u6210",
+    "\u4E0B\u4E00\u6B65",
+    "\u963B\u585E",
+    "\u66F4\u65B0\u65F6\u95F4",
+    "\u8BC1\u636E",
+    "\u6765\u6E90"
+  ])) return void 0;
   const { title, sections } = documentSections(content);
   const goal = sectionText(sections.get("\u76EE\u6807") ?? []);
   const status = sectionText(sections.get("\u5F53\u524D\u72B6\u6001") ?? []);
@@ -4092,6 +4119,16 @@ function extractContextTaskArtifact(content) {
   return revision({ title, goal, status, completed, next, blocker, updatedAt, evidence });
 }
 function extractContextVerificationArtifact(content) {
+  if (!exactSectionOrder(content, [
+    "\u8981\u8BC1\u660E\u4EC0\u4E48",
+    "\u7ED3\u679C",
+    "\u5C1A\u672A\u8BC1\u660E",
+    "\u9A8C\u8BC1\u65B9\u5F0F",
+    "\u9A8C\u8BC1\u4FEE\u8BA2",
+    "\u6267\u884C\u65F6\u95F4",
+    "\u8BC1\u636E",
+    "\u6765\u6E90"
+  ])) return void 0;
   const { title, sections } = documentSections(content);
   const claim = sectionText(sections.get("\u8981\u8BC1\u660E\u4EC0\u4E48") ?? []);
   const result = sectionText(sections.get("\u7ED3\u679C") ?? []);
@@ -4810,7 +4847,7 @@ function gitStatusLabel(status) {
 function stableFileStat(before, after) {
   return before.size === after.size && before.mtimeMs === after.mtimeMs && before.ctimeMs === after.ctimeMs && before.ino === after.ino;
 }
-async function verifyArtifactEvidence(root, artifact, signal) {
+async function verifyContextArtifactEvidence(root, artifact, signal) {
   if (signal?.aborted) return void 0;
   let handle;
   try {
@@ -5115,7 +5152,7 @@ var LocalWorkspaceAuthoritativeProvider = class {
       }), "utf8").digest("hex");
       const contentHash = content === void 0 ? void 0 : createHash6("sha256").update(content).digest("hex");
       const mentalModelContext = conceptContext ?? changeContext ?? explicitDecisionContext ?? taskContext ?? explicitVerificationContext;
-      const artifactEvidence2 = mentalModelContext === void 0 ? void 0 : await verifyArtifactEvidence(root, mentalModelContext, request.signal);
+      const artifactEvidence2 = mentalModelContext === void 0 ? void 0 : await verifyContextArtifactEvidence(root, mentalModelContext, request.signal);
       if (mentalModelContext !== void 0 && artifactEvidence2 === void 0) {
         return { kind: "not_found" };
       }

@@ -9,6 +9,7 @@ export * from "./validation.js";
 export * from "./adapters/json-files.js";
 export * from "./adapters/local-workspace.js";
 export * from "./adapters/context-concept.js";
+export * from "./records/context-record-check.js";
 export * from "./app-server/client.js";
 export * from "./app-server/referent.js";
 export * from "./app-server/referent-session.js";
