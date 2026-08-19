@@ -32,13 +32,19 @@ import {
   contextChangeDocumentPath,
   contextConceptDocumentPath,
   contextDecisionDocumentPath,
+  contextTaskDocumentPath,
+  contextVerificationDocumentPath,
   extractContextChangeArtifact,
   extractContextConceptArtifact,
   extractContextDecisionArtifact,
+  extractContextTaskArtifact,
+  extractContextVerificationArtifact,
   type ContextArtifactEvidence,
   type ContextChangeArtifact,
   type ContextConceptArtifact,
   type ContextDecisionArtifact,
+  type ContextTaskArtifact,
+  type ContextVerificationArtifact,
 } from "./context-concept.js";
 import {
   extractSourceModuleArtifactContext,
@@ -137,6 +143,8 @@ function workspaceEntityType(relativePath: string): string {
   if (contextConceptDocumentPath(relativePath)) return "concept";
   if (contextChangeDocumentPath(relativePath)) return "change";
   if (contextDecisionDocumentPath(relativePath)) return "decision";
+  if (contextTaskDocumentPath(relativePath)) return "task";
+  if (contextVerificationDocumentPath(relativePath)) return "verification";
   if (decisionDocumentPath(relativePath)) return "decision";
   if (markdownDocument(relativePath)) return "document";
   if (testSourcePath(relativePath)) return "verification";
@@ -282,7 +290,8 @@ export class LocalWorkspaceContextIndex implements ContextIndexPort {
       const name = basename(file.relativePath);
       const parent = portablePath(dirname(file.relativePath));
       const entityType = workspaceEntityType(file.relativePath);
-      const explicitMentalModel = entityType === "concept" ||
+      const explicitMentalModel = entityType === "concept" || entityType === "task" ||
+        contextVerificationDocumentPath(file.relativePath) ||
         contextChangeDocumentPath(file.relativePath) ||
         contextDecisionDocumentPath(file.relativePath);
       const canonicalName = explicitMentalModel
@@ -530,6 +539,7 @@ async function evidenceRevisionFingerprint(
   signal?: AbortSignal,
 ): Promise<string> {
   const explicitArtifact = entityType === "concept" || entityType === "change" ||
+    entityType === "task" || contextVerificationDocumentPath(locator) ||
     contextDecisionDocumentPath(locator);
   if (!explicitArtifact) return "none";
   let handle: Awaited<ReturnType<typeof open>> | undefined;
@@ -547,7 +557,11 @@ async function evidenceRevisionFingerprint(
         ? extractContextConceptArtifact(decoded)
         : entityType === "change"
           ? extractContextChangeArtifact(decoded)
-          : extractContextDecisionArtifact(decoded);
+          : entityType === "task"
+            ? extractContextTaskArtifact(decoded)
+            : contextVerificationDocumentPath(locator)
+              ? extractContextVerificationArtifact(decoded)
+              : extractContextDecisionArtifact(decoded);
     if (artifact === undefined) return "artifact-invalid";
     const sourcePath = resolve(root, ...artifact.evidence.sourcePath.split("/"));
     const canonicalSource = await realpath(sourcePath);
@@ -594,7 +608,8 @@ export class LocalWorkspaceRevisionProbe {
       request.entityType !== "configuration" &&
       request.entityType !== "decision" &&
       request.entityType !== "concept" &&
-      request.entityType !== "change"
+      request.entityType !== "change" &&
+      request.entityType !== "task"
     ) {
       return { kind: "not_found", observedAt };
     }
@@ -696,7 +711,8 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
       request.entityType !== "configuration" &&
       request.entityType !== "decision" &&
       request.entityType !== "concept" &&
-      request.entityType !== "change"
+      request.entityType !== "change" &&
+      request.entityType !== "task"
     ) {
       return { kind: "not_found" };
     }
@@ -737,7 +753,9 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
             })
           : undefined;
       const sourceModuleContext =
-        (request.entityType === "module" || request.entityType === "verification") &&
+        (request.entityType === "module" ||
+          (request.entityType === "verification" &&
+            !contextVerificationDocumentPath(relativePath))) &&
           decoded !== undefined
           ? await extractSourceModuleArtifactContext({
               root,
@@ -759,6 +777,16 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
           decoded !== undefined
           ? extractContextDecisionArtifact(decoded)
           : undefined;
+      const taskContext: ContextTaskArtifact | undefined =
+        request.entityType === "task" && decoded !== undefined
+          ? extractContextTaskArtifact(decoded)
+          : undefined;
+      const explicitVerificationContext: ContextVerificationArtifact | undefined =
+        request.entityType === "verification" &&
+          contextVerificationDocumentPath(relativePath) &&
+          decoded !== undefined
+          ? extractContextVerificationArtifact(decoded)
+          : undefined;
       if (request.entityType === "concept" && conceptContext === undefined) {
         return { kind: "not_found" };
       }
@@ -769,6 +797,16 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
         request.entityType === "decision" &&
         contextDecisionDocumentPath(relativePath) &&
         explicitDecisionContext === undefined
+      ) {
+        return { kind: "not_found" };
+      }
+      if (request.entityType === "task" && taskContext === undefined) {
+        return { kind: "not_found" };
+      }
+      if (
+        request.entityType === "verification" &&
+        contextVerificationDocumentPath(relativePath) &&
+        explicitVerificationContext === undefined
       ) {
         return { kind: "not_found" };
       }
@@ -788,7 +826,8 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
       const contentHash = content === undefined
         ? undefined
         : createHash("sha256").update(content).digest("hex");
-      const mentalModelContext = conceptContext ?? changeContext ?? explicitDecisionContext;
+      const mentalModelContext = conceptContext ?? changeContext ?? explicitDecisionContext ??
+        taskContext ?? explicitVerificationContext;
       const artifactEvidence = mentalModelContext === undefined
         ? undefined
         : await verifyArtifactEvidence(root, mentalModelContext, request.signal);
@@ -804,6 +843,8 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
             conceptContext?.contextRevision ??
             changeContext?.contextRevision ??
             explicitDecisionContext?.contextRevision ??
+            taskContext?.contextRevision ??
+            explicitVerificationContext?.contextRevision ??
             "file-metadata-v1",
           "utf8",
         )
@@ -812,7 +853,8 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
       const extension = extname(relativePath);
       const preview = content === undefined ? undefined : contentPreview(content);
       const observedAt = new Date().toISOString();
-      const testContext = request.entityType === "verification" && decoded !== undefined
+      const testContext = request.entityType === "verification" &&
+        !contextVerificationDocumentPath(relativePath) && decoded !== undefined
         ? extractStaticTestDefinitionContext(decoded)
         : undefined;
       const configurationContext = request.entityType === "configuration" && decoded !== undefined
@@ -928,6 +970,33 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
               index === conceptContext.currentStep ? `当前：${item}` : item),
             "证据": conceptContext.evidence.excerpt,
           };
+      const taskFacts = taskContext === undefined
+        ? undefined
+        : {
+            "目标": taskContext.goal,
+            "当前状态": taskContext.status,
+            "下一步": taskContext.next,
+            "阻塞": taskContext.blocker,
+            "更新时间": taskContext.updatedAt,
+            "已完成": taskContext.completed,
+            "证据": taskContext.evidence.excerpt,
+          };
+      const explicitVerificationFacts = explicitVerificationContext === undefined
+        ? undefined
+        : {
+            "要证明什么": explicitVerificationContext.claim,
+            "结果": explicitVerificationContext.result,
+            "尚未证明": explicitVerificationContext.gap,
+            "验证记录": [
+              `方式: ${explicitVerificationContext.method}`,
+              `修订: ${explicitVerificationContext.verifiedRevision}`,
+              `时间: ${explicitVerificationContext.executedAt}`,
+            ],
+            "证据": explicitVerificationContext.evidence.excerpt,
+            "验证方式": explicitVerificationContext.method,
+            "验证修订": explicitVerificationContext.verifiedRevision,
+            "执行时间": explicitVerificationContext.executedAt,
+          };
       return {
         kind: "snapshot",
         snapshot: {
@@ -937,7 +1006,9 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
           entityRevision: `sha256:${detailRevision}`,
           observedAt,
           freshness: "current",
-          facts: conceptFacts ?? changeFacts ?? explicitDecisionFacts ?? decisionFacts ?? verificationFacts ?? configurationFacts ?? markdownFacts ?? moduleFacts ?? {
+          facts: conceptFacts ?? changeFacts ?? explicitDecisionFacts ?? taskFacts ??
+            explicitVerificationFacts ?? decisionFacts ?? verificationFacts ??
+            configurationFacts ?? markdownFacts ?? moduleFacts ?? {
               path: relativePath,
               name: basename(relativePath),
               ...(preview === undefined ? {} : { preview }),

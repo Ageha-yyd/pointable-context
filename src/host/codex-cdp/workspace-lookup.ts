@@ -185,6 +185,27 @@ function mentalModelComprehension(
       ? undefined
       : { kind: "decision", problem, choice, consequence, evidence };
   }
+  if (outcome.detail.entityType === "task") {
+    const goal = scalarFact(outcome.detail.facts, "目标");
+    const status = scalarFact(outcome.detail.facts, "当前状态");
+    const completed = scalarFact(outcome.detail.facts, "已完成");
+    const next = scalarFact(outcome.detail.facts, "下一步");
+    const blocker = scalarFact(outcome.detail.facts, "阻塞");
+    const updatedAt = scalarFact(outcome.detail.facts, "更新时间");
+    return goal === undefined || status === undefined || completed === undefined ||
+      next === undefined || blocker === undefined || updatedAt === undefined
+      ? undefined
+      : { kind: "task", goal, status, completed, next, blocker, updatedAt, evidence };
+  }
+  if (outcome.detail.entityType === "verification") {
+    const claim = scalarFact(outcome.detail.facts, "要证明什么");
+    const result = scalarFact(outcome.detail.facts, "结果");
+    const gap = scalarFact(outcome.detail.facts, "尚未证明");
+    const executedAt = scalarFact(outcome.detail.facts, "执行时间");
+    return claim === undefined || result === undefined || gap === undefined || executedAt === undefined
+      ? undefined
+      : { kind: "verification", claim, result, gap, executedAt, evidence };
+  }
   return undefined;
 }
 
@@ -211,7 +232,7 @@ function detailView(
 ): PointableDetailView {
   const purpose = outcome.detail.facts["用途"] ?? outcome.detail.facts["职责"];
   const scenarioSummary = outcome.detail.entityType === "verification"
-    ? outcome.detail.facts["验证范围"]
+    ? outcome.detail.facts["结果"] ?? outcome.detail.facts["验证范围"]
     : outcome.detail.entityType === "configuration"
       ? outcome.detail.facts["配置用途"]
       : outcome.detail.entityType === "decision"
@@ -220,6 +241,8 @@ function detailView(
           ? outcome.detail.facts["它是什么意思"]
         : outcome.detail.entityType === "change"
           ? outcome.detail.facts["现在怎样"]
+        : outcome.detail.entityType === "task"
+          ? outcome.detail.facts["当前状态"]
         : undefined;
   const change = outcome.detail.facts["本次变化"];
   const activeChange = typeof change === "string" &&
@@ -236,7 +259,11 @@ function detailView(
           ? `${comprehension.meaning} ${comprehension.context}`
           : comprehension.kind === "change"
             ? `${comprehension.after} ${comprehension.impact}`
-            : `${comprehension.choice} ${comprehension.consequence}`,
+            : comprehension.kind === "decision"
+              ? `${comprehension.choice} ${comprehension.consequence}`
+              : comprehension.kind === "task"
+                ? `${comprehension.status} 下一步：${comprehension.next}`
+                : `${comprehension.result} 尚未证明：${comprehension.gap}`,
         1_024,
       );
   return {

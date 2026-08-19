@@ -1156,6 +1156,47 @@ function validateDetail(value) {
         consequence: view.consequence,
         evidence: validateEvidence(view.evidence)
       };
+    } else if (view.kind === "task") {
+      if (!exactKeys(view, [
+        "kind",
+        "goal",
+        "status",
+        "completed",
+        "next",
+        "blocker",
+        "updatedAt",
+        "evidence"
+      ]) || !boundedString(view.goal, 1, 1024) || !boundedString(view.status, 1, 1024) || !boundedString(view.completed, 1, 1024) || !boundedString(view.next, 1, 1024) || !boundedString(view.blocker, 1, 1024) || !boundedString(view.updatedAt, 20, 64) || !Number.isFinite(Date.parse(view.updatedAt))) {
+        throw new PointableProtocolError(
+          "invalid_lookup_result",
+          "detail comprehension view is invalid"
+        );
+      }
+      comprehension = {
+        kind: "task",
+        goal: view.goal,
+        status: view.status,
+        completed: view.completed,
+        next: view.next,
+        blocker: view.blocker,
+        updatedAt: view.updatedAt,
+        evidence: validateEvidence(view.evidence)
+      };
+    } else if (view.kind === "verification") {
+      if (!exactKeys(view, ["kind", "claim", "result", "gap", "executedAt", "evidence"]) || !boundedString(view.claim, 1, 1024) || !boundedString(view.result, 1, 1024) || !boundedString(view.gap, 1, 1024) || !boundedString(view.executedAt, 20, 64) || !Number.isFinite(Date.parse(view.executedAt))) {
+        throw new PointableProtocolError(
+          "invalid_lookup_result",
+          "detail comprehension view is invalid"
+        );
+      }
+      comprehension = {
+        kind: "verification",
+        claim: view.claim,
+        result: view.result,
+        gap: view.gap,
+        executedAt: view.executedAt,
+        evidence: validateEvidence(view.evidence)
+      };
     } else {
       throw new PointableProtocolError(
         "invalid_lookup_result",
@@ -1321,7 +1362,22 @@ function validatePointableRendererResponse(value) {
     if (candidate.kind === "change") {
       return exact(candidate, ["kind", "before", "after", "impact", "evidence"]) && bounded(candidate.before, 1, 1024) && bounded(candidate.after, 1, 1024) && bounded(candidate.impact, 1, 1024);
     }
-    return candidate.kind === "decision" && exact(candidate, ["kind", "problem", "choice", "consequence", "evidence"]) && bounded(candidate.problem, 1, 1024) && bounded(candidate.choice, 1, 1024) && bounded(candidate.consequence, 1, 1024);
+    if (candidate.kind === "decision") {
+      return exact(candidate, ["kind", "problem", "choice", "consequence", "evidence"]) && bounded(candidate.problem, 1, 1024) && bounded(candidate.choice, 1, 1024) && bounded(candidate.consequence, 1, 1024);
+    }
+    if (candidate.kind === "task") {
+      return exact(candidate, [
+        "kind",
+        "goal",
+        "status",
+        "completed",
+        "next",
+        "blocker",
+        "updatedAt",
+        "evidence"
+      ]) && bounded(candidate.goal, 1, 1024) && bounded(candidate.status, 1, 1024) && bounded(candidate.completed, 1, 1024) && bounded(candidate.next, 1, 1024) && bounded(candidate.blocker, 1, 1024) && bounded(candidate.updatedAt, 20, 64) && Number.isFinite(Date.parse(candidate.updatedAt));
+    }
+    return candidate.kind === "verification" && exact(candidate, ["kind", "claim", "result", "gap", "executedAt", "evidence"]) && bounded(candidate.claim, 1, 1024) && bounded(candidate.result, 1, 1024) && bounded(candidate.gap, 1, 1024) && bounded(candidate.executedAt, 20, 64) && Number.isFinite(Date.parse(candidate.executedAt));
   };
   if (!isRecord(value) || !exact(value, [
     "schemaVersion",
@@ -2110,12 +2166,26 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
         modelBlock("comprehension-after", "\u73B0\u5728", model.after, "primary"),
         modelBlock("comprehension-impact", "\u8FD9\u4F1A\u5F71\u54CD", model.impact, "impact")
       );
-    } else {
+    } else if (model.kind === "decision") {
       surface.append(
         modelBlock("comprehension-problem", "\u8981\u89E3\u51B3\u7684\u95EE\u9898", model.problem),
         arrow(),
         modelBlock("comprehension-choice", "\u9009\u62E9", model.choice, "primary"),
         modelBlock("comprehension-consequence", "\u7ED3\u679C\u4E0E\u4EE3\u4EF7", model.consequence, "impact")
+      );
+    } else if (model.kind === "task") {
+      surface.append(
+        paragraph(model.goal),
+        modelBlock("comprehension-status", "\u5F53\u524D\u72B6\u6001", model.status, "primary"),
+        modelBlock("comprehension-completed", "\u5DF2\u7ECF\u5B8C\u6210", model.completed),
+        modelBlock("comprehension-next", "\u63A5\u4E0B\u6765", model.next, "primary"),
+        modelBlock("comprehension-blocker", "\u963B\u585E", model.blocker, "impact")
+      );
+    } else {
+      surface.append(
+        paragraph(model.claim),
+        modelBlock("comprehension-result", "\u9A8C\u8BC1\u7ED3\u679C", model.result, "primary"),
+        modelBlock("comprehension-gap", "\u4ECD\u672A\u8BC1\u660E", model.gap, "impact")
       );
     }
     const evidenceDisclosure = document.createElement("div");

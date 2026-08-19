@@ -1086,6 +1086,47 @@ function validateDetail(value) {
         consequence: view.consequence,
         evidence: validateEvidence(view.evidence)
       };
+    } else if (view.kind === "task") {
+      if (!exactKeys2(view, [
+        "kind",
+        "goal",
+        "status",
+        "completed",
+        "next",
+        "blocker",
+        "updatedAt",
+        "evidence"
+      ]) || !boundedString(view.goal, 1, 1024) || !boundedString(view.status, 1, 1024) || !boundedString(view.completed, 1, 1024) || !boundedString(view.next, 1, 1024) || !boundedString(view.blocker, 1, 1024) || !boundedString(view.updatedAt, 20, 64) || !Number.isFinite(Date.parse(view.updatedAt))) {
+        throw new PointableProtocolError(
+          "invalid_lookup_result",
+          "detail comprehension view is invalid"
+        );
+      }
+      comprehension = {
+        kind: "task",
+        goal: view.goal,
+        status: view.status,
+        completed: view.completed,
+        next: view.next,
+        blocker: view.blocker,
+        updatedAt: view.updatedAt,
+        evidence: validateEvidence(view.evidence)
+      };
+    } else if (view.kind === "verification") {
+      if (!exactKeys2(view, ["kind", "claim", "result", "gap", "executedAt", "evidence"]) || !boundedString(view.claim, 1, 1024) || !boundedString(view.result, 1, 1024) || !boundedString(view.gap, 1, 1024) || !boundedString(view.executedAt, 20, 64) || !Number.isFinite(Date.parse(view.executedAt))) {
+        throw new PointableProtocolError(
+          "invalid_lookup_result",
+          "detail comprehension view is invalid"
+        );
+      }
+      comprehension = {
+        kind: "verification",
+        claim: view.claim,
+        result: view.result,
+        gap: view.gap,
+        executedAt: view.executedAt,
+        evidence: validateEvidence(view.evidence)
+      };
     } else {
       throw new PointableProtocolError(
         "invalid_lookup_result",
@@ -1251,7 +1292,22 @@ function validatePointableRendererResponse(value) {
     if (candidate.kind === "change") {
       return exact(candidate, ["kind", "before", "after", "impact", "evidence"]) && bounded(candidate.before, 1, 1024) && bounded(candidate.after, 1, 1024) && bounded(candidate.impact, 1, 1024);
     }
-    return candidate.kind === "decision" && exact(candidate, ["kind", "problem", "choice", "consequence", "evidence"]) && bounded(candidate.problem, 1, 1024) && bounded(candidate.choice, 1, 1024) && bounded(candidate.consequence, 1, 1024);
+    if (candidate.kind === "decision") {
+      return exact(candidate, ["kind", "problem", "choice", "consequence", "evidence"]) && bounded(candidate.problem, 1, 1024) && bounded(candidate.choice, 1, 1024) && bounded(candidate.consequence, 1, 1024);
+    }
+    if (candidate.kind === "task") {
+      return exact(candidate, [
+        "kind",
+        "goal",
+        "status",
+        "completed",
+        "next",
+        "blocker",
+        "updatedAt",
+        "evidence"
+      ]) && bounded(candidate.goal, 1, 1024) && bounded(candidate.status, 1, 1024) && bounded(candidate.completed, 1, 1024) && bounded(candidate.next, 1, 1024) && bounded(candidate.blocker, 1, 1024) && bounded(candidate.updatedAt, 20, 64) && Number.isFinite(Date.parse(candidate.updatedAt));
+    }
+    return candidate.kind === "verification" && exact(candidate, ["kind", "claim", "result", "gap", "executedAt", "evidence"]) && bounded(candidate.claim, 1, 1024) && bounded(candidate.result, 1, 1024) && bounded(candidate.gap, 1, 1024) && bounded(candidate.executedAt, 20, 64) && Number.isFinite(Date.parse(candidate.executedAt));
   };
   if (!isRecord(value) || !exact(value, [
     "schemaVersion",
@@ -2040,12 +2096,26 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
         modelBlock("comprehension-after", "\u73B0\u5728", model.after, "primary"),
         modelBlock("comprehension-impact", "\u8FD9\u4F1A\u5F71\u54CD", model.impact, "impact")
       );
-    } else {
+    } else if (model.kind === "decision") {
       surface.append(
         modelBlock("comprehension-problem", "\u8981\u89E3\u51B3\u7684\u95EE\u9898", model.problem),
         arrow(),
         modelBlock("comprehension-choice", "\u9009\u62E9", model.choice, "primary"),
         modelBlock("comprehension-consequence", "\u7ED3\u679C\u4E0E\u4EE3\u4EF7", model.consequence, "impact")
+      );
+    } else if (model.kind === "task") {
+      surface.append(
+        paragraph(model.goal),
+        modelBlock("comprehension-status", "\u5F53\u524D\u72B6\u6001", model.status, "primary"),
+        modelBlock("comprehension-completed", "\u5DF2\u7ECF\u5B8C\u6210", model.completed),
+        modelBlock("comprehension-next", "\u63A5\u4E0B\u6765", model.next, "primary"),
+        modelBlock("comprehension-blocker", "\u963B\u585E", model.blocker, "impact")
+      );
+    } else {
+      surface.append(
+        paragraph(model.claim),
+        modelBlock("comprehension-result", "\u9A8C\u8BC1\u7ED3\u679C", model.result, "primary"),
+        modelBlock("comprehension-gap", "\u4ECD\u672A\u8BC1\u660E", model.gap, "impact")
       );
     }
     const evidenceDisclosure = document.createElement("div");
@@ -3899,6 +3969,14 @@ function contextDecisionDocumentPath(relativePath) {
   const portable2 = relativePath.replace(/\\/gu, "/");
   return /(?:^|\/)docs\/decisions\/[^/]+\.md$/iu.test(portable2);
 }
+function contextTaskDocumentPath(relativePath) {
+  const portable2 = relativePath.replace(/\\/gu, "/");
+  return /(?:^|\/)docs\/tasks\/[^/]+\.md$/iu.test(portable2);
+}
+function contextVerificationDocumentPath(relativePath) {
+  const portable2 = relativePath.replace(/\\/gu, "/");
+  return /(?:^|\/)docs\/verifications\/[^/]+\.md$/iu.test(portable2);
+}
 function documentSections(content) {
   const lines = content.replace(/\r\n?/gu, "\n").split("\n");
   const sections = /* @__PURE__ */ new Map();
@@ -3936,6 +4014,13 @@ function revision(base) {
     ...base,
     contextRevision: createHash4("sha256").update(JSON.stringify(base), "utf8").digest("hex")
   });
+}
+function isoTimestamp(value) {
+  if (value === void 0 || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/u.test(value)) {
+    return void 0;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : void 0;
 }
 function extractContextConceptArtifact(content) {
   const { title, sections } = documentSections(content);
@@ -3991,6 +4076,43 @@ function extractContextDecisionArtifact(content) {
     return void 0;
   }
   return revision({ title, problem, choice, consequence, evidence });
+}
+function extractContextTaskArtifact(content) {
+  const { title, sections } = documentSections(content);
+  const goal = sectionText(sections.get("\u76EE\u6807") ?? []);
+  const status = sectionText(sections.get("\u5F53\u524D\u72B6\u6001") ?? []);
+  const completed = sectionText(sections.get("\u5DF2\u5B8C\u6210") ?? []);
+  const next = sectionText(sections.get("\u4E0B\u4E00\u6B65") ?? []);
+  const blocker = sectionText(sections.get("\u963B\u585E") ?? []);
+  const updatedAt = isoTimestamp(sectionText(sections.get("\u66F4\u65B0\u65F6\u95F4") ?? []));
+  const evidence = artifactEvidence(sections);
+  if (title === void 0 || goal === void 0 || status === void 0 || completed === void 0 || next === void 0 || blocker === void 0 || updatedAt === void 0 || evidence === void 0) {
+    return void 0;
+  }
+  return revision({ title, goal, status, completed, next, blocker, updatedAt, evidence });
+}
+function extractContextVerificationArtifact(content) {
+  const { title, sections } = documentSections(content);
+  const claim = sectionText(sections.get("\u8981\u8BC1\u660E\u4EC0\u4E48") ?? []);
+  const result = sectionText(sections.get("\u7ED3\u679C") ?? []);
+  const gap = sectionText(sections.get("\u5C1A\u672A\u8BC1\u660E") ?? []);
+  const method = sectionText(sections.get("\u9A8C\u8BC1\u65B9\u5F0F") ?? []);
+  const verifiedRevision = sectionText(sections.get("\u9A8C\u8BC1\u4FEE\u8BA2") ?? []);
+  const executedAt = isoTimestamp(sectionText(sections.get("\u6267\u884C\u65F6\u95F4") ?? []));
+  const evidence = artifactEvidence(sections);
+  if (title === void 0 || claim === void 0 || result === void 0 || gap === void 0 || method === void 0 || verifiedRevision === void 0 || executedAt === void 0 || evidence === void 0) {
+    return void 0;
+  }
+  return revision({
+    title,
+    claim,
+    result,
+    gap,
+    method,
+    verifiedRevision,
+    executedAt,
+    evidence
+  });
 }
 
 // src/adapters/source-module-artifact.ts
@@ -4502,6 +4624,8 @@ function workspaceEntityType(relativePath) {
   if (contextConceptDocumentPath(relativePath)) return "concept";
   if (contextChangeDocumentPath(relativePath)) return "change";
   if (contextDecisionDocumentPath(relativePath)) return "decision";
+  if (contextTaskDocumentPath(relativePath)) return "task";
+  if (contextVerificationDocumentPath(relativePath)) return "verification";
   if (decisionDocumentPath(relativePath)) return "decision";
   if (markdownDocument(relativePath)) return "document";
   if (testSourcePath(relativePath)) return "verification";
@@ -4625,7 +4749,7 @@ var LocalWorkspaceContextIndex = class {
       const name = basename3(file.relativePath);
       const parent = portablePath(dirname2(file.relativePath));
       const entityType = workspaceEntityType(file.relativePath);
-      const explicitMentalModel = entityType === "concept" || contextChangeDocumentPath(file.relativePath) || contextDecisionDocumentPath(file.relativePath);
+      const explicitMentalModel = entityType === "concept" || entityType === "task" || contextVerificationDocumentPath(file.relativePath) || contextChangeDocumentPath(file.relativePath) || contextDecisionDocumentPath(file.relativePath);
       const canonicalName = explicitMentalModel ? contextArtifactCanonicalName(file.relativePath) : name;
       return {
         schemaVersion: "1.0",
@@ -4809,7 +4933,7 @@ async function gitRevisionFingerprint(root, locator, entityType, signal) {
   };
 }
 async function evidenceRevisionFingerprint(root, canonicalFile, locator, entityType, signal) {
-  const explicitArtifact = entityType === "concept" || entityType === "change" || contextDecisionDocumentPath(locator);
+  const explicitArtifact = entityType === "concept" || entityType === "change" || entityType === "task" || contextVerificationDocumentPath(locator) || contextDecisionDocumentPath(locator);
   if (!explicitArtifact) return "none";
   let handle;
   try {
@@ -4820,7 +4944,7 @@ async function evidenceRevisionFingerprint(root, canonicalFile, locator, entityT
     const after = await handle.stat();
     if (!stableFileStat(before, after) || signal?.aborted) return "artifact-unavailable";
     const decoded = utf8Content(content);
-    const artifact = decoded === void 0 ? void 0 : entityType === "concept" ? extractContextConceptArtifact(decoded) : entityType === "change" ? extractContextChangeArtifact(decoded) : extractContextDecisionArtifact(decoded);
+    const artifact = decoded === void 0 ? void 0 : entityType === "concept" ? extractContextConceptArtifact(decoded) : entityType === "change" ? extractContextChangeArtifact(decoded) : entityType === "task" ? extractContextTaskArtifact(decoded) : contextVerificationDocumentPath(locator) ? extractContextVerificationArtifact(decoded) : extractContextDecisionArtifact(decoded);
     if (artifact === void 0) return "artifact-invalid";
     const sourcePath = resolve4(root, ...artifact.evidence.sourcePath.split("/"));
     const canonicalSource = await realpath2(sourcePath);
@@ -4849,7 +4973,7 @@ var LocalWorkspaceRevisionProbe = class {
     if (request.signal?.aborted) {
       return { kind: "unavailable", observedAt, retryable: true };
     }
-    if (request.entityType !== "file" && request.entityType !== "document" && request.entityType !== "module" && request.entityType !== "verification" && request.entityType !== "configuration" && request.entityType !== "decision" && request.entityType !== "concept" && request.entityType !== "change") {
+    if (request.entityType !== "file" && request.entityType !== "document" && request.entityType !== "module" && request.entityType !== "verification" && request.entityType !== "configuration" && request.entityType !== "decision" && request.entityType !== "concept" && request.entityType !== "change" && request.entityType !== "task") {
       return { kind: "not_found", observedAt };
     }
     if (!request.entityId.startsWith("file:")) {
@@ -4925,7 +5049,7 @@ var LocalWorkspaceAuthoritativeProvider = class {
   providerId = LOCAL_WORKSPACE_PROVIDER_ID;
   async getDetail(request) {
     if (request.signal?.aborted) return { kind: "unavailable", retryable: true };
-    if (request.entityType !== "file" && request.entityType !== "document" && request.entityType !== "module" && request.entityType !== "verification" && request.entityType !== "configuration" && request.entityType !== "decision" && request.entityType !== "concept" && request.entityType !== "change") {
+    if (request.entityType !== "file" && request.entityType !== "document" && request.entityType !== "module" && request.entityType !== "verification" && request.entityType !== "configuration" && request.entityType !== "decision" && request.entityType !== "concept" && request.entityType !== "change" && request.entityType !== "task") {
       return { kind: "not_found" };
     }
     if (request.authorityLocator.length < 1 || request.authorityLocator.length > MAX_RELATIVE_PATH_CHARS || request.authorityLocator.includes("\\") || request.authorityLocator.startsWith("/") || request.authorityLocator.split("/").includes("..") || request.entityId !== fileEntityId(request.authorityLocator) || workspaceEntityType(request.authorityLocator) !== request.entityType) {
@@ -4952,7 +5076,7 @@ var LocalWorkspaceAuthoritativeProvider = class {
         content: decoded,
         ...request.signal === void 0 ? {} : { signal: request.signal }
       }) : void 0;
-      const sourceModuleContext = (request.entityType === "module" || request.entityType === "verification") && decoded !== void 0 ? await extractSourceModuleArtifactContext({
+      const sourceModuleContext = (request.entityType === "module" || request.entityType === "verification" && !contextVerificationDocumentPath(relativePath)) && decoded !== void 0 ? await extractSourceModuleArtifactContext({
         root,
         relativePath,
         content: decoded,
@@ -4961,6 +5085,8 @@ var LocalWorkspaceAuthoritativeProvider = class {
       const conceptContext = request.entityType === "concept" && decoded !== void 0 ? extractContextConceptArtifact(decoded) : void 0;
       const changeContext = request.entityType === "change" && decoded !== void 0 ? extractContextChangeArtifact(decoded) : void 0;
       const explicitDecisionContext = request.entityType === "decision" && contextDecisionDocumentPath(relativePath) && decoded !== void 0 ? extractContextDecisionArtifact(decoded) : void 0;
+      const taskContext = request.entityType === "task" && decoded !== void 0 ? extractContextTaskArtifact(decoded) : void 0;
+      const explicitVerificationContext = request.entityType === "verification" && contextVerificationDocumentPath(relativePath) && decoded !== void 0 ? extractContextVerificationArtifact(decoded) : void 0;
       if (request.entityType === "concept" && conceptContext === void 0) {
         return { kind: "not_found" };
       }
@@ -4968,6 +5094,12 @@ var LocalWorkspaceAuthoritativeProvider = class {
         return { kind: "not_found" };
       }
       if (request.entityType === "decision" && contextDecisionDocumentPath(relativePath) && explicitDecisionContext === void 0) {
+        return { kind: "not_found" };
+      }
+      if (request.entityType === "task" && taskContext === void 0) {
+        return { kind: "not_found" };
+      }
+      if (request.entityType === "verification" && contextVerificationDocumentPath(relativePath) && explicitVerificationContext === void 0) {
         return { kind: "not_found" };
       }
       const after = await handle.stat();
@@ -4982,19 +5114,19 @@ var LocalWorkspaceAuthoritativeProvider = class {
         inode: after.ino
       }), "utf8").digest("hex");
       const contentHash = content === void 0 ? void 0 : createHash6("sha256").update(content).digest("hex");
-      const mentalModelContext = conceptContext ?? changeContext ?? explicitDecisionContext;
+      const mentalModelContext = conceptContext ?? changeContext ?? explicitDecisionContext ?? taskContext ?? explicitVerificationContext;
       const artifactEvidence2 = mentalModelContext === void 0 ? void 0 : await verifyArtifactEvidence(root, mentalModelContext, request.signal);
       if (mentalModelContext !== void 0 && artifactEvidence2 === void 0) {
         return { kind: "not_found" };
       }
       const detailRevision = createHash6("sha256").update(contentHash ?? statRevision, "utf8").update("\0", "utf8").update(
-        markdownContext?.contextRevision ?? sourceModuleContext?.contextRevision ?? conceptContext?.contextRevision ?? changeContext?.contextRevision ?? explicitDecisionContext?.contextRevision ?? "file-metadata-v1",
+        markdownContext?.contextRevision ?? sourceModuleContext?.contextRevision ?? conceptContext?.contextRevision ?? changeContext?.contextRevision ?? explicitDecisionContext?.contextRevision ?? taskContext?.contextRevision ?? explicitVerificationContext?.contextRevision ?? "file-metadata-v1",
         "utf8"
       ).update(artifactEvidence2?.revision ?? "", "utf8").digest("hex");
       const extension = extname3(relativePath);
       const preview = content === void 0 ? void 0 : contentPreview(content);
       const observedAt = (/* @__PURE__ */ new Date()).toISOString();
-      const testContext = request.entityType === "verification" && decoded !== void 0 ? extractStaticTestDefinitionContext(decoded) : void 0;
+      const testContext = request.entityType === "verification" && !contextVerificationDocumentPath(relativePath) && decoded !== void 0 ? extractStaticTestDefinitionContext(decoded) : void 0;
       const configurationContext = request.entityType === "configuration" && decoded !== void 0 ? extractJsonConfigurationContext(relativePath, decoded) : void 0;
       const decisionContext = request.entityType === "decision" && explicitDecisionContext === void 0 && decoded !== void 0 ? extractDecisionDocumentContext(decoded) : void 0;
       const markdownFacts = markdownContext === void 0 ? void 0 : {
@@ -5062,6 +5194,29 @@ var LocalWorkspaceAuthoritativeProvider = class {
         "\u6240\u5904\u6D41\u7A0B": conceptContext.sequence.map((item, index) => index === conceptContext.currentStep ? `\u5F53\u524D\uFF1A${item}` : item),
         "\u8BC1\u636E": conceptContext.evidence.excerpt
       };
+      const taskFacts = taskContext === void 0 ? void 0 : {
+        "\u76EE\u6807": taskContext.goal,
+        "\u5F53\u524D\u72B6\u6001": taskContext.status,
+        "\u4E0B\u4E00\u6B65": taskContext.next,
+        "\u963B\u585E": taskContext.blocker,
+        "\u66F4\u65B0\u65F6\u95F4": taskContext.updatedAt,
+        "\u5DF2\u5B8C\u6210": taskContext.completed,
+        "\u8BC1\u636E": taskContext.evidence.excerpt
+      };
+      const explicitVerificationFacts = explicitVerificationContext === void 0 ? void 0 : {
+        "\u8981\u8BC1\u660E\u4EC0\u4E48": explicitVerificationContext.claim,
+        "\u7ED3\u679C": explicitVerificationContext.result,
+        "\u5C1A\u672A\u8BC1\u660E": explicitVerificationContext.gap,
+        "\u9A8C\u8BC1\u8BB0\u5F55": [
+          `\u65B9\u5F0F: ${explicitVerificationContext.method}`,
+          `\u4FEE\u8BA2: ${explicitVerificationContext.verifiedRevision}`,
+          `\u65F6\u95F4: ${explicitVerificationContext.executedAt}`
+        ],
+        "\u8BC1\u636E": explicitVerificationContext.evidence.excerpt,
+        "\u9A8C\u8BC1\u65B9\u5F0F": explicitVerificationContext.method,
+        "\u9A8C\u8BC1\u4FEE\u8BA2": explicitVerificationContext.verifiedRevision,
+        "\u6267\u884C\u65F6\u95F4": explicitVerificationContext.executedAt
+      };
       return {
         kind: "snapshot",
         snapshot: {
@@ -5071,7 +5226,7 @@ var LocalWorkspaceAuthoritativeProvider = class {
           entityRevision: `sha256:${detailRevision}`,
           observedAt,
           freshness: "current",
-          facts: conceptFacts ?? changeFacts ?? explicitDecisionFacts ?? decisionFacts ?? verificationFacts ?? configurationFacts ?? markdownFacts ?? moduleFacts ?? {
+          facts: conceptFacts ?? changeFacts ?? explicitDecisionFacts ?? taskFacts ?? explicitVerificationFacts ?? decisionFacts ?? verificationFacts ?? configurationFacts ?? markdownFacts ?? moduleFacts ?? {
             path: relativePath,
             name: basename3(relativePath),
             ...preview === void 0 ? {} : { preview },
@@ -5974,6 +6129,22 @@ function mentalModelComprehension(outcome) {
     const consequence = scalarFact(outcome.detail.facts, "\u540E\u679C\u662F\u4EC0\u4E48");
     return problem === void 0 || choice === void 0 || consequence === void 0 ? void 0 : { kind: "decision", problem, choice, consequence, evidence };
   }
+  if (outcome.detail.entityType === "task") {
+    const goal = scalarFact(outcome.detail.facts, "\u76EE\u6807");
+    const status = scalarFact(outcome.detail.facts, "\u5F53\u524D\u72B6\u6001");
+    const completed = scalarFact(outcome.detail.facts, "\u5DF2\u5B8C\u6210");
+    const next = scalarFact(outcome.detail.facts, "\u4E0B\u4E00\u6B65");
+    const blocker = scalarFact(outcome.detail.facts, "\u963B\u585E");
+    const updatedAt = scalarFact(outcome.detail.facts, "\u66F4\u65B0\u65F6\u95F4");
+    return goal === void 0 || status === void 0 || completed === void 0 || next === void 0 || blocker === void 0 || updatedAt === void 0 ? void 0 : { kind: "task", goal, status, completed, next, blocker, updatedAt, evidence };
+  }
+  if (outcome.detail.entityType === "verification") {
+    const claim = scalarFact(outcome.detail.facts, "\u8981\u8BC1\u660E\u4EC0\u4E48");
+    const result = scalarFact(outcome.detail.facts, "\u7ED3\u679C");
+    const gap = scalarFact(outcome.detail.facts, "\u5C1A\u672A\u8BC1\u660E");
+    const executedAt = scalarFact(outcome.detail.facts, "\u6267\u884C\u65F6\u95F4");
+    return claim === void 0 || result === void 0 || gap === void 0 || executedAt === void 0 ? void 0 : { kind: "verification", claim, result, gap, executedAt, evidence };
+  }
   return void 0;
 }
 function errorPresentation(code, message, retryable) {
@@ -5989,14 +6160,14 @@ function candidateView(candidate, candidateRef) {
 }
 function detailView(outcome, options = {}) {
   const purpose = outcome.detail.facts["\u7528\u9014"] ?? outcome.detail.facts["\u804C\u8D23"];
-  const scenarioSummary = outcome.detail.entityType === "verification" ? outcome.detail.facts["\u9A8C\u8BC1\u8303\u56F4"] : outcome.detail.entityType === "configuration" ? outcome.detail.facts["\u914D\u7F6E\u7528\u9014"] : outcome.detail.entityType === "decision" ? outcome.detail.facts["\u9009\u62E9\u4E86\u4EC0\u4E48"] ?? outcome.detail.facts["\u51B3\u7B56"] : outcome.detail.entityType === "concept" ? outcome.detail.facts["\u5B83\u662F\u4EC0\u4E48\u610F\u601D"] : outcome.detail.entityType === "change" ? outcome.detail.facts["\u73B0\u5728\u600E\u6837"] : void 0;
+  const scenarioSummary = outcome.detail.entityType === "verification" ? outcome.detail.facts["\u7ED3\u679C"] ?? outcome.detail.facts["\u9A8C\u8BC1\u8303\u56F4"] : outcome.detail.entityType === "configuration" ? outcome.detail.facts["\u914D\u7F6E\u7528\u9014"] : outcome.detail.entityType === "decision" ? outcome.detail.facts["\u9009\u62E9\u4E86\u4EC0\u4E48"] ?? outcome.detail.facts["\u51B3\u7B56"] : outcome.detail.entityType === "concept" ? outcome.detail.facts["\u5B83\u662F\u4EC0\u4E48\u610F\u601D"] : outcome.detail.entityType === "change" ? outcome.detail.facts["\u73B0\u5728\u600E\u6837"] : outcome.detail.entityType === "task" ? outcome.detail.facts["\u5F53\u524D\u72B6\u6001"] : void 0;
   const change = outcome.detail.facts["\u672C\u6B21\u53D8\u5316"];
   const activeChange = typeof change === "string" && /^(?:涉及：|modified\b|staged\b|untracked\b|conflicted\b)/u.test(change);
   const summaryValue = scenarioSummary ?? (activeChange ? change : purpose);
   const summary = typeof summaryValue === "string" ? truncate(summaryValue, 1024) : truncate(outcome.candidate.summary, 1024);
   const comprehension = mentalModelComprehension(outcome);
   const humanSummary = comprehension === void 0 ? void 0 : truncate(
-    comprehension.kind === "concept" ? `${comprehension.meaning} ${comprehension.context}` : comprehension.kind === "change" ? `${comprehension.after} ${comprehension.impact}` : `${comprehension.choice} ${comprehension.consequence}`,
+    comprehension.kind === "concept" ? `${comprehension.meaning} ${comprehension.context}` : comprehension.kind === "change" ? `${comprehension.after} ${comprehension.impact}` : comprehension.kind === "decision" ? `${comprehension.choice} ${comprehension.consequence}` : comprehension.kind === "task" ? `${comprehension.status} \u4E0B\u4E00\u6B65\uFF1A${comprehension.next}` : `${comprehension.result} \u5C1A\u672A\u8BC1\u660E\uFF1A${comprehension.gap}`,
     1024
   );
   return {

@@ -77,10 +77,32 @@ export interface PointableDecisionComprehensionView {
   evidence: PointableEvidenceView[];
 }
 
+export interface PointableTaskComprehensionView {
+  kind: "task";
+  goal: string;
+  status: string;
+  completed: string;
+  next: string;
+  blocker: string;
+  updatedAt: string;
+  evidence: PointableEvidenceView[];
+}
+
+export interface PointableVerificationComprehensionView {
+  kind: "verification";
+  claim: string;
+  result: string;
+  gap: string;
+  executedAt: string;
+  evidence: PointableEvidenceView[];
+}
+
 export type PointableComprehensionView =
   | PointableConceptComprehensionView
   | PointableChangeComprehensionView
-  | PointableDecisionComprehensionView;
+  | PointableDecisionComprehensionView
+  | PointableTaskComprehensionView
+  | PointableVerificationComprehensionView;
 
 export interface PointableDetailView {
   entityId: string;
@@ -485,6 +507,56 @@ function validateDetail(value: unknown): PointableDetailView {
         problem: view.problem,
         choice: view.choice,
         consequence: view.consequence,
+        evidence: validateEvidence(view.evidence),
+      };
+    } else if (view.kind === "task") {
+      if (
+        !exactKeys(view, [
+          "kind", "goal", "status", "completed", "next", "blocker", "updatedAt", "evidence",
+        ]) ||
+        !boundedString(view.goal, 1, 1_024) ||
+        !boundedString(view.status, 1, 1_024) ||
+        !boundedString(view.completed, 1, 1_024) ||
+        !boundedString(view.next, 1, 1_024) ||
+        !boundedString(view.blocker, 1, 1_024) ||
+        !boundedString(view.updatedAt, 20, 64) ||
+        !Number.isFinite(Date.parse(view.updatedAt))
+      ) {
+        throw new PointableProtocolError(
+          "invalid_lookup_result",
+          "detail comprehension view is invalid",
+        );
+      }
+      comprehension = {
+        kind: "task",
+        goal: view.goal,
+        status: view.status,
+        completed: view.completed,
+        next: view.next,
+        blocker: view.blocker,
+        updatedAt: view.updatedAt,
+        evidence: validateEvidence(view.evidence),
+      };
+    } else if (view.kind === "verification") {
+      if (
+        !exactKeys(view, ["kind", "claim", "result", "gap", "executedAt", "evidence"]) ||
+        !boundedString(view.claim, 1, 1_024) ||
+        !boundedString(view.result, 1, 1_024) ||
+        !boundedString(view.gap, 1, 1_024) ||
+        !boundedString(view.executedAt, 20, 64) ||
+        !Number.isFinite(Date.parse(view.executedAt))
+      ) {
+        throw new PointableProtocolError(
+          "invalid_lookup_result",
+          "detail comprehension view is invalid",
+        );
+      }
+      comprehension = {
+        kind: "verification",
+        claim: view.claim,
+        result: view.result,
+        gap: view.gap,
+        executedAt: view.executedAt,
         evidence: validateEvidence(view.evidence),
       };
     } else {

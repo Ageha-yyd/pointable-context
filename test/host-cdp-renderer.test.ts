@@ -126,6 +126,24 @@ test("renderer response validator accepts bounded text-only views and rejects fe
       consequence: "Qualify the private host per build.",
       evidence: [{ excerpt: "Codex Desktop", source: "source:2" }],
     },
+    {
+      kind: "task" as const,
+      goal: "Expose explicit work results.",
+      status: "Ready for native-lane validation.",
+      completed: "The deterministic data path is connected.",
+      next: "Inspect the native task card.",
+      blocker: "Human efficiency is not yet measured.",
+      updatedAt: "2026-08-19T05:00:00.000Z",
+      evidence: [{ excerpt: "Task evidence", source: "source:3" }],
+    },
+    {
+      kind: "verification" as const,
+      claim: "Refresh preserves the card's reading state.",
+      result: "The bounded acceptance passed.",
+      gap: "Cross-version behavior remains unproven.",
+      executedAt: "2026-08-19T05:05:00.000Z",
+      evidence: [{ excerpt: "Verification evidence", source: "source:4" }],
+    },
   ]) {
     const detail: PointableLookupResponseV1 = {
       ...response,
@@ -197,6 +215,12 @@ test("install expression is namespaced, generic, click-gated, text-only, and cle
   assert.match(expression, /modelBlock\("comprehension-problem"/u);
   assert.match(expression, /modelBlock\("comprehension-choice"/u);
   assert.match(expression, /modelBlock\("comprehension-consequence"/u);
+  assert.match(expression, /modelBlock\("comprehension-status"/u);
+  assert.match(expression, /modelBlock\("comprehension-completed"/u);
+  assert.match(expression, /modelBlock\("comprehension-next"/u);
+  assert.match(expression, /modelBlock\("comprehension-blocker"/u);
+  assert.match(expression, /modelBlock\("comprehension-result"/u);
+  assert.match(expression, /modelBlock\("comprehension-gap"/u);
   assert.match(expression, /data-pointable-context-role", "evidence-toggle"/u);
   assert.match(expression, /为什么现在出现/u);
   assert.match(expression, /你现在位于这里/u);

@@ -184,11 +184,31 @@ export function validatePointableRendererResponse(
         bounded(candidate.after, 1, 1_024) &&
         bounded(candidate.impact, 1, 1_024);
     }
-    return candidate.kind === "decision" &&
-      exact(candidate, ["kind", "problem", "choice", "consequence", "evidence"]) &&
-      bounded(candidate.problem, 1, 1_024) &&
-      bounded(candidate.choice, 1, 1_024) &&
-      bounded(candidate.consequence, 1, 1_024);
+    if (candidate.kind === "decision") {
+      return exact(candidate, ["kind", "problem", "choice", "consequence", "evidence"]) &&
+        bounded(candidate.problem, 1, 1_024) &&
+        bounded(candidate.choice, 1, 1_024) &&
+        bounded(candidate.consequence, 1, 1_024);
+    }
+    if (candidate.kind === "task") {
+      return exact(candidate, [
+        "kind", "goal", "status", "completed", "next", "blocker", "updatedAt", "evidence",
+      ]) &&
+        bounded(candidate.goal, 1, 1_024) &&
+        bounded(candidate.status, 1, 1_024) &&
+        bounded(candidate.completed, 1, 1_024) &&
+        bounded(candidate.next, 1, 1_024) &&
+        bounded(candidate.blocker, 1, 1_024) &&
+        bounded(candidate.updatedAt, 20, 64) &&
+        Number.isFinite(Date.parse(candidate.updatedAt));
+    }
+    return candidate.kind === "verification" &&
+      exact(candidate, ["kind", "claim", "result", "gap", "executedAt", "evidence"]) &&
+      bounded(candidate.claim, 1, 1_024) &&
+      bounded(candidate.result, 1, 1_024) &&
+      bounded(candidate.gap, 1, 1_024) &&
+      bounded(candidate.executedAt, 20, 64) &&
+      Number.isFinite(Date.parse(candidate.executedAt));
   };
 
   if (
@@ -1289,12 +1309,26 @@ export function installPointableContextRenderer(
         modelBlock("comprehension-after", "现在", model.after, "primary"),
         modelBlock("comprehension-impact", "这会影响", model.impact, "impact"),
       );
-    } else {
+    } else if (model.kind === "decision") {
       surface.append(
         modelBlock("comprehension-problem", "要解决的问题", model.problem),
         arrow(),
         modelBlock("comprehension-choice", "选择", model.choice, "primary"),
         modelBlock("comprehension-consequence", "结果与代价", model.consequence, "impact"),
+      );
+    } else if (model.kind === "task") {
+      surface.append(
+        paragraph(model.goal),
+        modelBlock("comprehension-status", "当前状态", model.status, "primary"),
+        modelBlock("comprehension-completed", "已经完成", model.completed),
+        modelBlock("comprehension-next", "接下来", model.next, "primary"),
+        modelBlock("comprehension-blocker", "阻塞", model.blocker, "impact"),
+      );
+    } else {
+      surface.append(
+        paragraph(model.claim),
+        modelBlock("comprehension-result", "验证结果", model.result, "primary"),
+        modelBlock("comprehension-gap", "仍未证明", model.gap, "impact"),
       );
     }
 

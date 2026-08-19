@@ -41,6 +41,30 @@ export interface ContextDecisionArtifact {
   contextRevision: string;
 }
 
+export interface ContextTaskArtifact {
+  title: string;
+  goal: string;
+  status: string;
+  completed: string;
+  next: string;
+  blocker: string;
+  updatedAt: string;
+  evidence: ContextArtifactEvidence;
+  contextRevision: string;
+}
+
+export interface ContextVerificationArtifact {
+  title: string;
+  claim: string;
+  result: string;
+  gap: string;
+  method: string;
+  verifiedRevision: string;
+  executedAt: string;
+  evidence: ContextArtifactEvidence;
+  contextRevision: string;
+}
+
 function boundedText(value: string, maximum = MAX_FIELD_CHARS): string | undefined {
   const compact = value
     .replace(/[\p{Cc}\p{Cf}]+/gu, " ")
@@ -93,6 +117,16 @@ export function contextDecisionDocumentPath(relativePath: string): boolean {
   return /(?:^|\/)docs\/decisions\/[^/]+\.md$/iu.test(portable);
 }
 
+export function contextTaskDocumentPath(relativePath: string): boolean {
+  const portable = relativePath.replace(/\\/gu, "/");
+  return /(?:^|\/)docs\/tasks\/[^/]+\.md$/iu.test(portable);
+}
+
+export function contextVerificationDocumentPath(relativePath: string): boolean {
+  const portable = relativePath.replace(/\\/gu, "/");
+  return /(?:^|\/)docs\/verifications\/[^/]+\.md$/iu.test(portable);
+}
+
 function documentSections(content: string): {
   title?: string;
   sections: ReadonlyMap<string, readonly string[]>;
@@ -142,6 +176,17 @@ function revision<T extends object>(base: T): T & { contextRevision: string } {
       .update(JSON.stringify(base), "utf8")
       .digest("hex"),
   });
+}
+
+function isoTimestamp(value: string | undefined): string | undefined {
+  if (
+    value === undefined ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/u.test(value)
+  ) {
+    return undefined;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : undefined;
 }
 
 /**
@@ -233,4 +278,67 @@ export function extractContextDecisionArtifact(
     return undefined;
   }
   return revision({ title, problem, choice, consequence, evidence });
+}
+
+
+/**
+ * Parses an explicit Agent-authored task record. Status remains author data:
+ * this parser never infers completion from files, commits, or test presence.
+ */
+export function extractContextTaskArtifact(
+  content: string,
+): ContextTaskArtifact | undefined {
+  const { title, sections } = documentSections(content);
+  const goal = sectionText(sections.get("目标") ?? []);
+  const status = sectionText(sections.get("当前状态") ?? []);
+  const completed = sectionText(sections.get("已完成") ?? []);
+  const next = sectionText(sections.get("下一步") ?? []);
+  const blocker = sectionText(sections.get("阻塞") ?? []);
+  const updatedAt = isoTimestamp(sectionText(sections.get("更新时间") ?? []));
+  const evidence = artifactEvidence(sections);
+  if (
+    title === undefined ||
+    goal === undefined ||
+    status === undefined ||
+    completed === undefined ||
+    next === undefined ||
+    blocker === undefined ||
+    updatedAt === undefined ||
+    evidence === undefined
+  ) {
+    return undefined;
+  }
+  return revision({ title, goal, status, completed, next, blocker, updatedAt, evidence });
+}
+
+/**
+ * Parses an explicit verification-result record. The result is never derived
+ * from a test filename or source definition and must state its remaining gap.
+ */
+export function extractContextVerificationArtifact(
+  content: string,
+): ContextVerificationArtifact | undefined {
+  const { title, sections } = documentSections(content);
+  const claim = sectionText(sections.get("要证明什么") ?? []);
+  const result = sectionText(sections.get("结果") ?? []);
+  const gap = sectionText(sections.get("尚未证明") ?? []);
+  const method = sectionText(sections.get("验证方式") ?? []);
+  const verifiedRevision = sectionText(sections.get("验证修订") ?? []);
+  const executedAt = isoTimestamp(sectionText(sections.get("执行时间") ?? []));
+  const evidence = artifactEvidence(sections);
+  if (
+    title === undefined ||
+    claim === undefined ||
+    result === undefined ||
+    gap === undefined ||
+    method === undefined ||
+    verifiedRevision === undefined ||
+    executedAt === undefined ||
+    evidence === undefined
+  ) {
+    return undefined;
+  }
+  return revision({
+    title, claim, result, gap, method, verifiedRevision, executedAt, evidence,
+  });
 }
