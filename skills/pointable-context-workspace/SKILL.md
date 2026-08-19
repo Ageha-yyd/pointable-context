@@ -25,6 +25,7 @@ Manage the private Codex Desktop companion that keeps normal Chat visually uncha
 - The card is summary-first: facts, revision, observed time, and sources remain inside a collapsed in-card `查看详情` disclosure. Keep type and freshness visible even while collapsed.
 - Use `mental-model` as the ordinary product default. Presentation studies may explicitly fix `record`, `narrative`, or `mental-model` at startup. Never add an in-card condition switch. The mental-model condition keeps evidence behind the local `为什么这样说` disclosure.
 - An open card pins its snapshot. A lightweight file-stat revision probe may show `内容已更新`; only a trusted `刷新内容` click may re-read full detail, update the same card, and expose at most three changed fields. This creates no model call or Chat Turn.
+- Keep an open card visible when the user focuses the current Chat composer. Focusing or typing is not an outside-dismiss action; explicit close, Escape, a new selection, task/route drift, or a detached anchor still closes it.
 - If the selected file is deleted or revision status is unavailable, keep the old snapshot visible with an explicit warning. Never silently replace, hide, or relabel it as current.
 
 ## Boundaries
@@ -55,8 +56,9 @@ $companion = Join-Path $pluginRoot 'host\workspace-companion.mjs'
 6. Ask the user to select an exact visible file name/path, such as `README.md`, and click `查看上下文`.
 7. Verify that selection alone produces no detail request; the trusted click produces one direct detail or a bounded candidate menu.
 8. For revision qualification, leave one card open, change the selected file, confirm `内容已更新`, then click `刷新内容`. Verify that the card updates in place, displays a finite diff, opens no browser, and adds no Chat Turn.
-9. Run `unbind --json` only when explicitly requested. Verify that `activeBinding` disappears before binding another root.
-10. Run `stop --json` when requested. Stopping removes the renderer/runtime binding but intentionally preserves the explicit task-to-workspace registry for later reuse.
+9. Focus the current Chat composer while the card is open. Verify that the composer receives focus, the card stays visible, and its background revision check remains active.
+10. Run `unbind --json` only when explicitly requested. Verify that `activeBinding` disappears before binding another root.
+11. Run `stop --json` when requested. Stopping removes the renderer/runtime binding but intentionally preserves the explicit task-to-workspace registry for later reuse.
 
 ```powershell
 node $companion status --json

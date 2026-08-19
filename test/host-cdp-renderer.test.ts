@@ -166,6 +166,10 @@ test("install expression is namespaced, generic, click-gated, text-only, and cle
   assert.match(expression, /ownedInteraction/u);
   assert.match(expression, /removeAllRanges\(\)/u);
   assert.match(expression, /addEventListener\("mousedown", dismissPointer\)/u);
+  assert.match(expression, /card !== null && target instanceof Element/u);
+  assert.match(expression, /\[contenteditable="true"\]/u);
+  assert.match(expression, /stableRoot\.contains\(composer\)/u);
+  assert.match(expression, /restoreFocus = composer/u);
   assert.match(expression, /state === "resolving"/u);
   assert.match(expression, /detailBody\.hidden = true/u);
   assert.match(expression, /detailBody\.style\.display = "none"/u);

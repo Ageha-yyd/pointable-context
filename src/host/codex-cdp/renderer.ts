@@ -763,6 +763,15 @@ export function installPointableContextRenderer(
       ) {
         return;
       }
+      const composer = card !== null && target instanceof Element
+        ? target.closest<HTMLElement>(
+            'textarea, input, [contenteditable="true"], [role="textbox"]',
+          )
+        : null;
+      if (composer !== null && stableRoot.contains(composer)) {
+        restoreFocus = composer;
+        return;
+      }
       cleanup(true, true);
     };
     window.addEventListener("pointerdown", outsideHandler, true);

@@ -133,7 +133,14 @@ try {
     Object.assign(text.style, { font: '20px sans-serif' });
     overlay.append(text);
     message.append(overlay);
-    main.append(message);
+    const composer = document.createElement('textarea');
+    composer.id = 'fixture-composer';
+    composer.setAttribute('aria-label', 'Reply');
+    Object.assign(composer.style, {
+      position: 'fixed', right: '16px', bottom: '16px',
+      width: '240px', height: '64px', zIndex: '10',
+    });
+    main.append(message, composer);
     document.body.append(sidebar, main);
     return true;
   })()`);
@@ -265,6 +272,39 @@ try {
     createDeliverPointableResultExpression(response, lifecycleId),
   );
   if (delivered?.outcome !== "applied") throw new Error("detail was not applied");
+
+  const composer = await evaluate(connection, `(() => {
+    const editor = document.getElementById('fixture-composer');
+    if (!(editor instanceof HTMLTextAreaElement)) return null;
+    const rect = editor.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  })()`);
+  if (composer === null) throw new Error("headless composer missing");
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mousePressed", x: composer.x, y: composer.y, button: "left", clickCount: 1,
+  });
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mouseReleased", x: composer.x, y: composer.y, button: "left", clickCount: 1,
+  });
+  await waitFor(connection, `(() => {
+    const editor = document.getElementById('fixture-composer');
+    const card = document.querySelector('[data-pointable-context-role="card"]');
+    return document.activeElement === editor && card instanceof HTMLElement;
+  })()`);
+  await sleep(700);
+  const composerPersistence = await evaluate(connection, `(() => ({
+    activeElement: document.activeElement?.id ?? '',
+    selection: window.getSelection()?.toString() ?? '',
+    cardCount: document.querySelectorAll('[data-pointable-context-role="card"]').length,
+    status: window.__pointableContextRenderer?.status?.(),
+  }))()`);
+  if (
+    composerPersistence.activeElement !== "fixture-composer" ||
+    composerPersistence.cardCount !== 1 ||
+    composerPersistence.status?.state !== "detail"
+  ) {
+    throw new Error(`composer did not preserve the live card: ${JSON.stringify(composerPersistence)}`);
+  }
 
   const evidenceToggle = await waitFor(connection, `(() => {
     const card = document.querySelector('[data-pointable-context-role="card"]');
@@ -447,6 +487,7 @@ try {
     browser: "Microsoft Edge headless",
     selectedText: intent.selectionText,
     trustedActionProducedDetail: true,
+    composerFocusPreservedCard: true,
     mentalModelRenderedInLane: true,
     evidenceExpandedInPlace: true,
     backgroundRevisionDetected: true,

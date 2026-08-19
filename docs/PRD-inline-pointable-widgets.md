@@ -1,7 +1,7 @@
 # PRD：Quiet Context Reveal（选区式上下文速览）
 
-- 版本：v2.2
-- 状态：Quiet Reveal 主链、P-C 默认与三类样例已获人工采用；动态 revision v2 进入当前 Codex 真实场景验收
+- 版本：v2.3
+- 状态：Quiet Reveal 主链、P-C 默认与三类样例已获人工采用；动态 revision v2 与“边读边回复”进入当前 Codex 真实场景验收
 - 日期：2026-08-19
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
@@ -189,7 +189,9 @@ P0 不提供“识别更多概念”、自然语言语义扩展、LLM 候选生�
 ### 7.4 关闭与恢复
 
 - 明确、可操作的关闭按钮；
-- Escape 与外点关闭；
+- Escape 与普通外点关闭；
+- 详情卡打开时，点击当前 Chat composer 的 `textarea`、`input`、`contenteditable` 或 `role=textbox` 不属于外点关闭：输入框获得焦点，卡片继续作为回复时的阅读参照，后台 revision 检查不中断；
+- 仅入口尚未打开详情时，点击 composer 仍按普通外点清理入口；
 - 关闭后不自动重开；
 - 焦点回到触发入口或原阅读位置；
 - 不改变 Chat 滚动位置。
@@ -455,7 +457,8 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 - [ ] 不打开浏览器或 Dashboard；
 - [ ] 打开、展开、关闭新增 Chat Turn 为 0；
 - [ ] revision 变化只出现卡内提示，可信刷新在原卡完成且新增 Chat Turn 为 0；
-- [ ] 关闭按钮、Escape、外点和焦点恢复可用；
+- [ ] 详情打开后聚焦当前 Chat composer 不关闭卡片，输入框获得焦点且 revision 检查继续；
+- [ ] 关闭按钮、Escape、普通外点和焦点恢复可用；
 - [ ] 普通复制、高亮、terminal、browser、diff 不误触。
 
 ### 13.2 数据门禁
@@ -562,9 +565,11 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 11. 概念卡普通启动默认使用 P-C 微型心智模型；P-A/P-B 只作为显式研究基线，单用户偏好不得写成效率结论。
 12. P-C 首批只资格化显式 concept/change/decision 制品；普通 prose、任意 Git diff 和隐含决策均不做语义推断。
 13. 后台 revision v2 只散列有界 stat、Git 与字面关系信号；详情重读仍必须由可信刷新动作触发。
+14. 打开的卡片是回复时的临时阅读参照；聚焦当前 Chat composer 不关闭卡片，其他外点仍按 Quiet Reveal 规则清理。
 
 ## 18. 变更记录
 
+- v2.3：把“边读边回复”纳入原生交互合同；详情卡打开时聚焦当前 Chat composer 保留卡片及后台 revision 检查，入口态或普通外点仍关闭，并加入真实 Edge 焦点/持久性验收。
 - v2.2：记录三类 P-C 样例获产品负责人采用但不外推效率结论；把动态 revision 从 stat-only 扩展到目标 Git 状态/最近提交、Provider 同口径的字面引用成员集合，以及显式心智模型的 evidence source stat；完整详情仍只在可信刷新后读取。
 - v2.1：把 P-C 从单一 `pilot` 概念扩展为三种显式、证据绑定的微型心智模型：concept 的“定义/语境/流程/边界”、change 的“Before/After/Impact”、decision 的“问题/选择/后果”；加入 `presentation-default` 与 `native-chat-lane` 真实样例，仍保持无模型、零 Chat Turn 和普通 prose 不推断。
 - v2.0：记录同一 `pilot` 的单用户形成性比较结果（P-C 优于 P-A/P-B，P-A 与 P-B 接近），将 `mental-model` 收敛为普通启动默认；保留 P-A/P-B 作为固定研究基线，并明确该选择不是理解速度、正确率或 Chat Turn 效果证据。

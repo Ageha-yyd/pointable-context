@@ -7,7 +7,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v2.2 keeps Quiet Context Reveal, explicit P-C artifacts, and bounded dynamic invalidation", async () => {
+test("v2.3 keeps Quiet Context Reveal available while composing a reply", async () => {
   const [prd, readme, mainSkill, workspaceSkill] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -15,7 +15,7 @@ test("v2.2 keeps Quiet Context Reveal, explicit P-C artifacts, and bounded dynam
     text("skills/pointable-context-workspace/SKILL.md"),
   ]);
 
-  assert.match(prd, /版本：v2\.2/u);
+  assert.match(prd, /版本：v2\.3/u);
   assert.match(prd, /默认可视入口是用户选区后的轻量按钮/u);
   assert.match(prd, /selection 本身不读取详情、不调用模型/u);
   assert.match(prd, /产品不存在“识别更多概念”模型分支/u);
@@ -40,6 +40,8 @@ test("v2.2 keeps Quiet Context Reveal, explicit P-C artifacts, and bounded dynam
   assert.match(prd, /普通 prose、任意 Git diff 和隐含决策均不做语义推断/u);
   assert.match(prd, /stat\/Git\/字面关系\/evidence-source revision v2/u);
   assert.match(prd, /不建立语义依赖图/u);
+  assert.match(prd, /聚焦当前 Chat composer 不关闭卡片/u);
+  assert.match(prd, /后台 revision 检查不中断/u);
 
   assert.match(readme, /primary interaction is \*\*Quiet Context Reveal\*\*/u);
   assert.match(readme, /no "identify more concepts" or semantic-model branch/u);
@@ -54,6 +56,7 @@ test("v2.2 keeps Quiet Context Reveal, explicit P-C artifacts, and bounded dynam
   assert.match(readme, /problem\/choice\/consequence/u);
   assert.match(readme, /bounded v2 background probe/u);
   assert.match(readme, /detects literal reference membership changes, not runtime dependencies/u);
+  assert.match(readme, /keeps an open card visible when the user focuses the current Chat composer/u);
   assert.match(mainSkill, /Use MCP `render_context_capsule` only when the user explicitly asks/u);
   assert.match(mainSkill, /Do not offer `识别更多概念`/u);
   assert.match(workspaceSkill, /Selection alone is inert/u);
@@ -68,6 +71,7 @@ test("v2.2 keeps Quiet Context Reveal, explicit P-C artifacts, and bounded dynam
   assert.match(workspaceSkill, /explicitly authored `docs\/decisions\/\*\.md` artifact/u);
   assert.match(workspaceSkill, /revision v2 as a bounded invalidation fingerprint/u);
   assert.match(workspaceSkill, /Use `mental-model` as the ordinary product default/u);
+  assert.match(workspaceSkill, /Keep an open card visible when the user focuses the current Chat composer/u);
   assert.match(workspaceSkill, /`compatibility\.state` is `qualified`/u);
 });
 

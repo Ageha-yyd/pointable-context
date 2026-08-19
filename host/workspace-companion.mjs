@@ -1612,6 +1612,13 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       if (target instanceof Node && (action?.contains(target) === true || card?.contains(target) === true)) {
         return;
       }
+      const composer = card !== null && target instanceof Element ? target.closest(
+        'textarea, input, [contenteditable="true"], [role="textbox"]'
+      ) : null;
+      if (composer !== null && stableRoot.contains(composer)) {
+        restoreFocus = composer;
+        return;
+      }
       cleanup(true, true);
     };
     window.addEventListener("pointerdown", outsideHandler, true);

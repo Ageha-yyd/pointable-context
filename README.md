@@ -182,6 +182,7 @@ P0 is successful only when Quiet Context Reveal:
 - never infers PASS/FAIL from a test source file and never projects JSON configuration values;
 - exposes identity, source, revision, observed time, and freshness;
 - pins an opened snapshot, signals detected file revision drift, and refreshes the same card only after a trusted action;
+- keeps an open card visible when the user focuses the current Chat composer, so it can remain a reading aid while drafting a reply;
 - preserves the old snapshot with an explicit warning when the object is deleted or revision status is unavailable;
 - preserves text and structured fallback;
 - closes and restores reading context reliably;
