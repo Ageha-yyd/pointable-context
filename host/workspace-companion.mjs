@@ -6326,7 +6326,7 @@ function parseArguments(argv) {
   let registryPath = join(stateRoot, "task-workspace-bindings.json");
   let endpoint = "http://127.0.0.1:9223";
   let refreshIntervalMs = 2e3;
-  let presentationMode = "record";
+  let presentationMode = "mental-model";
   let workspaceRoot;
   let json = false;
   for (let index = 1; index < argv.length; index += 1) {

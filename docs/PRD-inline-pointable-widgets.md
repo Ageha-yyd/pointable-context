@@ -1,8 +1,8 @@
 # PRD：Quiet Context Reveal（选区式上下文速览）
 
-- 版本：v1.9
-- 状态：Quiet Reveal 主链、动态刷新与首批场景投影已完成；显式概念制品、A/B/C 人类理解呈现和非推断性 pilot 协议进入验证
-- 日期：2026-08-18
+- 版本：v2.0
+- 状态：Quiet Reveal 主链、动态刷新与首批场景投影已完成；P-C 微型心智模型经单用户形成性比较成为当前默认，正式理解与效率验证仍待进行
+- 日期：2026-08-19
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
 - 首个场景：长时程软件开发任务
@@ -406,6 +406,8 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 
 三者必须使用同一对象、同一事实、同一 evidence 和同一原生 Chat Lane，仅改变 projection。首个 `pilot` 任务要求回答“是什么、为什么现在出现、不能证明什么、前后步骤”，并记录正确理解时间、四个答案单元、证据展开、Chat Turn、lane leave、错误对象和 card sufficiency。8–12 人只用于发现流程/表达缺陷和估计方差，不用于显著性声明。
 
+2026-08-19 的一次产品负责人形成性走查认为 P-C 更好，P-A 与 P-B 体验接近。因此普通启动默认使用 P-C；P-A/P-B 仅保留为显式研究基线。该结果只代表当前设计偏好，不证明 P-C 更快、更准确或更能减少 Chat Turn，也不替代后续 counterbalanced pilot。
+
 ### 12.2 任务
 
 1. 找出某文档本次更新的关键点；
@@ -533,7 +535,7 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 3. 已完成首个文件 revision 失效提示、显式零-turn 刷新、有限差异和真实 Edge 零-turn 验收；
 4. 已完成文档、模块、测试源码、已知 JSON 配置与 path-qualified ADR 的摘要策略和真实仓库 Provider 验证；
 5. 已完成隔离技术延迟基准和正式 A/B 协议；
-6. 当前阶段：先以同一 `pilot` 对象运行 P-A/P-B/P-C 非推断性呈现 pilot，再基于真实错误与方差决定默认 projection，随后才进入线性 Chat 对照的效率研究。
+6. 当前阶段：P-C 已作为形成性产品默认；下一步先完善其信息结构与更多开发对象投影，再以 P-A/P-B 为研究基线运行 counterbalanced presentation pilot，随后才进入线性 Chat 对照的效率研究。
 
 ## 17. 已冻结决策
 
@@ -547,9 +549,11 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 8. 小项目按需索引，不预建复杂本体。
 9. 浏览器、DCPM/CWA 和完整工作台不是主线。
 10. 未完成用户研究前，只陈述假设和测量目标。
+11. 概念卡普通启动默认使用 P-C 微型心智模型；P-A/P-B 只作为显式研究基线，单用户偏好不得写成效率结论。
 
 ## 18. 变更记录
 
+- v2.0：记录同一 `pilot` 的单用户形成性比较结果（P-C 优于 P-A/P-B，P-A 与 P-B 接近），将 `mental-model` 收敛为普通启动默认；保留 P-A/P-B 作为固定研究基线，并明确该选择不是理解速度、正确率或 Chat Turn 效果证据。
 - v1.9：把卡片目标从“有界记录摘要”推进到“类型匹配的微型心智模型”；新增严格、无模型的 `docs/concepts/*.md` 概念制品与证据行复验；为同一 `pilot` 数据加入固定 `record/narrative/mental-model` 三种原生呈现条件、卡内证据展开和 8–12 人非推断性 pilot 协议。
 - v1.8：把技术响应速度与人的信息获取效率拆开；加入无模型、零 Chat Turn 的可重复 workspace latency benchmark、首个本机基线和 counterbalanced A/B 协议，明确自动 benchmark 不得冒充 `time_to_verified_fact` 或显著性证据。
 - v1.7：加入安全的场景摘要切片：测试源码只显示静态测试标题并明确未执行，已知 JSON 配置只显示用途和键名，path-qualified ADR 只读取显式决策章节；用当前仓库文档、模块、测试和配置做 Provider 实测，避免通用五字段堆叠。

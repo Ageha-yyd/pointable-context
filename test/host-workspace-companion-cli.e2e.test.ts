@@ -57,6 +57,7 @@ test("detached workspace companion supports lifecycle without guessing an active
     const companion = status.companion as Record<string, unknown>;
     assert.equal(companion.state, "running");
     assert.equal(companion.mode, "live-local-workspace");
+    assert.equal(companion.presentationMode, "mental-model");
     assert.equal(companion.activeTaskCount, 0);
     const compatibility = companion.compatibility as Record<string, unknown>;
     assert.equal(compatibility.state, "incompatible");

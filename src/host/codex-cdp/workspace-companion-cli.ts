@@ -100,7 +100,7 @@ function parseArguments(argv: string[]): ParsedArguments {
   let registryPath = join(stateRoot, "task-workspace-bindings.json");
   let endpoint = "http://127.0.0.1:9223";
   let refreshIntervalMs = 2_000;
-  let presentationMode: PointablePresentationMode = "record";
+  let presentationMode: PointablePresentationMode = "mental-model";
   let workspaceRoot: string | undefined;
   let json = false;
   for (let index = 1; index < argv.length; index += 1) {

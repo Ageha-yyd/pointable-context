@@ -94,6 +94,9 @@ Record aborted and timed-out tasks. Do not silently discard errors, stale result
 - Report accuracy, wrong-entity, stale/error, and selection-interference rates beside time.
 - The directional product target is at least 30% lower median exact-lookup time with no material accuracy loss. Treat this as a target, not a statistical conclusion.
 - Define the formal sample size only after a non-inferential usability pilot estimates variance. A pilot of roughly 8–12 participants may find workflow defects but must not be used to claim significance.
+
+One formative owner walkthrough on 2026-08-19 preferred P-C and judged P-A and P-B similarly. Use that observation only to set the current product default to `mental-model`; it is not a usability result, an efficiency effect, or a substitute for the counterbalanced presentation pilot. Keep P-A and P-B available as fixed study baselines.
+
 - Separate exact point lookup from open-ended explanation in every chart and conclusion.
 
 ## 8. Automated technical benchmark

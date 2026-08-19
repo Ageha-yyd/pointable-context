@@ -21,7 +21,7 @@ Manage the private Codex Desktop companion that keeps normal Chat visually uncha
 - A path-qualified ADR/decision Markdown detail reads only explicit Status, Decision, Context/Rationale, and Consequences sections.
 - An explicitly authored `docs/concepts/*.md` artifact may expose meaning, current context, boundary, a bounded process, and a verified workspace evidence line. Do not infer the same structure from ordinary prose.
 - The card is summary-first: facts, revision, observed time, and sources remain inside a collapsed in-card `查看详情` disclosure. Keep type and freshness visible even while collapsed.
-- Presentation studies fix one condition at startup: `record`, `narrative`, or `mental-model`. Never add an in-card condition switch. The mental-model condition keeps evidence behind the local `为什么这样说` disclosure.
+- Use `mental-model` as the ordinary product default. Presentation studies may explicitly fix `record`, `narrative`, or `mental-model` at startup. Never add an in-card condition switch. The mental-model condition keeps evidence behind the local `为什么这样说` disclosure.
 - An open card pins its snapshot. A lightweight file-stat revision probe may show `内容已更新`; only a trusted `刷新内容` click may re-read full detail, update the same card, and expose at most three changed fields. This creates no model call or Chat Turn.
 - If the selected file is deleted or revision status is unavailable, keep the old snapshot visible with an explicit warning. Never silently replace, hide, or relabel it as current.
 
@@ -46,7 +46,7 @@ $companion = Join-Path $pluginRoot 'host\workspace-companion.mjs'
 ## Workflow
 
 1. Run `status --json` first. Reuse a running companion only when `compatibility.state` is `qualified`; do not start a duplicate.
-2. Run `start --json` only after an explicit user request to enable Quiet Mode. For the frozen concept-presentation pilot, pass the assigned `--presentation-mode <record|narrative|mental-model>`; otherwise preserve the ordinary default.
+2. Run `start --json` only after an explicit user request to enable Quiet Mode. This starts the ordinary `mental-model` default. For a frozen concept-presentation study, pass the assigned `--presentation-mode <record|narrative|mental-model>` instead.
 3. Require an explicit absolute workspace root or an unambiguous current workspace root exposed by the host.
 4. Run `bind --workspace-root <absolute-path> --json`. Binding must fail unless exactly one Codex task is host-visible.
 5. Read back `status --json`. Report mode, process state, `compatibility.state/code`, target count, active task count, and `activeBinding` root/revision without exposing the control token.

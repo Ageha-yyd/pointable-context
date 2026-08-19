@@ -60,7 +60,7 @@ These are conservative projections of readable artifacts, not substitutes for an
 
 An author can now give a high-value project concept a deterministic identity by placing a strictly structured Markdown artifact under `docs/concepts/*.md`. The format requires meaning, current context, boundary, a 2–4 step process with one explicit current step, an evidence excerpt, and a workspace-relative source line. The Provider verifies that evidence line before returning the card; missing or drifted evidence fails closed. Ordinary prose is still not semantically mined.
 
-The native renderer supports three fixed research conditions over the same detail payload: `record`, `narrative`, and `mental-model`. The first frozen object is `pilot`. Its mental-model card shows what the pilot means, why it is needed now, where it sits in the study sequence, and what it cannot prove; exact evidence stays behind an in-card `为什么这样说` disclosure. The condition is selected when the companion starts, not by the participant inside a task.
+The native renderer supports three fixed research conditions over the same detail payload: `record`, `narrative`, and `mental-model`. The first frozen object is `pilot`. Its mental-model card shows what the pilot means, why it is needed now, where it sits in the study sequence, and what it cannot prove; exact evidence stays behind an in-card `为什么这样说` disclosure. `mental-model` is the ordinary product default after a single-user formative comparison preferred P-C while judging P-A and P-B similarly. This is a design preference, not efficiency evidence. Research assignments still select one fixed condition when the companion starts; participants never switch conditions inside a task.
 
 ## Current fixture
 
@@ -151,7 +151,8 @@ node mcp/server.mjs --fixture-root ./fixtures/mini-project --project-id PRJ-01
 "PRD-inline-pointable-widgets.md" | node dist/src/cli.js lookup --stdin --project-dir ./fixtures/mini-project
 
 # Primary Quiet Context Reveal prototype in a controlled Desktop build
-node host/workspace-companion.mjs start --presentation-mode mental-model --json
+# mental-model is the default; pass record or narrative only for a fixed study condition
+node host/workspace-companion.mjs start --json
 node host/workspace-companion.mjs status --json
 node host/workspace-companion.mjs bind --workspace-root 'D:\absolute\workspace' --json
 node host/workspace-companion.mjs stop --json

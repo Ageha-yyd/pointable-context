@@ -7,7 +7,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v1.9 keeps Quiet Context Reveal and adds a bounded comprehension pilot", async () => {
+test("v2.0 keeps Quiet Context Reveal and adopts P-C only as a formative default", async () => {
   const [prd, readme, mainSkill, workspaceSkill] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -15,7 +15,7 @@ test("v1.9 keeps Quiet Context Reveal and adds a bounded comprehension pilot", a
     text("skills/pointable-context-workspace/SKILL.md"),
   ]);
 
-  assert.match(prd, /版本：v1\.9/u);
+  assert.match(prd, /版本：v2\.0/u);
   assert.match(prd, /默认可视入口是用户选区后的轻量按钮/u);
   assert.match(prd, /selection 本身不读取详情、不调用模型/u);
   assert.match(prd, /产品不存在“识别更多概念”模型分支/u);
@@ -32,6 +32,8 @@ test("v1.9 keeps Quiet Context Reveal and adds a bounded comprehension pilot", a
   assert.match(prd, /自动延迟基准始终标记 `technical_latency_only`/u);
   assert.match(prd, /不证明人的 `time_to_verified_fact` 已下降/u);
   assert.match(prd, /P-A\/P-B\/P-C 使用同一对象、事实与证据/u);
+  assert.match(prd, /普通启动默认使用 P-C/u);
+  assert.match(prd, /不证明 P-C 更快、更准确或更能减少 Chat Turn/u);
   assert.match(prd, /`docs\/concepts\/\*\.md`/u);
 
   assert.match(readme, /primary interaction is \*\*Quiet Context Reveal\*\*/u);
@@ -41,6 +43,8 @@ test("v1.9 keeps Quiet Context Reveal and adds a bounded comprehension pilot", a
   assert.match(readme, /Reading the file never claims PASS or FAIL/u);
   assert.match(readme, /Configuration values and potential secrets never enter the card/u);
   assert.match(readme, /three fixed research conditions/u);
+  assert.match(readme, /mental-model.*ordinary product default/u);
+  assert.match(readme, /design preference, not efficiency evidence/u);
   assert.match(mainSkill, /Use MCP `render_context_capsule` only when the user explicitly asks/u);
   assert.match(mainSkill, /Do not offer `识别更多概念`/u);
   assert.match(workspaceSkill, /Selection alone is inert/u);
@@ -51,6 +55,7 @@ test("v1.9 keeps Quiet Context Reveal and adds a bounded comprehension pilot", a
   assert.match(workspaceSkill, /Never translate source presence into PASS\/FAIL/u);
   assert.match(workspaceSkill, /Never expose configuration values/u);
   assert.match(workspaceSkill, /explicitly authored `docs\/concepts\/\*\.md` artifact/u);
+  assert.match(workspaceSkill, /Use `mental-model` as the ordinary product default/u);
   assert.match(workspaceSkill, /`compatibility\.state` is `qualified`/u);
 });
 
