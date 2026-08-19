@@ -1,7 +1,7 @@
 # PRD：Quiet Context Reveal（选区式上下文速览）
 
-- 版本：v2.4
-- 状态：Quiet Reveal 主链、P-C 默认与三类样例已获人工采用；动态 revision v2、“边读边回复”与稳定原位刷新进入当前 Codex 真实场景验收
+- 版本：v2.5
+- 状态：Quiet Reveal 主链、P-C 默认与三类样例已获人工采用；动态 revision v2 已完成当前场景验收，显式 Agent Task/Verification 工作结果进入真实 Chat Lane 验收
 - 日期：2026-08-19
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
@@ -143,7 +143,11 @@ P0 不提供“识别更多概念”、自然语言语义扩展、LLM 候选生�
 
 ### 6.4 任务状态
 
-选中 `NATIVE-CAPSULE-P0` 后，卡片显示：目标、已完成、当前状态、下一步、阻塞、负责人和状态时间。
+作者显式放入 `docs/tasks/*.md` 的任务记录按“目标、当前状态、已完成、下一步、阻塞”投影，并保留更新时间与证据。普通 Chat 计划、TODO、Git 变更或文件存在本身不自动升级为任务状态。`NATIVE-CAPSULE-P0` 继续只是 fixture 兼容样例。
+
+### 6.5 验证结果
+
+作者显式放入 `docs/verifications/*.md` 的验证记录按“Claim → Result → Gap”投影，并保留验证方式、被验证修订、执行时间与证据。测试源码仍只说明静态验证范围；只有结构完整、明确写出结果与尚未证明边界、且证据行复验成功的记录才能表述一次实际结果。产品不根据测试文件名、测试定义、命令名称或 exit-code 缺失的 prose 自动生成 PASS/FAIL。
 
 ### 6.5 验证结果
 
@@ -314,7 +318,19 @@ P0 不从任意 prose 自动抽取心智模型。只有位于冻结目录且包�
 - 流程最多 4 步，且必须显式标记一个 `当前：` 步骤；
 - 来源必须是 workspace 内相对路径和行号；详情读取时原文证据必须与该行精确一致；
 - 任一必填段、当前步骤或证据复验缺失时 fail closed；
-- 当前轻量 revision probe 仍只观察被选中的心智模型制品自身，外部证据文件单独变化可能需要重新打开卡片，这是人工校准阶段的已知边界。
+- 当前轻量 revision v2 同时观察被选中的显式制品和其声明的 evidence source stat；变化只产生 `内容已更新`，完整事实仍必须由可信刷新动作重读。
+
+### 8.9 Explicit Agent Work Result Artifact
+
+Agent 工作结果采用文件式、按需索引的最小制品合同，不引入 Dashboard、常驻数据库或后台语义抽取：
+
+- `docs/tasks/*.md` 必须包含：`目标`、`当前状态`、`已完成`、`下一步`、`阻塞`、ISO 8601 `更新时间`、`证据`、`来源`；
+- `docs/verifications/*.md` 必须包含：`要证明什么`、`结果`、`尚未证明`、`验证方式`、`验证修订`、ISO 8601 `执行时间`、`证据`、`来源`；
+- 文件 stem 是确定性名称/alias；只有完整显式制品才获得 `task` / result-bearing `verification` 身份；
+- Task 状态与 Verification 结果都是作者声明，Provider 只验证结构、范围、当前文件快照与 exact evidence line，不补写结论；
+- `docs/verifications/*.md` 与普通 `*.test.*`/`*.spec.*` 共用实体类型但语义不同：前者是证据绑定的运行/验收记录，后者永远只是未执行的静态测试定义；
+- 证据漂移、必填字段缺失、时间格式无效或路径越界时 fail closed；
+- 这一步只让 Agent 已经明确知道的稳定结果进入轻量 Context Index，不要求每个 Chat Turn 或每个文件变化都生成记录。
 
 ## 9. P0 功能需求
 
@@ -344,7 +360,7 @@ P0 不从任意 prose 自动抽取心智模型。只有位于冻结目录且包�
 
 ### P0-7 Type-specific projection
 
-Artifact、Module、Verification Source、Configuration、Decision 使用不同字段优先级。测试源码不得推断 PASS/FAIL，配置不得投影值，Decision 只消费 path-qualified Markdown 的显式章节。未知类型使用保守通用投影。
+Artifact、Module、Verification Source、Verification Result、Configuration、Decision、Task 使用不同字段优先级。测试源码不得推断 PASS/FAIL；结果只来自证据绑定的显式 Verification 制品；配置不得投影值；Decision 只消费 path-qualified Markdown 的显式章节。未知类型使用保守通用投影。
 
 ### P0-8 Zero-turn native detail
 
@@ -475,6 +491,8 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 - [ ] 已知 JSON 配置只显示用途与有限键名，配置值和潜在密钥不进入卡片；
 - [ ] ADR/Decision 只从 path-qualified Markdown 的显式章节读取；
 - [ ] Concept 只从 `docs/concepts/*.md` 的冻结结构读取，并复验 workspace 内证据行；
+- [ ] Task 只从 `docs/tasks/*.md` 的冻结结构读取，不从 Chat/TODO/Git 自动推断状态；
+- [ ] 实际 Verification 结果只从 `docs/verifications/*.md` 的冻结结构读取，必须同时包含 result、gap、method、verified revision、executedAt 与 exact evidence line；
 - [ ] opaque ref 绑定完整 context 和对象身份；
 - [ ] 点击后读取当前 authoritative snapshot；
 - [ ] index/provider/context 漂移 fail closed；
@@ -525,7 +543,8 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 - Known JSON Configuration 投影：用途、有限顶层键名、零值披露和路径；
 - Path-qualified ADR 投影：显式状态、决策、原因、后果和路径；
 - 显式 Concept Artifact：严格结构、确定性名称、当前步骤、边界和 workspace 内证据行复验；
-- renderer 固定的 `record/narrative/mental-model` 三种研究条件，以及 concept/change/decision 三种 P-C 微型心智模型和卡内证据展开；
+- 显式 Agent Work Result：严格 Task/Verification 结构、时间/验证修订、证据行复验与静态测试定义隔离；
+- renderer 固定的 `record/narrative/mental-model` 三种研究条件，以及 concept/change/decision/task/verification 五种 P-C 微型心智模型和卡内证据展开；
 - 摘要优先的卡内 progressive disclosure：默认隐藏事实/元数据/来源，保留类型与 freshness；
 - Artifact、Module/Concept、Decision/Task 类型化详情；
 - 来源、修订、新鲜度、观察时间和文本 fallback；
@@ -538,8 +557,8 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 仍缺：
 
 - 让当前 workspace 文件之外的 Agent-known Module/Decision/Task 获得可靠 Provider；
-- 接入真实测试运行证据；测试源码卡本身永远不能替代运行结果；
-- 把 Agent 工作结果增量写入轻量 Context Index；
+- 将显式 Verification 制品从文件式人工/Agent 记录扩展到可靠的测试运行事件接入；测试源码卡本身永远不能替代运行结果；
+- 定义 Agent 何时应该产生或更新 Task/Verification，避免记录泛滥并验证真实长任务中的覆盖率；
 - 证明不同 Codex Desktop 版本中的 Host Adapter 兼容性；
 - 完成受控效率研究。
 
@@ -551,8 +570,9 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 4. 已完成文档、模块、测试源码、已知 JSON 配置与 path-qualified ADR 的摘要策略和真实仓库 Provider 验证；
 5. 已完成隔离技术延迟基准和正式 A/B 协议；
 6. 已完成人工采用 P-C 的 concept/change/decision 三种首批信息结构；P-A/P-B 继续只作为研究基线；
-7. 当前阶段：完成 stat/Git/字面关系/evidence-source revision v2 的真实 Chat Lane 动态变化验收；
-8. 下一阶段：让 Agent 工作结果以轻量、显式、可验证的 Task/Verification 记录增量进入 Context Index，再进行 counterbalanced pilot 与线性 Chat 对照效率研究。
+7. 已完成 stat/Git/字面关系/evidence-source revision v2 的真实 Chat Lane 动态变化验收；
+8. 当前阶段：完成轻量、显式、可验证的 Task/Verification 文件制品、Context Index 投影和自动回归；下一步在真实 Chat Lane 做两类理解验收；
+9. 验收后冻结 Agent 产出策略，再进行 counterbalanced pilot 与线性 Chat 对照效率研究。
 
 ## 17. 已冻结决策
 
@@ -571,9 +591,11 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 13. 后台 revision v2 只散列有界 stat、Git 与字面关系信号；详情重读仍必须由可信刷新动作触发。
 14. 打开的卡片是回复时的临时阅读参照；聚焦当前 Chat composer 不关闭卡片，其他外点仍按 Quiet Reveal 规则清理。
 15. 显式刷新必须复用当前卡片 DOM，并保留位置、滚动与渐进披露状态；数据更新不等于重建界面上下文。
+16. Agent 工作结果只有在稳定、结构完整且证据可复验时才进入 Task/Verification 索引；不从普通 Chat、测试源码或文件存在推断完成与 PASS/FAIL。
 
 ## 18. 变更记录
 
+- v2.5：新增证据绑定的显式 Agent Work Result 合同；`docs/tasks/*.md` 投影目标/状态/进展/下一步/阻塞，`docs/verifications/*.md` 投影 Claim/Result/Gap 并保留方式、验证修订和执行时间；两者进入同一 Quiet Reveal 与 P-C 原生卡片，普通 Chat 和测试源码仍不得自动产生完成/PASS 结论。
 - v2.4：修正真实关系变化刷新时的界面连续性；显式刷新改为复用同一卡片 DOM，保留位置、滚动、详情与证据展开状态，并加入真实 Edge 的对象身份和 UI 状态回归。
 - v2.3：把“边读边回复”纳入原生交互合同；详情卡打开时聚焦当前 Chat composer 保留卡片及后台 revision 检查，入口态或普通外点仍关闭，并加入真实 Edge 焦点/持久性验收。
 - v2.2：记录三类 P-C 样例获产品负责人采用但不外推效率结论；把动态 revision 从 stat-only 扩展到目标 Git 状态/最近提交、Provider 同口径的字面引用成员集合，以及显式心智模型的 evidence source stat；完整详情仍只在可信刷新后读取。

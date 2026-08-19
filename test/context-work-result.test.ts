@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -131,6 +131,28 @@ test("task and verification records require frozen paths, complete fields, and e
   assert.equal(extractContextVerificationArtifact(
     verificationArtifact().replace("2026-08-19T13:05:00+08:00", "今天"),
   ), undefined);
+});
+
+test("repository work-result samples keep exact evidence references", async () => {
+  const samples = [
+    {
+      path: "docs/tasks/work-result-context.md",
+      parse: extractContextTaskArtifact,
+    },
+    {
+      path: "docs/verifications/task-verification-contract.md",
+      parse: extractContextVerificationArtifact,
+    },
+  ] as const;
+  for (const sample of samples) {
+    const artifact = sample.parse(await readFile(sample.path, "utf8"));
+    assert.ok(artifact, `${sample.path} must remain a valid explicit work-result record`);
+    const sourceLine = (await readFile(artifact.evidence.sourcePath, "utf8"))
+      .replace(/\r\n?/gu, "\n")
+      .split("\n")[artifact.evidence.sourceLine - 1]
+      ?.trim();
+    assert.equal(sourceLine, artifact.evidence.excerpt);
+  }
 });
 
 test("explicit work results become evidence-bound type-specific views without inferred verdicts", async () => {

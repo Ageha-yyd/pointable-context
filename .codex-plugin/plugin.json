@@ -1,6 +1,6 @@
 {
   "name": "pointable-context",
-  "version": "0.1.0+codex.20260819125259",
+  "version": "0.1.0+codex.20260819130718",
   "description": "Selection-triggered, zero-turn development context reveal in the native Codex Chat Lane.",
   "author": {
     "name": "Local developer"
@@ -15,7 +15,7 @@
   "interface": {
     "displayName": "Pointable Context",
     "shortDescription": "Select a reference and reveal verified context in place.",
-    "longDescription": "Keep the Codex Chat Lane quiet until the user selects a stable file, module, decision, test, configuration, or explicitly authored context reference. A trusted explicit action reveals bounded, type-specific detail beside the selection without opening a browser, calling a model, or creating another chat turn. Explicit concept, change, and decision artifacts project compact mental models with evidence kept behind a local disclosure. Open workspace cards pin their snapshot, signal detected file revision drift, and refresh in place only after another trusted action. Test source never implies PASS/FAIL, configuration values stay hidden, and ordinary prose is never semantically mined; browser clients and DCPM/CWA are not product dependencies.",
+    "longDescription": "Keep the Codex Chat Lane quiet until the user selects a stable file, module, decision, test, configuration, or explicitly authored context reference. A trusted explicit action reveals bounded, type-specific detail beside the selection without opening a browser, calling a model, or creating another chat turn. Explicit concept, change, decision, task, and verification artifacts project compact mental models with evidence kept behind a local disclosure. Open workspace cards pin their snapshot, signal detected file revision drift, and refresh in place only after another trusted action. Test source never implies PASS/FAIL, task completion and verification results are never inferred, ordinary prose is never semantically mined, configuration values stay hidden, and browser clients plus DCPM/CWA are not product dependencies.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
@@ -27,6 +27,8 @@
       "Start the fixture Quiet Mode so I can select ARCH-7 in this task.",
       "Check whether the Pointable Context selection companion is running.",
       "Check whether this Codex Desktop build passes the Pointable Context compatibility gate.",
+      "Record the current stable task status for Pointable Context with exact workspace evidence.",
+      "Record this observed verification result for Pointable Context, including its remaining gap.",
       "Use the optional capsule renderer only as an explicit fixture diagnostic."
     ]
   }

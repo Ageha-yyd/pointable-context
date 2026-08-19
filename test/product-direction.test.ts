@@ -7,7 +7,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v2.4 preserves the live card across composing and explicit refresh", async () => {
+test("v2.5 preserves quiet refresh while adding explicit work-result records", async () => {
   const [prd, readme, mainSkill, workspaceSkill] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -15,7 +15,7 @@ test("v2.4 preserves the live card across composing and explicit refresh", async
     text("skills/pointable-context-workspace/SKILL.md"),
   ]);
 
-  assert.match(prd, /版本：v2\.4/u);
+  assert.match(prd, /版本：v2\.5/u);
   assert.match(prd, /默认可视入口是用户选区后的轻量按钮/u);
   assert.match(prd, /selection 本身不读取详情、不调用模型/u);
   assert.match(prd, /产品不存在“识别更多概念”模型分支/u);
@@ -37,6 +37,9 @@ test("v2.4 preserves the live card across composing and explicit refresh", async
   assert.match(prd, /`docs\/concepts\/\*\.md`/u);
   assert.match(prd, /`docs\/changes\/\*\.md`/u);
   assert.match(prd, /`docs\/decisions\/\*\.md`/u);
+  assert.match(prd, /`docs\/tasks\/\*\.md`/u);
+  assert.match(prd, /`docs\/verifications\/\*\.md`/u);
+  assert.match(prd, /普通 Chat 和测试源码仍不得自动产生完成\/PASS 结论/u);
   assert.match(prd, /普通 prose、任意 Git diff 和隐含决策均不做语义推断/u);
   assert.match(prd, /stat\/Git\/字面关系\/evidence-source revision v2/u);
   assert.match(prd, /不建立语义依赖图/u);
@@ -74,6 +77,8 @@ test("v2.4 preserves the live card across composing and explicit refresh", async
   assert.match(workspaceSkill, /explicitly authored `docs\/concepts\/\*\.md` artifact/u);
   assert.match(workspaceSkill, /explicitly authored `docs\/changes\/\*\.md` artifact/u);
   assert.match(workspaceSkill, /explicitly authored `docs\/decisions\/\*\.md` artifact/u);
+  assert.match(workspaceSkill, /explicitly authored `docs\/tasks\/\*\.md` record/u);
+  assert.match(workspaceSkill, /always remains `未执行`/u);
   assert.match(workspaceSkill, /revision v2 as a bounded invalidation fingerprint/u);
   assert.match(workspaceSkill, /Use `mental-model` as the ordinary product default/u);
   assert.match(workspaceSkill, /Keep an open card visible when the user focuses the current Chat composer/u);

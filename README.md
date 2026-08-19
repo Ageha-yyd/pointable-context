@@ -60,7 +60,16 @@ These are conservative projections of readable artifacts, not substitutes for an
 
 An author can now give a high-value project concept a deterministic identity by placing a strictly structured Markdown artifact under `docs/concepts/*.md`. The format requires meaning, current context, boundary, a 2–4 step process with one explicit current step, an evidence excerpt, and a workspace-relative source line. The Provider verifies that evidence line before returning the card; missing or drifted evidence fails closed. Ordinary prose is still not semantically mined.
 
-The native renderer supports three fixed research conditions over the same detail payload: `record`, `narrative`, and `mental-model`. `mental-model` is the ordinary product default after a single-user formative comparison preferred P-C while judging P-A and P-B similarly. This is a design preference, not efficiency evidence. P-C currently supports three explicitly authored, evidence-bound structures: `docs/concepts/*.md` for meaning/context/flow/boundary, `docs/changes/*.md` for before/after/impact, and `docs/decisions/*.md` for problem/choice/consequence. Exact evidence stays behind an in-card `为什么这样说` disclosure. Research assignments still select one fixed condition when the companion starts; participants never switch conditions inside a task.
+The native renderer supports three fixed research conditions over the same detail payload: `record`, `narrative`, and `mental-model`. `mental-model` is the ordinary product default after a single-user formative comparison preferred P-C while judging P-A and P-B similarly. This is a design preference, not efficiency evidence. P-C supports five explicitly authored, evidence-bound structures: `docs/concepts/*.md` for meaning/context/flow/boundary, `docs/changes/*.md` for before/after/impact, `docs/decisions/*.md` for problem/choice/consequence, `docs/tasks/*.md` for task progress, and `docs/verifications/*.md` for claim/result/gap. Exact evidence stays behind an in-card `为什么这样说` disclosure. Research assignments still select one fixed condition when the companion starts; participants never switch conditions inside a task.
+
+## Explicit Agent work results
+
+Agent-known work results can now enter the same lightweight Context Index through two strict, file-backed records:
+
+- `docs/tasks/*.md` records goal, current status, completed work, next step, blocker, update time, and one exact workspace evidence line;
+- `docs/verifications/*.md` records claim, explicit result, remaining gap, verification method, verified revision, execution time, and one exact workspace evidence line.
+
+These are author-supplied records, not automatic conclusions. Ordinary Chat prose, TODOs, commits, test filenames, and static test definitions never become “completed” or PASS/FAIL by inference. Missing fields, invalid timestamps, or evidence drift fail closed. The current implementation re-reads these files on demand; it does not require a Dashboard or persistent semantic index. In P-C, Task foregrounds current status and next action, while Verification foregrounds result and the boundary it still does not prove. Exact evidence remains locally collapsible.
 
 ## Current fixture
 
@@ -77,6 +86,8 @@ Development-oriented examples include:
 | `pilot` | P-C concept | meaning, why now, process position, boundary |
 | `presentation-default` | P-C change | before, after, product impact |
 | `native-chat-lane` | P-C decision | problem, choice, consequence |
+| `work-result-context` | P-C task | goal, status, progress, next step, blocker |
+| `task-verification-contract` | P-C verification | claim, explicit result, remaining gap |
 | `GOV-1`, `DEV-54A` | Legacy work unit | compatibility with the earlier lookup fixture |
 
 The fixture MCP server exposes:
@@ -122,10 +133,11 @@ These foundations are implementation assets. Selection is the visual trigger; it
 - The shipped MCP data is fixture-only.
 - The standard MCP App path renders beside a tool result; it does not provide the required ordinary-prose selection hook.
 - The private Desktop selection companion is currently the primary interaction prototype, but remains host/build-specific and must be qualified per Codex build.
-- Further object/Extractor expansion is paused while cross-build native-host compatibility and scenario-specific summary quality are qualified.
-- Markdown artifact, TypeScript/JavaScript module, static test-definition, known JSON configuration, path-qualified ADR, and explicitly authored concept context are implemented. Actual test-run results, task state, and concepts without an explicit identity remain later stages.
-- Real Agent work results do not yet systematically emit context references.
-- Source files and strict `docs/concepts/*.md`, `docs/changes/*.md`, and `docs/decisions/*.md` artifacts have real local Providers; other Agent-known concepts, tasks, and verification results are not yet connected.
+- Further object/Extractor expansion remains subordinate to cross-build native-host compatibility and scenario-specific summary quality.
+- Markdown artifact, TypeScript/JavaScript module, static test-definition, known JSON configuration, path-qualified ADR, and explicitly authored concept/change/decision/task/verification context are implemented.
+- Agent work results currently enter through explicit Markdown records; no hook or runtime event source decides automatically when a record should be created or updated.
+- Static tests remain “not executed.” Actual results require `docs/verifications/*.md`; reliable direct test-run event ingestion is a later stage.
+- Concepts without an explicit identity are not connected.
 - A persistent multi-object capsule strip is no longer a default product goal.
 - No formal user study has yet proven the expected efficiency gain.
 
@@ -180,6 +192,7 @@ P0 is successful only when Quiet Context Reveal:
 - does not call a model to reveal existing facts;
 - uses type-specific information priorities;
 - never infers PASS/FAIL from a test source file and never projects JSON configuration values;
+- never infers Task completion or Verification success from ordinary Chat, Git state, filenames, or source definitions;
 - exposes identity, source, revision, observed time, and freshness;
 - pins an opened snapshot, signals detected file revision drift, and refreshes the same card only after a trusted action;
 - keeps an open card visible when the user focuses the current Chat composer, so it can remain a reading aid while drafting a reply;

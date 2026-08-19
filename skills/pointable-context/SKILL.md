@@ -1,6 +1,6 @@
 ---
 name: pointable-context
-description: Enable, inspect, or validate selection-triggered Quiet Context Reveal beside the current Codex conversation. Use when the user explicitly asks to enable Pointable Context, run its fixture Quiet Mode, inspect its native selection interaction, or perform an optional capsule-rendering diagnostic. Do not trigger merely because text was selected or copied, and never treat fixture data as active-workspace evidence.
+description: Enable, inspect, or validate selection-triggered Quiet Context Reveal beside the current Codex conversation. Use when the user explicitly asks to enable Pointable Context, run its fixture Quiet Mode, inspect its native selection interaction, or perform an optional capsule-rendering diagnostic. For authoring stable Task or Verification records, route to pointable-context-records. Do not trigger merely because text was selected or copied, and never treat fixture data as active-workspace evidence.
 ---
 
 # Pointable Context Quiet Mode
@@ -10,9 +10,10 @@ The product-default interaction keeps the Chat Lane unchanged until the user sel
 ## Choose the correct mode
 
 1. For the active local workspace, prefer the companion workflow in `$pointable-context-workspace` and require an explicit workspace binding.
-2. For a self-contained demonstration, use the bundled fixture companion. Preserve its `FIXTURE-ONLY` status.
-3. Use MCP `render_context_capsule` only when the user explicitly asks to diagnose the optional inline renderer. Do not use it as the default product surface.
-4. Never route an ordinary request to the browser App Server harness or a Dashboard.
+2. When the user explicitly asks to preserve a stable task status or observed verification result, use `$pointable-context-records`; do not turn ordinary conversation into records automatically.
+3. For a self-contained demonstration, use the bundled fixture companion. Preserve its `FIXTURE-ONLY` status.
+4. Use MCP `render_context_capsule` only when the user explicitly asks to diagnose the optional inline renderer. Do not use it as the default product surface.
+5. Never route an ordinary request to the browser App Server harness or a Dashboard.
 
 ## Fixture Quiet Mode workflow
 
