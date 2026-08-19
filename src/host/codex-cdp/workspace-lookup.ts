@@ -131,48 +131,61 @@ function scalarFact(
   return typeof value === "string" ? truncate(value, 1_024) : undefined;
 }
 
-function conceptComprehension(
+function mentalModelComprehension(
   outcome: Extract<LookupOutcome, { kind: "detail" }>,
 ): PointableComprehensionView | undefined {
-  if (outcome.detail.entityType !== "concept") return undefined;
-  const meaning = scalarFact(outcome.detail.facts, "它是什么意思");
-  const context = scalarFact(outcome.detail.facts, "为什么现在出现");
-  const boundary = scalarFact(outcome.detail.facts, "它不是什么");
   const evidenceExcerpt = scalarFact(outcome.detail.facts, "证据");
-  const rawSequence = outcome.detail.facts["所处流程"];
-  if (
-    meaning === undefined ||
-    context === undefined ||
-    boundary === undefined ||
-    evidenceExcerpt === undefined ||
-    !Array.isArray(rawSequence)
-  ) {
-    return undefined;
-  }
-  const normalizedSequence = rawSequence
-    .filter((item): item is string => typeof item === "string")
-    .slice(0, 4);
-  const sequence = normalizedSequence
-    .map((item) => truncate(item.replace(/^当前[：:]\s*/u, ""), 256));
-  const currentStep = normalizedSequence.findIndex((item) =>
-    /^当前[：:]\s*/u.test(item));
   const source = outcome.detail.sourceRefs.find((item) =>
     item.sourceType === "project_evidence");
-  if (sequence.length < 2 || currentStep < 0 || currentStep >= sequence.length || source === undefined) {
+  if (evidenceExcerpt === undefined || source === undefined) {
     return undefined;
   }
-  return {
-    kind: "concept",
-    meaning,
-    context,
-    boundary,
-    sequence,
-    currentStep,
-    evidence: [{
-      excerpt: evidenceExcerpt,
-      source: truncate(source.sourceId, 512),
-    }],
-  };
+  const evidence = [{
+    excerpt: evidenceExcerpt,
+    source: truncate(source.sourceId, 512),
+  }];
+  if (outcome.detail.entityType === "concept") {
+    const meaning = scalarFact(outcome.detail.facts, "它是什么意思");
+    const context = scalarFact(outcome.detail.facts, "为什么现在出现");
+    const boundary = scalarFact(outcome.detail.facts, "它不是什么");
+    const rawSequence = outcome.detail.facts["所处流程"];
+    if (
+      meaning === undefined ||
+      context === undefined ||
+      boundary === undefined ||
+      !Array.isArray(rawSequence)
+    ) {
+      return undefined;
+    }
+    const normalizedSequence = rawSequence
+      .filter((item): item is string => typeof item === "string")
+      .slice(0, 4);
+    const sequence = normalizedSequence
+      .map((item) => truncate(item.replace(/^当前[：:]\s*/u, ""), 256));
+    const currentStep = normalizedSequence.findIndex((item) =>
+      /^当前[：:]\s*/u.test(item));
+    if (sequence.length < 2 || currentStep < 0 || currentStep >= sequence.length) {
+      return undefined;
+    }
+    return { kind: "concept", meaning, context, boundary, sequence, currentStep, evidence };
+  }
+  if (outcome.detail.entityType === "change") {
+    const before = scalarFact(outcome.detail.facts, "原来怎样");
+    const after = scalarFact(outcome.detail.facts, "现在怎样");
+    const impact = scalarFact(outcome.detail.facts, "影响什么");
+    return before === undefined || after === undefined || impact === undefined
+      ? undefined
+      : { kind: "change", before, after, impact, evidence };
+  }
+  if (outcome.detail.entityType === "decision") {
+    const problem = scalarFact(outcome.detail.facts, "为什么需要决定");
+    const choice = scalarFact(outcome.detail.facts, "选择了什么");
+    const consequence = scalarFact(outcome.detail.facts, "后果是什么");
+    return problem === undefined || choice === undefined || consequence === undefined
+      ? undefined
+      : { kind: "decision", problem, choice, consequence, evidence };
+  }
+  return undefined;
 }
 
 function errorPresentation(
@@ -202,9 +215,11 @@ function detailView(
     : outcome.detail.entityType === "configuration"
       ? outcome.detail.facts["配置用途"]
       : outcome.detail.entityType === "decision"
-        ? outcome.detail.facts["决策"]
-        : outcome.detail.entityType === "concept"
+        ? outcome.detail.facts["选择了什么"] ?? outcome.detail.facts["决策"]
+      : outcome.detail.entityType === "concept"
           ? outcome.detail.facts["它是什么意思"]
+        : outcome.detail.entityType === "change"
+          ? outcome.detail.facts["现在怎样"]
         : undefined;
   const change = outcome.detail.facts["本次变化"];
   const activeChange = typeof change === "string" &&
@@ -213,10 +228,17 @@ function detailView(
   const summary = typeof summaryValue === "string"
     ? truncate(summaryValue, 1_024)
     : truncate(outcome.candidate.summary, 1_024);
-  const comprehension = conceptComprehension(outcome);
+  const comprehension = mentalModelComprehension(outcome);
   const humanSummary = comprehension === undefined
     ? undefined
-    : truncate(`${comprehension.meaning} ${comprehension.context}`, 1_024);
+    : truncate(
+        comprehension.kind === "concept"
+          ? `${comprehension.meaning} ${comprehension.context}`
+          : comprehension.kind === "change"
+            ? `${comprehension.after} ${comprehension.impact}`
+            : `${comprehension.choice} ${comprehension.consequence}`,
+        1_024,
+      );
   return {
     entityId: truncate(outcome.detail.entityId, 256),
     entityType: truncate(outcome.detail.entityType, 128),

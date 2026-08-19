@@ -1,7 +1,7 @@
 # PRD：Quiet Context Reveal（选区式上下文速览）
 
-- 版本：v2.0
-- 状态：Quiet Reveal 主链、动态刷新与首批场景投影已完成；P-C 微型心智模型经单用户形成性比较成为当前默认，正式理解与效率验证仍待进行
+- 版本：v2.1
+- 状态：Quiet Reveal 主链、动态刷新与 P-C 默认已完成；概念、变更、决策三类显式微型心智模型进入真实场景人工校准
 - 日期：2026-08-19
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
@@ -135,9 +135,11 @@ P0 不提供“识别更多概念”、自然语言语义扩展、LLM 候选生�
 
 选中 `src/adapters/local-workspace.ts` 等 TypeScript/JavaScript 模块后，卡片显示：职责、公开入口、本次变化、直接依赖与字面引用/测试关联、路径。作者显式放入 `docs/concepts/*.md` 的概念制品可以通过文件名/稳定名称确定性解析，并按“它是什么意思、为什么现在出现、它不是什么、所处流程、证据”投影；普通 prose 中没有显式身份的抽象概念仍不做语义猜测。
 
+作者显式放入 `docs/changes/*.md` 的变更制品按“原来怎样、现在怎样、影响什么、证据”投影。它回答一次具体转变，不等同于自动解释任意 Git diff；没有显式制品时仍使用现有文件/模块的有界 Git 摘要。
+
 ### 6.3 架构或产品决策
 
-选中 path-qualified ADR/Decision Markdown 后，卡片显示：显式 Status、Decision、Context/Rationale、Consequences 和路径。P0 不用模型从普通文档推断“隐含决策”；尚无独立决策文件身份的 `ARCH-7` 仍由 fixture 或未来 Agent-known Provider 承载。
+选中普通 path-qualified ADR/Decision Markdown 后，卡片显示显式 Status、Decision、Context/Rationale、Consequences 和路径。作者显式放入 `docs/decisions/*.md` 的 P-C 制品进一步按“为什么需要决定、选择了什么、后果是什么、证据”投影。P0 不用模型从普通文档推断“隐含决策”；尚无独立决策文件身份的对象仍由 fixture 或未来 Agent-known Provider 承载。
 
 ### 6.4 任务状态
 
@@ -294,13 +296,17 @@ v1.7 已把其中三类收窄为安全、可执行合同：测试源码默认摘
 
 ### 8.8 Explicit Concept Artifact
 
-P0 不从任意 prose 自动抽取概念。只有位于 `docs/concepts/*.md` 且包含冻结结构标题的作者制品才获得 `concept` 身份：`它是什么意思`、`为什么现在出现`、`它不是什么`、`所处流程`、`证据`、`来源`。
+P0 不从任意 prose 自动抽取心智模型。只有位于冻结目录且包含完整结构标题的作者制品才能进入 P-C：
+
+- `docs/concepts/*.md`：`它是什么意思`、`为什么现在出现`、`它不是什么`、`所处流程`、`证据`、`来源`；
+- `docs/changes/*.md`：`原来怎样`、`现在怎样`、`影响什么`、`证据`、`来源`；
+- `docs/decisions/*.md`：`为什么需要决定`、`选择了什么`、`后果是什么`、`证据`、`来源`。
 
 - 文件 stem 是确定性名称/alias，不调用 embedding 或模型；
 - 流程最多 4 步，且必须显式标记一个 `当前：` 步骤；
 - 来源必须是 workspace 内相对路径和行号；详情读取时原文证据必须与该行精确一致；
 - 任一必填段、当前步骤或证据复验缺失时 fail closed；
-- 当前轻量 revision probe 仍只观察概念制品自身，外部证据文件单独变化可能需要重新打开卡片，这是 pilot 前已知边界。
+- 当前轻量 revision probe 仍只观察被选中的心智模型制品自身，外部证据文件单独变化可能需要重新打开卡片，这是人工校准阶段的已知边界。
 
 ## 9. P0 功能需求
 
@@ -509,7 +515,7 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 - Known JSON Configuration 投影：用途、有限顶层键名、零值披露和路径；
 - Path-qualified ADR 投影：显式状态、决策、原因、后果和路径；
 - 显式 Concept Artifact：严格结构、确定性名称、当前步骤、边界和 workspace 内证据行复验；
-- renderer 固定的 `record/narrative/mental-model` 三种研究条件，以及 `pilot` 微型心智模型和卡内证据展开；
+- renderer 固定的 `record/narrative/mental-model` 三种研究条件，以及 concept/change/decision 三种 P-C 微型心智模型和卡内证据展开；
 - 摘要优先的卡内 progressive disclosure：默认隐藏事实/元数据/来源，保留类型与 freshness；
 - Artifact、Module/Concept、Decision/Task 类型化详情；
 - 来源、修订、新鲜度、观察时间和文本 fallback；
@@ -535,7 +541,7 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 3. 已完成首个文件 revision 失效提示、显式零-turn 刷新、有限差异和真实 Edge 零-turn 验收；
 4. 已完成文档、模块、测试源码、已知 JSON 配置与 path-qualified ADR 的摘要策略和真实仓库 Provider 验证；
 5. 已完成隔离技术延迟基准和正式 A/B 协议；
-6. 当前阶段：P-C 已作为形成性产品默认；下一步先完善其信息结构与更多开发对象投影，再以 P-A/P-B 为研究基线运行 counterbalanced presentation pilot，随后才进入线性 Chat 对照的效率研究。
+6. 当前阶段：P-C 已作为形成性产品默认；以 `pilot`、`presentation-default`、`native-chat-lane` 校准概念/变更/决策三种信息结构，再以 P-A/P-B 为研究基线运行 counterbalanced presentation pilot，随后才进入线性 Chat 对照的效率研究。
 
 ## 17. 已冻结决策
 
@@ -550,9 +556,11 @@ Artifact、Module、Verification Source、Configuration、Decision 使用不同�
 9. 浏览器、DCPM/CWA 和完整工作台不是主线。
 10. 未完成用户研究前，只陈述假设和测量目标。
 11. 概念卡普通启动默认使用 P-C 微型心智模型；P-A/P-B 只作为显式研究基线，单用户偏好不得写成效率结论。
+12. P-C 首批只资格化显式 concept/change/decision 制品；普通 prose、任意 Git diff 和隐含决策均不做语义推断。
 
 ## 18. 变更记录
 
+- v2.1：把 P-C 从单一 `pilot` 概念扩展为三种显式、证据绑定的微型心智模型：concept 的“定义/语境/流程/边界”、change 的“Before/After/Impact”、decision 的“问题/选择/后果”；加入 `presentation-default` 与 `native-chat-lane` 真实样例，仍保持无模型、零 Chat Turn 和普通 prose 不推断。
 - v2.0：记录同一 `pilot` 的单用户形成性比较结果（P-C 优于 P-A/P-B，P-A 与 P-B 接近），将 `mental-model` 收敛为普通启动默认；保留 P-A/P-B 作为固定研究基线，并明确该选择不是理解速度、正确率或 Chat Turn 效果证据。
 - v1.9：把卡片目标从“有界记录摘要”推进到“类型匹配的微型心智模型”；新增严格、无模型的 `docs/concepts/*.md` 概念制品与证据行复验；为同一 `pilot` 数据加入固定 `record/narrative/mental-model` 三种原生呈现条件、卡内证据展开和 8–12 人非推断性 pilot 协议。
 - v1.8：把技术响应速度与人的信息获取效率拆开；加入无模型、零 Chat Turn 的可重复 workspace latency benchmark、首个本机基线和 counterbalanced A/B 协议，明确自动 benchmark 不得冒充 `time_to_verified_fact` 或显著性证据。

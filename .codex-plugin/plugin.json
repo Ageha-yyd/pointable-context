@@ -1,6 +1,6 @@
 {
   "name": "pointable-context",
-  "version": "0.1.0+codex.20260819084006",
+  "version": "0.1.0+codex.20260819091042",
   "description": "Selection-triggered, zero-turn development context reveal in the native Codex Chat Lane.",
   "author": {
     "name": "Local developer"
@@ -15,7 +15,7 @@
   "interface": {
     "displayName": "Pointable Context",
     "shortDescription": "Select a reference and reveal verified context in place.",
-    "longDescription": "Keep the Codex Chat Lane quiet until the user selects a stable file, module, decision, test, configuration, or explicitly authored concept reference. A trusted explicit action reveals bounded, type-specific detail beside the selection without opening a browser, calling a model, or creating another chat turn. Concept artifacts can project a compact mental model with evidence kept behind a local disclosure. Open workspace cards pin their snapshot, signal detected file revision drift, and refresh in place only after another trusted action. Test source never implies PASS/FAIL, configuration values stay hidden, and ordinary prose is never semantically mined; browser clients and DCPM/CWA are not product dependencies.",
+    "longDescription": "Keep the Codex Chat Lane quiet until the user selects a stable file, module, decision, test, configuration, or explicitly authored context reference. A trusted explicit action reveals bounded, type-specific detail beside the selection without opening a browser, calling a model, or creating another chat turn. Explicit concept, change, and decision artifacts project compact mental models with evidence kept behind a local disclosure. Open workspace cards pin their snapshot, signal detected file revision drift, and refresh in place only after another trusted action. Test source never implies PASS/FAIL, configuration values stay hidden, and ordinary prose is never semantically mined; browser clients and DCPM/CWA are not product dependencies.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [

@@ -111,6 +111,42 @@ test("renderer response validator accepts bounded text-only views and rejects fe
     ...response,
     unexpected: true,
   }), undefined);
+  for (const comprehension of [
+    {
+      kind: "change" as const,
+      before: "Record was the default.",
+      after: "P-C is the default.",
+      impact: "Concept cards foreground a mental model.",
+      evidence: [{ excerpt: "mental-model", source: "source:1" }],
+    },
+    {
+      kind: "decision" as const,
+      problem: "Browser switching adds cost.",
+      choice: "Use the native Chat Lane.",
+      consequence: "Qualify the private host per build.",
+      evidence: [{ excerpt: "Codex Desktop", source: "source:2" }],
+    },
+  ]) {
+    const detail: PointableLookupResponseV1 = {
+      ...response,
+      presentation: {
+        kind: "detail",
+        detail: {
+          entityId: "file:mental-model",
+          entityType: comprehension.kind,
+          label: "Mental model",
+          summary: "Summary",
+          revision: "r1",
+          observedAt: "2026-08-19T08:00:00.000Z",
+          freshness: "current",
+          facts: [],
+          sources: [],
+          comprehension,
+        },
+      },
+    };
+    assert.deepEqual(validatePointableRendererResponse(detail), detail);
+  }
 });
 
 test("install expression is namespaced, generic, click-gated, text-only, and cleanup-capable", () => {
@@ -144,11 +180,22 @@ test("install expression is namespaced, generic, click-gated, text-only, and cle
   assert.match(expression, /data-pointable-context-role", "revision-changes"/u);
   assert.match(expression, /data-pointable-context-role", "comprehension-model"/u);
   assert.match(expression, /data-pointable-context-role", "comprehension-flow"/u);
-  assert.match(expression, /data-pointable-context-role", "comprehension-boundary"/u);
+  assert.match(expression, /modelBlock\("comprehension-boundary"/u);
+  assert.match(expression, /modelBlock\("comprehension-before"/u);
+  assert.match(expression, /modelBlock\("comprehension-after"/u);
+  assert.match(expression, /modelBlock\("comprehension-impact"/u);
+  assert.match(expression, /modelBlock\("comprehension-problem"/u);
+  assert.match(expression, /modelBlock\("comprehension-choice"/u);
+  assert.match(expression, /modelBlock\("comprehension-consequence"/u);
   assert.match(expression, /data-pointable-context-role", "evidence-toggle"/u);
   assert.match(expression, /为什么现在出现/u);
   assert.match(expression, /你现在位于这里/u);
   assert.match(expression, /不会证明：/u);
+  assert.match(expression, /原来/u);
+  assert.match(expression, /现在/u);
+  assert.match(expression, /这会影响/u);
+  assert.match(expression, /要解决的问题/u);
+  assert.match(expression, /结果与代价/u);
   assert.match(expression, /为什么这样说/u);
   assert.match(expression, /Commit the explicit trusted activation synchronously/u);
   assert.match(expression, /range\.toString\(\)\.trim\(\)/u);

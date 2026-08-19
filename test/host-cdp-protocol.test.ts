@@ -250,7 +250,12 @@ test("concept comprehension views keep flow, boundary, and evidence bounded", ()
   } as const;
   const result = validatePointableLookupPresentation(base);
   assert.equal(result.kind, "detail");
-  if (result.kind === "detail") assert.equal(result.detail.comprehension?.currentStep, 1);
+  if (result.kind === "detail") {
+    assert.equal(result.detail.comprehension?.kind, "concept");
+    if (result.detail.comprehension?.kind === "concept") {
+      assert.equal(result.detail.comprehension.currentStep, 1);
+    }
+  }
   assert.throws(() => validatePointableLookupPresentation({
     ...base,
     detail: {
@@ -268,4 +273,66 @@ test("concept comprehension views keep flow, boundary, and evidence bounded", ()
       },
     },
   }), /detail evidence is invalid/u);
+});
+
+test("change and decision comprehension views preserve their type-specific answer units", () => {
+  const detail = {
+    entityId: "file:docs/changes/presentation-default.md",
+    entityType: "change",
+    label: "Presentation Default",
+    summary: "P-C is now the ordinary default.",
+    revision: "r2",
+    observedAt: "2026-08-19T08:00:00.000Z",
+    freshness: "current",
+    facts: [],
+    sources: [{ label: "project_evidence / source" }],
+  } as const;
+  const change = validatePointableLookupPresentation({
+    kind: "detail",
+    detail: {
+      ...detail,
+      comprehension: {
+        kind: "change",
+        before: "Record was the ordinary default.",
+        after: "P-C is the ordinary default.",
+        impact: "Normal starts now foreground a compact mental model.",
+        evidence: [{ excerpt: "mental-model", source: "workspace-companion-cli.ts:103" }],
+      },
+    },
+  });
+  assert.equal(change.kind, "detail");
+  if (change.kind === "detail") assert.equal(change.detail.comprehension?.kind, "change");
+
+  const decision = validatePointableLookupPresentation({
+    kind: "detail",
+    detail: {
+      ...detail,
+      entityId: "file:docs/decisions/native-chat-lane.md",
+      entityType: "decision",
+      label: "Native Chat Lane",
+      comprehension: {
+        kind: "decision",
+        problem: "Leaving the task adds switching cost.",
+        choice: "Render beside the current Codex Chat Lane.",
+        consequence: "Compatibility must be qualified per build.",
+        evidence: [{ excerpt: "The first host is Codex Desktop.", source: "PRD:1" }],
+      },
+    },
+  });
+  assert.equal(decision.kind, "detail");
+  if (decision.kind === "detail") assert.equal(decision.detail.comprehension?.kind, "decision");
+  assert.throws(() => validatePointableLookupPresentation({
+    kind: "detail",
+    detail: {
+      ...detail,
+      comprehension: {
+        kind: "change",
+        before: "before",
+        after: "after",
+        impact: "impact",
+        problem: "unsupported cross-kind field",
+        evidence: [{ excerpt: "evidence", source: "source" }],
+      },
+    },
+  }), /comprehension view is invalid/u);
 });

@@ -28,9 +28,16 @@ import {
   type MarkdownArtifactContext,
 } from "./markdown-artifact.js";
 import {
+  contextChangeDocumentPath,
   contextConceptDocumentPath,
+  contextDecisionDocumentPath,
+  extractContextChangeArtifact,
   extractContextConceptArtifact,
+  extractContextDecisionArtifact,
+  type ContextArtifactEvidence,
+  type ContextChangeArtifact,
   type ContextConceptArtifact,
+  type ContextDecisionArtifact,
 } from "./context-concept.js";
 import {
   extractSourceModuleArtifactContext,
@@ -125,6 +132,8 @@ function markdownDocument(relativePath: string): boolean {
 
 function workspaceEntityType(relativePath: string): string {
   if (contextConceptDocumentPath(relativePath)) return "concept";
+  if (contextChangeDocumentPath(relativePath)) return "change";
+  if (contextDecisionDocumentPath(relativePath)) return "decision";
   if (decisionDocumentPath(relativePath)) return "decision";
   if (markdownDocument(relativePath)) return "document";
   if (testSourcePath(relativePath)) return "verification";
@@ -133,13 +142,16 @@ function workspaceEntityType(relativePath: string): string {
   return "file";
 }
 
-function conceptCanonicalName(relativePath: string): string {
+function contextArtifactCanonicalName(relativePath: string): string {
   const name = basename(relativePath);
   const extension = extname(name);
   const stem = extension.length === 0 ? name : name.slice(0, -extension.length);
-  return stem.length === 0
-    ? name
-    : `${stem[0]?.toLocaleUpperCase("en-US") ?? ""}${stem.slice(1)}`;
+  if (stem.length === 0) return name;
+  return stem
+    .split(/[-_]+/u)
+    .filter((word) => word.length > 0)
+    .map((word) => `${word[0]?.toLocaleUpperCase("en-US") ?? ""}${word.slice(1)}`)
+    .join(" ");
 }
 
 async function verifiedWorkspaceRoot(binding: TrustedContextBinding): Promise<string> {
@@ -267,8 +279,11 @@ export class LocalWorkspaceContextIndex implements ContextIndexPort {
       const name = basename(file.relativePath);
       const parent = portablePath(dirname(file.relativePath));
       const entityType = workspaceEntityType(file.relativePath);
-      const canonicalName = entityType === "concept"
-        ? conceptCanonicalName(file.relativePath)
+      const explicitMentalModel = entityType === "concept" ||
+        contextChangeDocumentPath(file.relativePath) ||
+        contextDecisionDocumentPath(file.relativePath);
+      const canonicalName = explicitMentalModel
+        ? contextArtifactCanonicalName(file.relativePath)
         : name;
       return {
         schemaVersion: "1.0",
@@ -279,8 +294,8 @@ export class LocalWorkspaceContextIndex implements ContextIndexPort {
         canonicalName,
         aliases: fileAliases(file.relativePath)
           .filter((alias) => alias !== canonicalName),
-        summary: entityType === "concept"
-          ? `Explicit context concept in ${parent}`
+        summary: explicitMentalModel
+          ? `Explicit ${entityType} mental model in ${parent}`
           : parent === "." ? "Workspace file" : `Workspace file in ${parent}`,
         authorityRef: {
           provider: LOCAL_WORKSPACE_PROVIDER_ID,
@@ -340,17 +355,17 @@ function stableFileStat(
   );
 }
 
-async function verifyConceptEvidence(
+async function verifyArtifactEvidence(
   root: string,
-  concept: ContextConceptArtifact,
+  artifact: { evidence: ContextArtifactEvidence },
   signal?: AbortSignal,
 ): Promise<{ sourceId: string; revision: string } | undefined> {
   if (signal?.aborted) return undefined;
   let handle: Awaited<ReturnType<typeof open>> | undefined;
   try {
-    const requested = resolve(root, ...concept.evidence.sourcePath.split("/"));
+    const requested = resolve(root, ...artifact.evidence.sourcePath.split("/"));
     const canonical = await realpath(requested);
-    if (containedRelative(root, canonical) !== concept.evidence.sourcePath) return undefined;
+    if (containedRelative(root, canonical) !== artifact.evidence.sourcePath) return undefined;
     handle = await open(canonical, "r");
     const before = await handle.stat();
     if (!before.isFile() || before.size > MAX_PREVIEW_FILE_BYTES) return undefined;
@@ -362,15 +377,15 @@ async function verifyConceptEvidence(
     }
     const sourceLine = decoded
       .replace(/\r\n?/gu, "\n")
-      .split("\n")[concept.evidence.sourceLine - 1];
+      .split("\n")[artifact.evidence.sourceLine - 1];
     const compact = sourceLine
-      ?.replace(/^\s*(?:[-*+>])\s+/u, "")
+      ?.replace(/^\s*(?:(?:[-*+>])|(?:\d+[.)]))\s+/u, "")
       .replace(/[\p{Cc}\p{Cf}]+/gu, " ")
       .replace(/\s+/gu, " ")
       .trim();
-    if (compact !== concept.evidence.excerpt) return undefined;
+    if (compact !== artifact.evidence.excerpt) return undefined;
     return {
-      sourceId: `${concept.evidence.sourcePath}:${concept.evidence.sourceLine}`,
+      sourceId: `${artifact.evidence.sourcePath}:${artifact.evidence.sourceLine}`,
       revision: createHash("sha256").update(content).digest("hex"),
     };
   } catch {
@@ -403,7 +418,8 @@ export class LocalWorkspaceRevisionProbe {
       request.entityType !== "verification" &&
       request.entityType !== "configuration" &&
       request.entityType !== "decision" &&
-      request.entityType !== "concept"
+      request.entityType !== "concept" &&
+      request.entityType !== "change"
     ) {
       return { kind: "not_found", observedAt };
     }
@@ -482,7 +498,8 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
       request.entityType !== "verification" &&
       request.entityType !== "configuration" &&
       request.entityType !== "decision" &&
-      request.entityType !== "concept"
+      request.entityType !== "concept" &&
+      request.entityType !== "change"
     ) {
       return { kind: "not_found" };
     }
@@ -535,7 +552,27 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
       const conceptContext = request.entityType === "concept" && decoded !== undefined
         ? extractContextConceptArtifact(decoded)
         : undefined;
+      const changeContext: ContextChangeArtifact | undefined =
+        request.entityType === "change" && decoded !== undefined
+          ? extractContextChangeArtifact(decoded)
+          : undefined;
+      const explicitDecisionContext: ContextDecisionArtifact | undefined =
+        request.entityType === "decision" &&
+          contextDecisionDocumentPath(relativePath) &&
+          decoded !== undefined
+          ? extractContextDecisionArtifact(decoded)
+          : undefined;
       if (request.entityType === "concept" && conceptContext === undefined) {
+        return { kind: "not_found" };
+      }
+      if (request.entityType === "change" && changeContext === undefined) {
+        return { kind: "not_found" };
+      }
+      if (
+        request.entityType === "decision" &&
+        contextDecisionDocumentPath(relativePath) &&
+        explicitDecisionContext === undefined
+      ) {
         return { kind: "not_found" };
       }
       const after = await handle.stat();
@@ -554,10 +591,11 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
       const contentHash = content === undefined
         ? undefined
         : createHash("sha256").update(content).digest("hex");
-      const conceptEvidence = conceptContext === undefined
+      const mentalModelContext = conceptContext ?? changeContext ?? explicitDecisionContext;
+      const artifactEvidence = mentalModelContext === undefined
         ? undefined
-        : await verifyConceptEvidence(root, conceptContext, request.signal);
-      if (conceptContext !== undefined && conceptEvidence === undefined) {
+        : await verifyArtifactEvidence(root, mentalModelContext, request.signal);
+      if (mentalModelContext !== undefined && artifactEvidence === undefined) {
         return { kind: "not_found" };
       }
       const detailRevision = createHash("sha256")
@@ -567,10 +605,12 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
           markdownContext?.contextRevision ??
             sourceModuleContext?.contextRevision ??
             conceptContext?.contextRevision ??
+            changeContext?.contextRevision ??
+            explicitDecisionContext?.contextRevision ??
             "file-metadata-v1",
           "utf8",
         )
-        .update(conceptEvidence?.revision ?? "", "utf8")
+        .update(artifactEvidence?.revision ?? "", "utf8")
         .digest("hex");
       const extension = extname(relativePath);
       const preview = content === undefined ? undefined : contentPreview(content);
@@ -581,7 +621,9 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
       const configurationContext = request.entityType === "configuration" && decoded !== undefined
         ? extractJsonConfigurationContext(relativePath, decoded)
         : undefined;
-      const decisionContext = request.entityType === "decision" && decoded !== undefined
+      const decisionContext = request.entityType === "decision" &&
+        explicitDecisionContext === undefined &&
+        decoded !== undefined
         ? extractDecisionDocumentContext(decoded)
         : undefined;
       const markdownFacts = markdownContext === undefined
@@ -663,6 +705,22 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
             "后果": decisionContext.consequences ?? "未提供可提取的 Consequences 段落",
             "路径": relativePath,
           };
+      const explicitDecisionFacts = explicitDecisionContext === undefined
+        ? undefined
+        : {
+            "为什么需要决定": explicitDecisionContext.problem,
+            "选择了什么": explicitDecisionContext.choice,
+            "后果是什么": explicitDecisionContext.consequence,
+            "证据": explicitDecisionContext.evidence.excerpt,
+          };
+      const changeFacts = changeContext === undefined
+        ? undefined
+        : {
+            "原来怎样": changeContext.before,
+            "现在怎样": changeContext.after,
+            "影响什么": changeContext.impact,
+            "证据": changeContext.evidence.excerpt,
+          };
       const conceptFacts = conceptContext === undefined
         ? undefined
         : {
@@ -682,7 +740,7 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
           entityRevision: `sha256:${detailRevision}`,
           observedAt,
           freshness: "current",
-          facts: conceptFacts ?? decisionFacts ?? verificationFacts ?? configurationFacts ?? markdownFacts ?? moduleFacts ?? {
+          facts: conceptFacts ?? changeFacts ?? explicitDecisionFacts ?? decisionFacts ?? verificationFacts ?? configurationFacts ?? markdownFacts ?? moduleFacts ?? {
               path: relativePath,
               name: basename(relativePath),
               ...(preview === undefined ? {} : { preview }),
@@ -703,9 +761,9 @@ export class LocalWorkspaceAuthoritativeProvider implements AuthoritativeProvide
             ...(sourceModuleContext?.gitAvailable === true
               ? [{ sourceType: "local_git", sourceId: relativePath }]
               : []),
-            ...(conceptEvidence === undefined
+            ...(artifactEvidence === undefined
               ? []
-              : [{ sourceType: "project_evidence", sourceId: conceptEvidence.sourceId }]),
+              : [{ sourceType: "project_evidence", sourceId: artifactEvidence.sourceId }]),
           ],
         },
         verification: {

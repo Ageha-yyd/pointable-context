@@ -954,6 +954,23 @@ function validateCandidate(value) {
     summary: requiredString(value.summary, "candidate summary", 1024)
   };
 }
+function validateEvidence(value) {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 3) {
+    throw new PointableProtocolError(
+      "invalid_lookup_result",
+      "detail evidence is invalid"
+    );
+  }
+  return value.map((item) => {
+    if (!record2(item) || !exactKeys2(item, ["excerpt", "source"]) || !boundedString(item.excerpt, 1, 1024) || !boundedString(item.source, 1, 512)) {
+      throw new PointableProtocolError(
+        "invalid_lookup_result",
+        "detail evidence is invalid"
+      );
+    }
+    return { excerpt: item.excerpt, source: item.source };
+  });
+}
 function validateDetail(value) {
   if (!record2(value) || !exactKeys2(value, [
     "entityId",
@@ -1011,38 +1028,70 @@ function validateDetail(value) {
   let comprehension;
   if (value.comprehension !== void 0) {
     const view = value.comprehension;
-    if (!record2(view) || !exactKeys2(view, [
-      "kind",
-      "meaning",
-      "context",
-      "boundary",
-      "sequence",
-      "currentStep",
-      "evidence"
-    ]) || view.kind !== "concept" || !boundedString(view.meaning, 1, 1024) || !boundedString(view.context, 1, 1024) || !boundedString(view.boundary, 1, 1024) || !Array.isArray(view.sequence) || view.sequence.length < 2 || view.sequence.length > 4 || !view.sequence.every((item) => boundedString(item, 1, 256)) || !Number.isSafeInteger(view.currentStep) || Number(view.currentStep) < 0 || Number(view.currentStep) >= view.sequence.length || !Array.isArray(view.evidence) || view.evidence.length < 1 || view.evidence.length > 3) {
+    if (!record2(view)) {
       throw new PointableProtocolError(
         "invalid_lookup_result",
         "detail comprehension view is invalid"
       );
     }
-    const evidence = view.evidence.map((item) => {
-      if (!record2(item) || !exactKeys2(item, ["excerpt", "source"]) || !boundedString(item.excerpt, 1, 1024) || !boundedString(item.source, 1, 512)) {
+    if (view.kind === "concept") {
+      if (!exactKeys2(view, [
+        "kind",
+        "meaning",
+        "context",
+        "boundary",
+        "sequence",
+        "currentStep",
+        "evidence"
+      ]) || !boundedString(view.meaning, 1, 1024) || !boundedString(view.context, 1, 1024) || !boundedString(view.boundary, 1, 1024) || !Array.isArray(view.sequence) || view.sequence.length < 2 || view.sequence.length > 4 || !view.sequence.every((item) => boundedString(item, 1, 256)) || !Number.isSafeInteger(view.currentStep) || Number(view.currentStep) < 0 || Number(view.currentStep) >= view.sequence.length) {
         throw new PointableProtocolError(
           "invalid_lookup_result",
-          "detail evidence is invalid"
+          "detail comprehension view is invalid"
         );
       }
-      return { excerpt: item.excerpt, source: item.source };
-    });
-    comprehension = {
-      kind: "concept",
-      meaning: view.meaning,
-      context: view.context,
-      boundary: view.boundary,
-      sequence: [...view.sequence],
-      currentStep: Number(view.currentStep),
-      evidence
-    };
+      comprehension = {
+        kind: "concept",
+        meaning: view.meaning,
+        context: view.context,
+        boundary: view.boundary,
+        sequence: [...view.sequence],
+        currentStep: Number(view.currentStep),
+        evidence: validateEvidence(view.evidence)
+      };
+    } else if (view.kind === "change") {
+      if (!exactKeys2(view, ["kind", "before", "after", "impact", "evidence"]) || !boundedString(view.before, 1, 1024) || !boundedString(view.after, 1, 1024) || !boundedString(view.impact, 1, 1024)) {
+        throw new PointableProtocolError(
+          "invalid_lookup_result",
+          "detail comprehension view is invalid"
+        );
+      }
+      comprehension = {
+        kind: "change",
+        before: view.before,
+        after: view.after,
+        impact: view.impact,
+        evidence: validateEvidence(view.evidence)
+      };
+    } else if (view.kind === "decision") {
+      if (!exactKeys2(view, ["kind", "problem", "choice", "consequence", "evidence"]) || !boundedString(view.problem, 1, 1024) || !boundedString(view.choice, 1, 1024) || !boundedString(view.consequence, 1, 1024)) {
+        throw new PointableProtocolError(
+          "invalid_lookup_result",
+          "detail comprehension view is invalid"
+        );
+      }
+      comprehension = {
+        kind: "decision",
+        problem: view.problem,
+        choice: view.choice,
+        consequence: view.consequence,
+        evidence: validateEvidence(view.evidence)
+      };
+    } else {
+      throw new PointableProtocolError(
+        "invalid_lookup_result",
+        "detail comprehension view is invalid"
+      );
+    }
   }
   const changes = value.changes === void 0 ? void 0 : value.changes.map((change) => {
     if (!record2(change) || !exactKeys2(change, ["label", "before", "after"])) {
@@ -1184,15 +1233,26 @@ function validatePointableRendererResponse(value) {
   const sourceView = (candidate) => isRecord(candidate) && exact(candidate, ["label"]) && bounded(candidate.label, 1, 512);
   const changeView = (candidate) => isRecord(candidate) && exact(candidate, ["label", "before", "after"]) && bounded(candidate.label, 1, 128) && bounded(candidate.before, 1, 1024) && bounded(candidate.after, 1, 1024);
   const evidenceView = (candidate) => isRecord(candidate) && exact(candidate, ["excerpt", "source"]) && bounded(candidate.excerpt, 1, 1024) && bounded(candidate.source, 1, 512);
-  const comprehensionView = (candidate) => isRecord(candidate) && exact(candidate, [
-    "kind",
-    "meaning",
-    "context",
-    "boundary",
-    "sequence",
-    "currentStep",
-    "evidence"
-  ]) && candidate.kind === "concept" && bounded(candidate.meaning, 1, 1024) && bounded(candidate.context, 1, 1024) && bounded(candidate.boundary, 1, 1024) && Array.isArray(candidate.sequence) && candidate.sequence.length >= 2 && candidate.sequence.length <= 4 && candidate.sequence.every((item) => bounded(item, 1, 256)) && Number.isSafeInteger(candidate.currentStep) && Number(candidate.currentStep) >= 0 && Number(candidate.currentStep) < candidate.sequence.length && Array.isArray(candidate.evidence) && candidate.evidence.length >= 1 && candidate.evidence.length <= 3 && candidate.evidence.every(evidenceView);
+  const comprehensionView = (candidate) => {
+    if (!isRecord(candidate) || !Array.isArray(candidate.evidence) || candidate.evidence.length < 1 || candidate.evidence.length > 3 || !candidate.evidence.every(evidenceView)) {
+      return false;
+    }
+    if (candidate.kind === "concept") {
+      return exact(candidate, [
+        "kind",
+        "meaning",
+        "context",
+        "boundary",
+        "sequence",
+        "currentStep",
+        "evidence"
+      ]) && bounded(candidate.meaning, 1, 1024) && bounded(candidate.context, 1, 1024) && bounded(candidate.boundary, 1, 1024) && Array.isArray(candidate.sequence) && candidate.sequence.length >= 2 && candidate.sequence.length <= 4 && candidate.sequence.every((item) => bounded(item, 1, 256)) && Number.isSafeInteger(candidate.currentStep) && Number(candidate.currentStep) >= 0 && Number(candidate.currentStep) < candidate.sequence.length;
+    }
+    if (candidate.kind === "change") {
+      return exact(candidate, ["kind", "before", "after", "impact", "evidence"]) && bounded(candidate.before, 1, 1024) && bounded(candidate.after, 1, 1024) && bounded(candidate.impact, 1, 1024);
+    }
+    return candidate.kind === "decision" && exact(candidate, ["kind", "problem", "choice", "consequence", "evidence"]) && bounded(candidate.problem, 1, 1024) && bounded(candidate.choice, 1, 1024) && bounded(candidate.consequence, 1, 1024);
+  };
   if (!isRecord(value) || !exact(value, [
     "schemaVersion",
     "kind",
@@ -1229,8 +1289,8 @@ function validatePointableRendererResponse(value) {
       return void 0;
     }
   } else if (presentation.kind === "revision") {
-    const revision = presentation.revision;
-    if (!exact(presentation, ["kind", "revision"]) || !isRecord(revision) || !exact(revision, ["detailRef", "state", "checkedAt"]) || !bounded(revision.detailRef, 8, 256) || revision.state !== "unchanged" && revision.state !== "updated" && revision.state !== "deleted" && revision.state !== "unavailable" || !bounded(revision.checkedAt, 20, 64) || !Number.isFinite(Date.parse(revision.checkedAt))) {
+    const revision2 = presentation.revision;
+    if (!exact(presentation, ["kind", "revision"]) || !isRecord(revision2) || !exact(revision2, ["detailRef", "state", "checkedAt"]) || !bounded(revision2.detailRef, 8, 256) || revision2.state !== "unchanged" && revision2.state !== "updated" && revision2.state !== "deleted" && revision2.state !== "unavailable" || !bounded(revision2.checkedAt, 20, 64) || !Number.isFinite(Date.parse(revision2.checkedAt))) {
       return void 0;
     }
   } else if (presentation.kind === "error") {
@@ -1865,89 +1925,105 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     else shell.insertBefore(notice, header?.nextSibling ?? shell.firstChild);
     reposition();
   }
-  function mountConceptComprehension(body, model) {
+  function mountComprehension(body, model) {
     const surface = document.createElement("div");
     surface.setAttribute("data-pointable-context-role", "comprehension-model");
     surface.setAttribute("data-pointable-context-kind", model.kind);
-    surface.append(paragraph(model.meaning));
-    const context = document.createElement("div");
-    context.setAttribute("data-pointable-context-role", "comprehension-context");
-    Object.assign(context.style, {
-      marginTop: "10px",
-      padding: "8px 10px",
-      borderLeft: "3px solid #8ba8ff",
-      borderRadius: "0 8px 8px 0",
-      background: "#f7f9ff"
-    });
-    const contextLabel = document.createElement("strong");
-    contextLabel.textContent = "\u4E3A\u4EC0\u4E48\u73B0\u5728\u51FA\u73B0";
-    Object.assign(contextLabel.style, {
-      display: "block",
-      marginBottom: "3px",
-      color: "#334155",
-      fontSize: "12px"
-    });
-    const contextText = paragraph(model.context, true);
-    context.append(contextLabel, contextText);
-    surface.append(context);
-    const flow = document.createElement("div");
-    flow.setAttribute("data-pointable-context-role", "comprehension-flow");
-    Object.assign(flow.style, { marginTop: "12px" });
-    const flowLabel = document.createElement("strong");
-    flowLabel.textContent = "\u4F60\u73B0\u5728\u4F4D\u4E8E\u8FD9\u91CC";
-    Object.assign(flowLabel.style, {
-      display: "block",
-      marginBottom: "6px",
-      color: "#334155",
-      fontSize: "12px"
-    });
-    flow.append(flowLabel);
-    for (let index = 0; index < model.sequence.length; index += 1) {
-      const step = document.createElement("div");
-      const current = index === model.currentStep;
-      step.setAttribute("data-pointable-context-role", "comprehension-step");
-      step.setAttribute("data-pointable-context-current", String(current));
-      step.textContent = `${current ? "\u5F53\u524D \xB7 " : ""}${model.sequence[index] ?? ""}`;
-      Object.assign(step.style, {
-        padding: "6px 9px",
-        border: current ? "1px solid #7798ff" : "1px solid #dce3ee",
-        borderRadius: "8px",
-        background: current ? "#edf2ff" : "#ffffff",
-        color: current ? "#1746c7" : "#52627a",
-        fontWeight: current ? "700" : "500",
+    const modelBlock = (role, label, text, tone = "neutral") => {
+      const block = document.createElement("div");
+      block.setAttribute("data-pointable-context-role", role);
+      Object.assign(block.style, {
+        marginTop: "10px",
+        padding: "8px 10px",
+        borderLeft: tone === "primary" ? "3px solid #7798ff" : "3px solid #d7deea",
+        borderRadius: "0 8px 8px 0",
+        background: tone === "primary" ? "#edf2ff" : tone === "impact" ? "#fff7ed" : "#f8fafc",
+        color: tone === "primary" ? "#1746c7" : tone === "impact" ? "#8a4b00" : "#334155"
+      });
+      const heading = document.createElement("strong");
+      heading.textContent = label;
+      Object.assign(heading.style, {
+        display: "block",
+        marginBottom: "3px",
         fontSize: "12px"
       });
-      flow.append(step);
-      if (index < model.sequence.length - 1) {
-        const arrow = document.createElement("div");
-        arrow.textContent = "\u2193";
-        arrow.setAttribute("aria-hidden", "true");
-        Object.assign(arrow.style, {
-          height: "16px",
-          color: "#94a3b8",
-          textAlign: "center",
-          lineHeight: "16px"
+      block.append(heading, paragraph(text, true));
+      return block;
+    };
+    const arrow = () => {
+      const node = document.createElement("div");
+      node.textContent = "\u2193";
+      node.setAttribute("aria-hidden", "true");
+      Object.assign(node.style, {
+        height: "16px",
+        color: "#94a3b8",
+        textAlign: "center",
+        lineHeight: "16px"
+      });
+      return node;
+    };
+    if (model.kind === "concept") {
+      surface.append(paragraph(model.meaning));
+      surface.append(modelBlock(
+        "comprehension-context",
+        "\u4E3A\u4EC0\u4E48\u73B0\u5728\u51FA\u73B0",
+        model.context,
+        "primary"
+      ));
+      const flow = document.createElement("div");
+      flow.setAttribute("data-pointable-context-role", "comprehension-flow");
+      Object.assign(flow.style, { marginTop: "12px" });
+      const flowLabel = document.createElement("strong");
+      flowLabel.textContent = "\u4F60\u73B0\u5728\u4F4D\u4E8E\u8FD9\u91CC";
+      Object.assign(flowLabel.style, {
+        display: "block",
+        marginBottom: "6px",
+        color: "#334155",
+        fontSize: "12px"
+      });
+      flow.append(flowLabel);
+      for (let index = 0; index < model.sequence.length; index += 1) {
+        const step = document.createElement("div");
+        const current = index === model.currentStep;
+        step.setAttribute("data-pointable-context-role", "comprehension-step");
+        step.setAttribute("data-pointable-context-current", String(current));
+        step.textContent = `${current ? "\u5F53\u524D \xB7 " : ""}${model.sequence[index] ?? ""}`;
+        Object.assign(step.style, {
+          padding: "6px 9px",
+          border: current ? "1px solid #7798ff" : "1px solid #dce3ee",
+          borderRadius: "8px",
+          background: current ? "#edf2ff" : "#ffffff",
+          color: current ? "#1746c7" : "#52627a",
+          fontWeight: current ? "700" : "500",
+          fontSize: "12px"
         });
-        flow.append(arrow);
+        flow.append(step);
+        if (index < model.sequence.length - 1) flow.append(arrow());
       }
+      surface.append(flow);
+      const boundary = modelBlock(
+        "comprehension-boundary",
+        "\u4E0D\u4F1A\u8BC1\u660E\uFF1A",
+        model.boundary,
+        "impact"
+      );
+      boundary.style.borderLeft = "3px solid #f2b86b";
+      surface.append(boundary);
+    } else if (model.kind === "change") {
+      surface.append(
+        modelBlock("comprehension-before", "\u539F\u6765", model.before),
+        arrow(),
+        modelBlock("comprehension-after", "\u73B0\u5728", model.after, "primary"),
+        modelBlock("comprehension-impact", "\u8FD9\u4F1A\u5F71\u54CD", model.impact, "impact")
+      );
+    } else {
+      surface.append(
+        modelBlock("comprehension-problem", "\u8981\u89E3\u51B3\u7684\u95EE\u9898", model.problem),
+        arrow(),
+        modelBlock("comprehension-choice", "\u9009\u62E9", model.choice, "primary"),
+        modelBlock("comprehension-consequence", "\u7ED3\u679C\u4E0E\u4EE3\u4EF7", model.consequence, "impact")
+      );
     }
-    surface.append(flow);
-    const boundary = document.createElement("div");
-    boundary.setAttribute("data-pointable-context-role", "comprehension-boundary");
-    Object.assign(boundary.style, {
-      marginTop: "12px",
-      padding: "8px 10px",
-      borderRadius: "8px",
-      background: "#fff7ed",
-      color: "#8a4b00",
-      fontSize: "12px"
-    });
-    const boundaryLabel = document.createElement("strong");
-    boundaryLabel.textContent = "\u4E0D\u4F1A\u8BC1\u660E\uFF1A";
-    const boundaryText = document.createElement("span");
-    boundaryText.textContent = model.boundary;
-    boundary.append(boundaryLabel, boundaryText);
-    surface.append(boundary);
     const evidenceDisclosure = document.createElement("div");
     evidenceDisclosure.setAttribute("data-pointable-context-role", "evidence-disclosure");
     Object.assign(evidenceDisclosure.style, { marginTop: "8px" });
@@ -2005,7 +2081,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     state = "detail";
     const { body } = createShell(detail.label);
     if (presentationMode === "mental-model" && detail.comprehension !== void 0) {
-      mountConceptComprehension(body, detail.comprehension);
+      mountComprehension(body, detail.comprehension);
     } else {
       const summary = presentationMode === "record" ? detail.summary : detail.humanSummary ?? detail.summary;
       body.append(paragraph(summary));
@@ -2199,13 +2275,13 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     } else if (response.presentation.kind === "detail") {
       mountDetail(response.presentation.detail);
     } else if (response.presentation.kind === "revision") {
-      const revision = response.presentation.revision;
+      const revision2 = response.presentation.revision;
       state = "detail";
-      if (revision.state === "unchanged") {
+      if (revision2.state === "unchanged") {
         removeRevisionNotice();
-        scheduleRevisionCheck(revision.detailRef, request.generation);
+        scheduleRevisionCheck(revision2.detailRef, request.generation);
       } else {
-        showRevisionNotice(revision.state, revision.detailRef);
+        showRevisionNotice(revision2.state, revision2.detailRef);
       }
     } else if (request.operation === "check" || request.operation === "refresh") {
       state = "detail";
@@ -3783,7 +3859,15 @@ function contextConceptDocumentPath(relativePath) {
   const portable2 = relativePath.replace(/\\/gu, "/");
   return /(?:^|\/)docs\/concepts\/[^/]+\.md$/iu.test(portable2);
 }
-function extractContextConceptArtifact(content) {
+function contextChangeDocumentPath(relativePath) {
+  const portable2 = relativePath.replace(/\\/gu, "/");
+  return /(?:^|\/)docs\/changes\/[^/]+\.md$/iu.test(portable2);
+}
+function contextDecisionDocumentPath(relativePath) {
+  const portable2 = relativePath.replace(/\\/gu, "/");
+  return /(?:^|\/)docs\/decisions\/[^/]+\.md$/iu.test(portable2);
+}
+function documentSections(content) {
   const lines = content.replace(/\r\n?/gu, "\n").split("\n");
   const sections = /* @__PURE__ */ new Map();
   let title;
@@ -3808,11 +3892,25 @@ function extractContextConceptArtifact(content) {
     }
     if (activeSection !== void 0) sections.get(activeSection)?.push(line);
   }
+  return { ...title === void 0 ? {} : { title }, sections };
+}
+function artifactEvidence(sections) {
+  const excerpt = sectionText(sections.get("\u8BC1\u636E") ?? []);
+  const source = sourceReference(sectionText(sections.get("\u6765\u6E90") ?? []) ?? "");
+  return excerpt === void 0 || source === void 0 ? void 0 : Object.freeze({ excerpt, ...source });
+}
+function revision(base) {
+  return Object.freeze({
+    ...base,
+    contextRevision: createHash4("sha256").update(JSON.stringify(base), "utf8").digest("hex")
+  });
+}
+function extractContextConceptArtifact(content) {
+  const { title, sections } = documentSections(content);
   const meaning = sectionText(sections.get("\u5B83\u662F\u4EC0\u4E48\u610F\u601D") ?? []);
   const currentContext = sectionText(sections.get("\u4E3A\u4EC0\u4E48\u73B0\u5728\u51FA\u73B0") ?? []);
   const boundary = sectionText(sections.get("\u5B83\u4E0D\u662F\u4EC0\u4E48") ?? []);
-  const evidenceExcerpt = sectionText(sections.get("\u8BC1\u636E") ?? []);
-  const source = sourceReference(sectionText(sections.get("\u6765\u6E90") ?? []) ?? "");
+  const evidence = artifactEvidence(sections);
   const flowLines = sections.get("\u6240\u5904\u6D41\u7A0B") ?? [];
   const sequence = [];
   let currentStep;
@@ -3826,7 +3924,7 @@ function extractContextConceptArtifact(content) {
     if (current && currentStep === void 0) currentStep = sequence.length;
     sequence.push(value);
   }
-  if (title === void 0 || meaning === void 0 || currentContext === void 0 || boundary === void 0 || sequence.length < 2 || currentStep === void 0 || evidenceExcerpt === void 0 || source === void 0) {
+  if (title === void 0 || meaning === void 0 || currentContext === void 0 || boundary === void 0 || sequence.length < 2 || currentStep === void 0 || evidence === void 0) {
     return void 0;
   }
   const base = {
@@ -3836,12 +3934,31 @@ function extractContextConceptArtifact(content) {
     boundary,
     sequence: Object.freeze([...sequence]),
     currentStep,
-    evidence: Object.freeze({ excerpt: evidenceExcerpt, ...source })
+    evidence
   };
-  return Object.freeze({
-    ...base,
-    contextRevision: createHash4("sha256").update(JSON.stringify(base), "utf8").digest("hex")
-  });
+  return revision(base);
+}
+function extractContextChangeArtifact(content) {
+  const { title, sections } = documentSections(content);
+  const before = sectionText(sections.get("\u539F\u6765\u600E\u6837") ?? []);
+  const after = sectionText(sections.get("\u73B0\u5728\u600E\u6837") ?? []);
+  const impact = sectionText(sections.get("\u5F71\u54CD\u4EC0\u4E48") ?? []);
+  const evidence = artifactEvidence(sections);
+  if (title === void 0 || before === void 0 || after === void 0 || impact === void 0 || evidence === void 0) {
+    return void 0;
+  }
+  return revision({ title, before, after, impact, evidence });
+}
+function extractContextDecisionArtifact(content) {
+  const { title, sections } = documentSections(content);
+  const problem = sectionText(sections.get("\u4E3A\u4EC0\u4E48\u9700\u8981\u51B3\u5B9A") ?? []);
+  const choice = sectionText(sections.get("\u9009\u62E9\u4E86\u4EC0\u4E48") ?? []);
+  const consequence = sectionText(sections.get("\u540E\u679C\u662F\u4EC0\u4E48") ?? []);
+  const evidence = artifactEvidence(sections);
+  if (title === void 0 || problem === void 0 || choice === void 0 || consequence === void 0 || evidence === void 0) {
+    return void 0;
+  }
+  return revision({ title, problem, choice, consequence, evidence });
 }
 
 // src/adapters/source-module-artifact.ts
@@ -4349,6 +4466,8 @@ function markdownDocument(relativePath) {
 }
 function workspaceEntityType(relativePath) {
   if (contextConceptDocumentPath(relativePath)) return "concept";
+  if (contextChangeDocumentPath(relativePath)) return "change";
+  if (contextDecisionDocumentPath(relativePath)) return "decision";
   if (decisionDocumentPath(relativePath)) return "decision";
   if (markdownDocument(relativePath)) return "document";
   if (testSourcePath(relativePath)) return "verification";
@@ -4356,11 +4475,12 @@ function workspaceEntityType(relativePath) {
   if (jsonConfigurationPath(relativePath)) return "configuration";
   return "file";
 }
-function conceptCanonicalName(relativePath) {
+function contextArtifactCanonicalName(relativePath) {
   const name = basename3(relativePath);
   const extension = extname3(name);
   const stem = extension.length === 0 ? name : name.slice(0, -extension.length);
-  return stem.length === 0 ? name : `${stem[0]?.toLocaleUpperCase("en-US") ?? ""}${stem.slice(1)}`;
+  if (stem.length === 0) return name;
+  return stem.split(/[-_]+/u).filter((word) => word.length > 0).map((word) => `${word[0]?.toLocaleUpperCase("en-US") ?? ""}${word.slice(1)}`).join(" ");
 }
 async function verifiedWorkspaceRoot(binding) {
   if (!binding.workspaceRoot || !isAbsolute2(binding.workspaceRoot)) {
@@ -4465,13 +4585,14 @@ var LocalWorkspaceContextIndex = class {
       this.#ignoredDirectories,
       signal
     );
-    const revision = indexRevision(files);
+    const revision2 = indexRevision(files);
     const indexedAt = (/* @__PURE__ */ new Date()).toISOString();
     return files.map((file) => {
       const name = basename3(file.relativePath);
       const parent = portablePath(dirname2(file.relativePath));
       const entityType = workspaceEntityType(file.relativePath);
-      const canonicalName = entityType === "concept" ? conceptCanonicalName(file.relativePath) : name;
+      const explicitMentalModel = entityType === "concept" || contextChangeDocumentPath(file.relativePath) || contextDecisionDocumentPath(file.relativePath);
+      const canonicalName = explicitMentalModel ? contextArtifactCanonicalName(file.relativePath) : name;
       return {
         schemaVersion: "1.0",
         scope: { ...binding.scope },
@@ -4480,12 +4601,12 @@ var LocalWorkspaceContextIndex = class {
         canonicalKey: file.relativePath,
         canonicalName,
         aliases: fileAliases(file.relativePath).filter((alias) => alias !== canonicalName),
-        summary: entityType === "concept" ? `Explicit context concept in ${parent}` : parent === "." ? "Workspace file" : `Workspace file in ${parent}`,
+        summary: explicitMentalModel ? `Explicit ${entityType} mental model in ${parent}` : parent === "." ? "Workspace file" : `Workspace file in ${parent}`,
         authorityRef: {
           provider: LOCAL_WORKSPACE_PROVIDER_ID,
           locator: file.relativePath
         },
-        indexRevision: revision,
+        indexRevision: revision2,
         indexedAt,
         deleted: false
       };
@@ -4531,13 +4652,13 @@ function gitStatusLabel(status) {
 function stableFileStat(before, after) {
   return before.size === after.size && before.mtimeMs === after.mtimeMs && before.ctimeMs === after.ctimeMs && before.ino === after.ino;
 }
-async function verifyConceptEvidence(root, concept, signal) {
+async function verifyArtifactEvidence(root, artifact, signal) {
   if (signal?.aborted) return void 0;
   let handle;
   try {
-    const requested = resolve4(root, ...concept.evidence.sourcePath.split("/"));
+    const requested = resolve4(root, ...artifact.evidence.sourcePath.split("/"));
     const canonical = await realpath2(requested);
-    if (containedRelative(root, canonical) !== concept.evidence.sourcePath) return void 0;
+    if (containedRelative(root, canonical) !== artifact.evidence.sourcePath) return void 0;
     handle = await open(canonical, "r");
     const before = await handle.stat();
     if (!before.isFile() || before.size > MAX_PREVIEW_FILE_BYTES) return void 0;
@@ -4547,11 +4668,11 @@ async function verifyConceptEvidence(root, concept, signal) {
     if (decoded === void 0 || !stableFileStat(before, after) || signal?.aborted) {
       return void 0;
     }
-    const sourceLine = decoded.replace(/\r\n?/gu, "\n").split("\n")[concept.evidence.sourceLine - 1];
-    const compact2 = sourceLine?.replace(/^\s*(?:[-*+>])\s+/u, "").replace(/[\p{Cc}\p{Cf}]+/gu, " ").replace(/\s+/gu, " ").trim();
-    if (compact2 !== concept.evidence.excerpt) return void 0;
+    const sourceLine = decoded.replace(/\r\n?/gu, "\n").split("\n")[artifact.evidence.sourceLine - 1];
+    const compact2 = sourceLine?.replace(/^\s*(?:(?:[-*+>])|(?:\d+[.)]))\s+/u, "").replace(/[\p{Cc}\p{Cf}]+/gu, " ").replace(/\s+/gu, " ").trim();
+    if (compact2 !== artifact.evidence.excerpt) return void 0;
     return {
-      sourceId: `${concept.evidence.sourcePath}:${concept.evidence.sourceLine}`,
+      sourceId: `${artifact.evidence.sourcePath}:${artifact.evidence.sourceLine}`,
       revision: createHash6("sha256").update(content).digest("hex")
     };
   } catch {
@@ -4566,7 +4687,7 @@ var LocalWorkspaceRevisionProbe = class {
     if (request.signal?.aborted) {
       return { kind: "unavailable", observedAt, retryable: true };
     }
-    if (request.entityType !== "file" && request.entityType !== "document" && request.entityType !== "module" && request.entityType !== "verification" && request.entityType !== "configuration" && request.entityType !== "decision" && request.entityType !== "concept") {
+    if (request.entityType !== "file" && request.entityType !== "document" && request.entityType !== "module" && request.entityType !== "verification" && request.entityType !== "configuration" && request.entityType !== "decision" && request.entityType !== "concept" && request.entityType !== "change") {
       return { kind: "not_found", observedAt };
     }
     if (!request.entityId.startsWith("file:")) {
@@ -4590,7 +4711,7 @@ var LocalWorkspaceRevisionProbe = class {
       if (!info.isFile() || request.signal?.aborted) {
         return { kind: "unavailable", observedAt, retryable: true };
       }
-      const revision = createHash6("sha256").update(JSON.stringify({
+      const revision2 = createHash6("sha256").update(JSON.stringify({
         path: locator,
         size: info.size,
         modifiedMs: info.mtimeMs,
@@ -4599,7 +4720,7 @@ var LocalWorkspaceRevisionProbe = class {
       }), "utf8").digest("hex");
       return {
         kind: "current",
-        revision: `workspace-file-stat:${revision}`,
+        revision: `workspace-file-stat:${revision2}`,
         observedAt
       };
     } catch (error) {
@@ -4620,7 +4741,7 @@ var LocalWorkspaceAuthoritativeProvider = class {
   providerId = LOCAL_WORKSPACE_PROVIDER_ID;
   async getDetail(request) {
     if (request.signal?.aborted) return { kind: "unavailable", retryable: true };
-    if (request.entityType !== "file" && request.entityType !== "document" && request.entityType !== "module" && request.entityType !== "verification" && request.entityType !== "configuration" && request.entityType !== "decision" && request.entityType !== "concept") {
+    if (request.entityType !== "file" && request.entityType !== "document" && request.entityType !== "module" && request.entityType !== "verification" && request.entityType !== "configuration" && request.entityType !== "decision" && request.entityType !== "concept" && request.entityType !== "change") {
       return { kind: "not_found" };
     }
     if (request.authorityLocator.length < 1 || request.authorityLocator.length > MAX_RELATIVE_PATH_CHARS || request.authorityLocator.includes("\\") || request.authorityLocator.startsWith("/") || request.authorityLocator.split("/").includes("..") || request.entityId !== fileEntityId(request.authorityLocator) || workspaceEntityType(request.authorityLocator) !== request.entityType) {
@@ -4654,7 +4775,15 @@ var LocalWorkspaceAuthoritativeProvider = class {
         ...request.signal === void 0 ? {} : { signal: request.signal }
       }) : void 0;
       const conceptContext = request.entityType === "concept" && decoded !== void 0 ? extractContextConceptArtifact(decoded) : void 0;
+      const changeContext = request.entityType === "change" && decoded !== void 0 ? extractContextChangeArtifact(decoded) : void 0;
+      const explicitDecisionContext = request.entityType === "decision" && contextDecisionDocumentPath(relativePath) && decoded !== void 0 ? extractContextDecisionArtifact(decoded) : void 0;
       if (request.entityType === "concept" && conceptContext === void 0) {
+        return { kind: "not_found" };
+      }
+      if (request.entityType === "change" && changeContext === void 0) {
+        return { kind: "not_found" };
+      }
+      if (request.entityType === "decision" && contextDecisionDocumentPath(relativePath) && explicitDecisionContext === void 0) {
         return { kind: "not_found" };
       }
       const after = await handle.stat();
@@ -4669,20 +4798,21 @@ var LocalWorkspaceAuthoritativeProvider = class {
         inode: after.ino
       }), "utf8").digest("hex");
       const contentHash = content === void 0 ? void 0 : createHash6("sha256").update(content).digest("hex");
-      const conceptEvidence = conceptContext === void 0 ? void 0 : await verifyConceptEvidence(root, conceptContext, request.signal);
-      if (conceptContext !== void 0 && conceptEvidence === void 0) {
+      const mentalModelContext = conceptContext ?? changeContext ?? explicitDecisionContext;
+      const artifactEvidence2 = mentalModelContext === void 0 ? void 0 : await verifyArtifactEvidence(root, mentalModelContext, request.signal);
+      if (mentalModelContext !== void 0 && artifactEvidence2 === void 0) {
         return { kind: "not_found" };
       }
       const detailRevision = createHash6("sha256").update(contentHash ?? statRevision, "utf8").update("\0", "utf8").update(
-        markdownContext?.contextRevision ?? sourceModuleContext?.contextRevision ?? conceptContext?.contextRevision ?? "file-metadata-v1",
+        markdownContext?.contextRevision ?? sourceModuleContext?.contextRevision ?? conceptContext?.contextRevision ?? changeContext?.contextRevision ?? explicitDecisionContext?.contextRevision ?? "file-metadata-v1",
         "utf8"
-      ).update(conceptEvidence?.revision ?? "", "utf8").digest("hex");
+      ).update(artifactEvidence2?.revision ?? "", "utf8").digest("hex");
       const extension = extname3(relativePath);
       const preview = content === void 0 ? void 0 : contentPreview(content);
       const observedAt = (/* @__PURE__ */ new Date()).toISOString();
       const testContext = request.entityType === "verification" && decoded !== void 0 ? extractStaticTestDefinitionContext(decoded) : void 0;
       const configurationContext = request.entityType === "configuration" && decoded !== void 0 ? extractJsonConfigurationContext(relativePath, decoded) : void 0;
-      const decisionContext = request.entityType === "decision" && decoded !== void 0 ? extractDecisionDocumentContext(decoded) : void 0;
+      const decisionContext = request.entityType === "decision" && explicitDecisionContext === void 0 && decoded !== void 0 ? extractDecisionDocumentContext(decoded) : void 0;
       const markdownFacts = markdownContext === void 0 ? void 0 : {
         "\u7528\u9014": markdownContext.purpose ?? `${markdownContext.title ?? basename3(relativePath)} Markdown \u6587\u6863`,
         "\u672C\u6B21\u53D8\u5316": markdownContext.changeSummary ?? (markdownContext.gitAvailable ? "\u5F53\u524D\u5DE5\u4F5C\u6811\u672A\u68C0\u6D4B\u5230\u672A\u63D0\u4EA4\u53D8\u66F4" : "Git \u4E0A\u4E0B\u6587\u4E0D\u53EF\u7528"),
@@ -4729,6 +4859,18 @@ var LocalWorkspaceAuthoritativeProvider = class {
         "\u540E\u679C": decisionContext.consequences ?? "\u672A\u63D0\u4F9B\u53EF\u63D0\u53D6\u7684 Consequences \u6BB5\u843D",
         "\u8DEF\u5F84": relativePath
       };
+      const explicitDecisionFacts = explicitDecisionContext === void 0 ? void 0 : {
+        "\u4E3A\u4EC0\u4E48\u9700\u8981\u51B3\u5B9A": explicitDecisionContext.problem,
+        "\u9009\u62E9\u4E86\u4EC0\u4E48": explicitDecisionContext.choice,
+        "\u540E\u679C\u662F\u4EC0\u4E48": explicitDecisionContext.consequence,
+        "\u8BC1\u636E": explicitDecisionContext.evidence.excerpt
+      };
+      const changeFacts = changeContext === void 0 ? void 0 : {
+        "\u539F\u6765\u600E\u6837": changeContext.before,
+        "\u73B0\u5728\u600E\u6837": changeContext.after,
+        "\u5F71\u54CD\u4EC0\u4E48": changeContext.impact,
+        "\u8BC1\u636E": changeContext.evidence.excerpt
+      };
       const conceptFacts = conceptContext === void 0 ? void 0 : {
         "\u5B83\u662F\u4EC0\u4E48\u610F\u601D": conceptContext.meaning,
         "\u4E3A\u4EC0\u4E48\u73B0\u5728\u51FA\u73B0": conceptContext.currentContext,
@@ -4745,7 +4887,7 @@ var LocalWorkspaceAuthoritativeProvider = class {
           entityRevision: `sha256:${detailRevision}`,
           observedAt,
           freshness: "current",
-          facts: conceptFacts ?? decisionFacts ?? verificationFacts ?? configurationFacts ?? markdownFacts ?? moduleFacts ?? {
+          facts: conceptFacts ?? changeFacts ?? explicitDecisionFacts ?? decisionFacts ?? verificationFacts ?? configurationFacts ?? markdownFacts ?? moduleFacts ?? {
             path: relativePath,
             name: basename3(relativePath),
             ...preview === void 0 ? {} : { preview },
@@ -4762,7 +4904,7 @@ var LocalWorkspaceAuthoritativeProvider = class {
             },
             ...markdownContext?.gitAvailable === true ? [{ sourceType: "local_git", sourceId: relativePath }] : [],
             ...sourceModuleContext?.gitAvailable === true ? [{ sourceType: "local_git", sourceId: relativePath }] : [],
-            ...conceptEvidence === void 0 ? [] : [{ sourceType: "project_evidence", sourceId: conceptEvidence.sourceId }]
+            ...artifactEvidence2 === void 0 ? [] : [{ sourceType: "project_evidence", sourceId: artifactEvidence2.sourceId }]
           ]
         },
         verification: {
@@ -5610,35 +5752,45 @@ function scalarFact(facts, key) {
   const value = facts[key];
   return typeof value === "string" ? truncate(value, 1024) : void 0;
 }
-function conceptComprehension(outcome) {
-  if (outcome.detail.entityType !== "concept") return void 0;
-  const meaning = scalarFact(outcome.detail.facts, "\u5B83\u662F\u4EC0\u4E48\u610F\u601D");
-  const context = scalarFact(outcome.detail.facts, "\u4E3A\u4EC0\u4E48\u73B0\u5728\u51FA\u73B0");
-  const boundary = scalarFact(outcome.detail.facts, "\u5B83\u4E0D\u662F\u4EC0\u4E48");
+function mentalModelComprehension(outcome) {
   const evidenceExcerpt = scalarFact(outcome.detail.facts, "\u8BC1\u636E");
-  const rawSequence = outcome.detail.facts["\u6240\u5904\u6D41\u7A0B"];
-  if (meaning === void 0 || context === void 0 || boundary === void 0 || evidenceExcerpt === void 0 || !Array.isArray(rawSequence)) {
-    return void 0;
-  }
-  const normalizedSequence = rawSequence.filter((item) => typeof item === "string").slice(0, 4);
-  const sequence = normalizedSequence.map((item) => truncate(item.replace(/^当前[：:]\s*/u, ""), 256));
-  const currentStep = normalizedSequence.findIndex((item) => /^当前[：:]\s*/u.test(item));
   const source = outcome.detail.sourceRefs.find((item) => item.sourceType === "project_evidence");
-  if (sequence.length < 2 || currentStep < 0 || currentStep >= sequence.length || source === void 0) {
+  if (evidenceExcerpt === void 0 || source === void 0) {
     return void 0;
   }
-  return {
-    kind: "concept",
-    meaning,
-    context,
-    boundary,
-    sequence,
-    currentStep,
-    evidence: [{
-      excerpt: evidenceExcerpt,
-      source: truncate(source.sourceId, 512)
-    }]
-  };
+  const evidence = [{
+    excerpt: evidenceExcerpt,
+    source: truncate(source.sourceId, 512)
+  }];
+  if (outcome.detail.entityType === "concept") {
+    const meaning = scalarFact(outcome.detail.facts, "\u5B83\u662F\u4EC0\u4E48\u610F\u601D");
+    const context = scalarFact(outcome.detail.facts, "\u4E3A\u4EC0\u4E48\u73B0\u5728\u51FA\u73B0");
+    const boundary = scalarFact(outcome.detail.facts, "\u5B83\u4E0D\u662F\u4EC0\u4E48");
+    const rawSequence = outcome.detail.facts["\u6240\u5904\u6D41\u7A0B"];
+    if (meaning === void 0 || context === void 0 || boundary === void 0 || !Array.isArray(rawSequence)) {
+      return void 0;
+    }
+    const normalizedSequence = rawSequence.filter((item) => typeof item === "string").slice(0, 4);
+    const sequence = normalizedSequence.map((item) => truncate(item.replace(/^当前[：:]\s*/u, ""), 256));
+    const currentStep = normalizedSequence.findIndex((item) => /^当前[：:]\s*/u.test(item));
+    if (sequence.length < 2 || currentStep < 0 || currentStep >= sequence.length) {
+      return void 0;
+    }
+    return { kind: "concept", meaning, context, boundary, sequence, currentStep, evidence };
+  }
+  if (outcome.detail.entityType === "change") {
+    const before = scalarFact(outcome.detail.facts, "\u539F\u6765\u600E\u6837");
+    const after = scalarFact(outcome.detail.facts, "\u73B0\u5728\u600E\u6837");
+    const impact = scalarFact(outcome.detail.facts, "\u5F71\u54CD\u4EC0\u4E48");
+    return before === void 0 || after === void 0 || impact === void 0 ? void 0 : { kind: "change", before, after, impact, evidence };
+  }
+  if (outcome.detail.entityType === "decision") {
+    const problem = scalarFact(outcome.detail.facts, "\u4E3A\u4EC0\u4E48\u9700\u8981\u51B3\u5B9A");
+    const choice = scalarFact(outcome.detail.facts, "\u9009\u62E9\u4E86\u4EC0\u4E48");
+    const consequence = scalarFact(outcome.detail.facts, "\u540E\u679C\u662F\u4EC0\u4E48");
+    return problem === void 0 || choice === void 0 || consequence === void 0 ? void 0 : { kind: "decision", problem, choice, consequence, evidence };
+  }
+  return void 0;
 }
 function errorPresentation(code, message, retryable) {
   return { kind: "error", code, message, retryable };
@@ -5653,13 +5805,16 @@ function candidateView(candidate, candidateRef) {
 }
 function detailView(outcome, options = {}) {
   const purpose = outcome.detail.facts["\u7528\u9014"] ?? outcome.detail.facts["\u804C\u8D23"];
-  const scenarioSummary = outcome.detail.entityType === "verification" ? outcome.detail.facts["\u9A8C\u8BC1\u8303\u56F4"] : outcome.detail.entityType === "configuration" ? outcome.detail.facts["\u914D\u7F6E\u7528\u9014"] : outcome.detail.entityType === "decision" ? outcome.detail.facts["\u51B3\u7B56"] : outcome.detail.entityType === "concept" ? outcome.detail.facts["\u5B83\u662F\u4EC0\u4E48\u610F\u601D"] : void 0;
+  const scenarioSummary = outcome.detail.entityType === "verification" ? outcome.detail.facts["\u9A8C\u8BC1\u8303\u56F4"] : outcome.detail.entityType === "configuration" ? outcome.detail.facts["\u914D\u7F6E\u7528\u9014"] : outcome.detail.entityType === "decision" ? outcome.detail.facts["\u9009\u62E9\u4E86\u4EC0\u4E48"] ?? outcome.detail.facts["\u51B3\u7B56"] : outcome.detail.entityType === "concept" ? outcome.detail.facts["\u5B83\u662F\u4EC0\u4E48\u610F\u601D"] : outcome.detail.entityType === "change" ? outcome.detail.facts["\u73B0\u5728\u600E\u6837"] : void 0;
   const change = outcome.detail.facts["\u672C\u6B21\u53D8\u5316"];
   const activeChange = typeof change === "string" && /^(?:涉及：|modified\b|staged\b|untracked\b|conflicted\b)/u.test(change);
   const summaryValue = scenarioSummary ?? (activeChange ? change : purpose);
   const summary = typeof summaryValue === "string" ? truncate(summaryValue, 1024) : truncate(outcome.candidate.summary, 1024);
-  const comprehension = conceptComprehension(outcome);
-  const humanSummary = comprehension === void 0 ? void 0 : truncate(`${comprehension.meaning} ${comprehension.context}`, 1024);
+  const comprehension = mentalModelComprehension(outcome);
+  const humanSummary = comprehension === void 0 ? void 0 : truncate(
+    comprehension.kind === "concept" ? `${comprehension.meaning} ${comprehension.context}` : comprehension.kind === "change" ? `${comprehension.after} ${comprehension.impact}` : `${comprehension.choice} ${comprehension.consequence}`,
+    1024
+  );
   return {
     entityId: truncate(outcome.detail.entityId, 256),
     entityType: truncate(outcome.detail.entityType, 128),

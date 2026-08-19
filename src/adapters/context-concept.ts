@@ -4,11 +4,13 @@ const MAX_FIELD_CHARS = 1_024;
 const MAX_SEQUENCE_ITEMS = 4;
 const MAX_SOURCE_PATH_CHARS = 480;
 
-export interface ContextConceptEvidence {
+export interface ContextArtifactEvidence {
   excerpt: string;
   sourcePath: string;
   sourceLine: number;
 }
+
+export type ContextConceptEvidence = ContextArtifactEvidence;
 
 export interface ContextConceptArtifact {
   title: string;
@@ -18,6 +20,24 @@ export interface ContextConceptArtifact {
   sequence: readonly string[];
   currentStep?: number;
   evidence: ContextConceptEvidence;
+  contextRevision: string;
+}
+
+export interface ContextChangeArtifact {
+  title: string;
+  before: string;
+  after: string;
+  impact: string;
+  evidence: ContextArtifactEvidence;
+  contextRevision: string;
+}
+
+export interface ContextDecisionArtifact {
+  title: string;
+  problem: string;
+  choice: string;
+  consequence: string;
+  evidence: ContextArtifactEvidence;
   contextRevision: string;
 }
 
@@ -39,7 +59,7 @@ function sectionText(lines: readonly string[]): string | undefined {
   );
 }
 
-function sourceReference(value: string): Pick<ContextConceptEvidence, "sourcePath" | "sourceLine"> | undefined {
+function sourceReference(value: string): Pick<ContextArtifactEvidence, "sourcePath" | "sourceLine"> | undefined {
   const compact = value.trim().replace(/\\/gu, "/");
   const match = /^([^:\r\n]{1,480}):(\d{1,6})$/u.exec(compact);
   if (match === null) return undefined;
@@ -63,14 +83,20 @@ export function contextConceptDocumentPath(relativePath: string): boolean {
   return /(?:^|\/)docs\/concepts\/[^/]+\.md$/iu.test(portable);
 }
 
-/**
- * Parses an author-supplied, explicitly structured concept artifact. It does
- * not infer concepts from prose and deliberately recognizes only the frozen
- * headings below.
- */
-export function extractContextConceptArtifact(
-  content: string,
-): ContextConceptArtifact | undefined {
+export function contextChangeDocumentPath(relativePath: string): boolean {
+  const portable = relativePath.replace(/\\/gu, "/");
+  return /(?:^|\/)docs\/changes\/[^/]+\.md$/iu.test(portable);
+}
+
+export function contextDecisionDocumentPath(relativePath: string): boolean {
+  const portable = relativePath.replace(/\\/gu, "/");
+  return /(?:^|\/)docs\/decisions\/[^/]+\.md$/iu.test(portable);
+}
+
+function documentSections(content: string): {
+  title?: string;
+  sections: ReadonlyMap<string, readonly string[]>;
+} {
   const lines = content.replace(/\r\n?/gu, "\n").split("\n");
   const sections = new Map<string, string[]>();
   let title: string | undefined;
@@ -96,12 +122,42 @@ export function extractContextConceptArtifact(
     }
     if (activeSection !== undefined) sections.get(activeSection)?.push(line);
   }
+  return { ...(title === undefined ? {} : { title }), sections };
+}
+
+function artifactEvidence(
+  sections: ReadonlyMap<string, readonly string[]>,
+): ContextArtifactEvidence | undefined {
+  const excerpt = sectionText(sections.get("证据") ?? []);
+  const source = sourceReference(sectionText(sections.get("来源") ?? []) ?? "");
+  return excerpt === undefined || source === undefined
+    ? undefined
+    : Object.freeze({ excerpt, ...source });
+}
+
+function revision<T extends object>(base: T): T & { contextRevision: string } {
+  return Object.freeze({
+    ...base,
+    contextRevision: createHash("sha256")
+      .update(JSON.stringify(base), "utf8")
+      .digest("hex"),
+  });
+}
+
+/**
+ * Parses an author-supplied, explicitly structured concept artifact. It does
+ * not infer concepts from prose and deliberately recognizes only the frozen
+ * headings below.
+ */
+export function extractContextConceptArtifact(
+  content: string,
+): ContextConceptArtifact | undefined {
+  const { title, sections } = documentSections(content);
 
   const meaning = sectionText(sections.get("它是什么意思") ?? []);
   const currentContext = sectionText(sections.get("为什么现在出现") ?? []);
   const boundary = sectionText(sections.get("它不是什么") ?? []);
-  const evidenceExcerpt = sectionText(sections.get("证据") ?? []);
-  const source = sourceReference(sectionText(sections.get("来源") ?? []) ?? "");
+  const evidence = artifactEvidence(sections);
   const flowLines = sections.get("所处流程") ?? [];
   const sequence: string[] = [];
   let currentStep: number | undefined;
@@ -123,8 +179,7 @@ export function extractContextConceptArtifact(
     boundary === undefined ||
     sequence.length < 2 ||
     currentStep === undefined ||
-    evidenceExcerpt === undefined ||
-    source === undefined
+    evidence === undefined
   ) {
     return undefined;
   }
@@ -135,12 +190,47 @@ export function extractContextConceptArtifact(
     boundary,
     sequence: Object.freeze([...sequence]),
     currentStep,
-    evidence: Object.freeze({ excerpt: evidenceExcerpt, ...source }),
+    evidence,
   };
-  return Object.freeze({
-    ...base,
-    contextRevision: createHash("sha256")
-      .update(JSON.stringify(base), "utf8")
-      .digest("hex"),
-  });
+  return revision(base);
+}
+
+export function extractContextChangeArtifact(
+  content: string,
+): ContextChangeArtifact | undefined {
+  const { title, sections } = documentSections(content);
+  const before = sectionText(sections.get("原来怎样") ?? []);
+  const after = sectionText(sections.get("现在怎样") ?? []);
+  const impact = sectionText(sections.get("影响什么") ?? []);
+  const evidence = artifactEvidence(sections);
+  if (
+    title === undefined ||
+    before === undefined ||
+    after === undefined ||
+    impact === undefined ||
+    evidence === undefined
+  ) {
+    return undefined;
+  }
+  return revision({ title, before, after, impact, evidence });
+}
+
+export function extractContextDecisionArtifact(
+  content: string,
+): ContextDecisionArtifact | undefined {
+  const { title, sections } = documentSections(content);
+  const problem = sectionText(sections.get("为什么需要决定") ?? []);
+  const choice = sectionText(sections.get("选择了什么") ?? []);
+  const consequence = sectionText(sections.get("后果是什么") ?? []);
+  const evidence = artifactEvidence(sections);
+  if (
+    title === undefined ||
+    problem === undefined ||
+    choice === undefined ||
+    consequence === undefined ||
+    evidence === undefined
+  ) {
+    return undefined;
+  }
+  return revision({ title, problem, choice, consequence, evidence });
 }

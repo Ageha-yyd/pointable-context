@@ -364,6 +364,84 @@ docs/evaluation-protocol.md:1
   }
 });
 
+test("workspace lookup projects explicit change and decision mental models", async () => {
+  const item = await fixture();
+  const changeEvidence = 'let presentationMode: PointablePresentationMode = "mental-model";';
+  const decisionEvidence = "首个宿主是 Codex Desktop 当前 Chat Lane。";
+  try {
+    await mkdir(join(item.workspace, "docs", "changes"), { recursive: true });
+    await mkdir(join(item.workspace, "docs", "decisions"), { recursive: true });
+    await mkdir(join(item.workspace, "src", "host", "codex-cdp"), { recursive: true });
+    await writeFile(join(item.workspace, "src", "host", "codex-cdp", "workspace-companion-cli.ts"), `${changeEvidence}\n`, "utf8");
+    await writeFile(join(item.workspace, "docs", "PRD-inline-pointable-widgets.md"), `- ${decisionEvidence}\n`, "utf8");
+    await writeFile(join(item.workspace, "docs", "changes", "presentation-default.md"), `# Presentation Default
+## 原来怎样
+普通启动使用记录式摘要。
+## 现在怎样
+普通启动使用 P-C 微型心智模型。
+## 影响什么
+用户首先看到定义、语境、流程和边界。
+## 证据
+> ${changeEvidence}
+## 来源
+src/host/codex-cdp/workspace-companion-cli.ts:1
+`, "utf8");
+    await writeFile(join(item.workspace, "docs", "decisions", "native-chat-lane.md"), `# Native Chat Lane
+## 为什么需要决定
+离开当前任务会增加切换成本。
+## 选择了什么
+首个产品宿主固定为 Codex Desktop 当前 Chat Lane。
+## 后果是什么
+无需打开浏览器，但每个 build 都要重新通过兼容门禁。
+## 证据
+> ${decisionEvidence}
+## 来源
+docs/PRD-inline-pointable-widgets.md:1
+`, "utf8");
+    const activeTask = task();
+    await item.registry.bind(activeTask, item.workspace);
+    const callback = createWorkspaceLookupCallback({ registry: item.registry });
+
+    const change = await invoke(callback, request(activeTask, "presentation-default", {
+      requestId: "request-workspace-change-model",
+    }));
+    assert.equal(change.kind, "detail");
+    if (change.kind === "detail") {
+      assert.equal(change.detail.label, "Presentation Default");
+      assert.deepEqual(change.detail.comprehension, {
+        kind: "change",
+        before: "普通启动使用记录式摘要。",
+        after: "普通启动使用 P-C 微型心智模型。",
+        impact: "用户首先看到定义、语境、流程和边界。",
+        evidence: [{
+          excerpt: changeEvidence,
+          source: "src/host/codex-cdp/workspace-companion-cli.ts:1",
+        }],
+      });
+    }
+
+    const decision = await invoke(callback, request(activeTask, "native-chat-lane", {
+      requestId: "request-workspace-decision-model",
+    }));
+    assert.equal(decision.kind, "detail");
+    if (decision.kind === "detail") {
+      assert.equal(decision.detail.label, "Native Chat Lane");
+      assert.deepEqual(decision.detail.comprehension, {
+        kind: "decision",
+        problem: "离开当前任务会增加切换成本。",
+        choice: "首个产品宿主固定为 Codex Desktop 当前 Chat Lane。",
+        consequence: "无需打开浏览器，但每个 build 都要重新通过兼容门禁。",
+        evidence: [{
+          excerpt: decisionEvidence,
+          source: "docs/PRD-inline-pointable-widgets.md:1",
+        }],
+      });
+    }
+  } finally {
+    await rm(item.root, { recursive: true, force: true });
+  }
+});
+
 test("workspace candidate references are one-shot and bound to task plus registry revision", async () => {
   const item = await fixture();
   try {

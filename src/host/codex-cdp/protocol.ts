@@ -51,7 +51,7 @@ export interface PointableEvidenceView {
   source: string;
 }
 
-export interface PointableComprehensionView {
+export interface PointableConceptComprehensionView {
   kind: "concept";
   meaning: string;
   context: string;
@@ -60,6 +60,27 @@ export interface PointableComprehensionView {
   currentStep: number;
   evidence: PointableEvidenceView[];
 }
+
+export interface PointableChangeComprehensionView {
+  kind: "change";
+  before: string;
+  after: string;
+  impact: string;
+  evidence: PointableEvidenceView[];
+}
+
+export interface PointableDecisionComprehensionView {
+  kind: "decision";
+  problem: string;
+  choice: string;
+  consequence: string;
+  evidence: PointableEvidenceView[];
+}
+
+export type PointableComprehensionView =
+  | PointableConceptComprehensionView
+  | PointableChangeComprehensionView
+  | PointableDecisionComprehensionView;
 
 export interface PointableDetailView {
   entityId: string;
@@ -290,6 +311,29 @@ function validateCandidate(value: unknown): PointableCandidateView {
   };
 }
 
+function validateEvidence(value: unknown): PointableEvidenceView[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 3) {
+    throw new PointableProtocolError(
+      "invalid_lookup_result",
+      "detail evidence is invalid",
+    );
+  }
+  return value.map((item) => {
+    if (
+      !record(item) ||
+      !exactKeys(item, ["excerpt", "source"]) ||
+      !boundedString(item.excerpt, 1, 1_024) ||
+      !boundedString(item.source, 1, 512)
+    ) {
+      throw new PointableProtocolError(
+        "invalid_lookup_result",
+        "detail evidence is invalid",
+      );
+    }
+    return { excerpt: item.excerpt, source: item.source };
+  });
+}
+
 function validateDetail(value: unknown): PointableDetailView {
   if (!record(value) || !exactKeys(value, [
     "entityId",
@@ -363,60 +407,92 @@ function validateDetail(value: unknown): PointableDetailView {
   let comprehension: PointableComprehensionView | undefined;
   if (value.comprehension !== undefined) {
     const view = value.comprehension;
-    if (
-      !record(view) ||
-      !exactKeys(view, [
-        "kind",
-        "meaning",
-        "context",
-        "boundary",
-        "sequence",
-        "currentStep",
-        "evidence",
-      ]) ||
-      view.kind !== "concept" ||
-      !boundedString(view.meaning, 1, 1_024) ||
-      !boundedString(view.context, 1, 1_024) ||
-      !boundedString(view.boundary, 1, 1_024) ||
-      !Array.isArray(view.sequence) ||
-      view.sequence.length < 2 ||
-      view.sequence.length > 4 ||
-      !view.sequence.every((item) => boundedString(item, 1, 256)) ||
-      !Number.isSafeInteger(view.currentStep) ||
-      Number(view.currentStep) < 0 ||
-      Number(view.currentStep) >= view.sequence.length ||
-      !Array.isArray(view.evidence) ||
-      view.evidence.length < 1 ||
-      view.evidence.length > 3
-    ) {
+    if (!record(view)) {
       throw new PointableProtocolError(
         "invalid_lookup_result",
         "detail comprehension view is invalid",
       );
     }
-    const evidence = view.evidence.map((item) => {
+    if (view.kind === "concept") {
       if (
-        !record(item) ||
-        !exactKeys(item, ["excerpt", "source"]) ||
-        !boundedString(item.excerpt, 1, 1_024) ||
-        !boundedString(item.source, 1, 512)
+        !exactKeys(view, [
+          "kind",
+          "meaning",
+          "context",
+          "boundary",
+          "sequence",
+          "currentStep",
+          "evidence",
+        ]) ||
+        !boundedString(view.meaning, 1, 1_024) ||
+        !boundedString(view.context, 1, 1_024) ||
+        !boundedString(view.boundary, 1, 1_024) ||
+        !Array.isArray(view.sequence) ||
+        view.sequence.length < 2 ||
+        view.sequence.length > 4 ||
+        !view.sequence.every((item) => boundedString(item, 1, 256)) ||
+        !Number.isSafeInteger(view.currentStep) ||
+        Number(view.currentStep) < 0 ||
+        Number(view.currentStep) >= view.sequence.length
       ) {
         throw new PointableProtocolError(
           "invalid_lookup_result",
-          "detail evidence is invalid",
+          "detail comprehension view is invalid",
         );
       }
-      return { excerpt: item.excerpt, source: item.source };
-    });
-    comprehension = {
-      kind: "concept",
-      meaning: view.meaning,
-      context: view.context,
-      boundary: view.boundary,
-      sequence: [...view.sequence],
-      currentStep: Number(view.currentStep),
-      evidence,
-    };
+      comprehension = {
+        kind: "concept",
+        meaning: view.meaning,
+        context: view.context,
+        boundary: view.boundary,
+        sequence: [...view.sequence],
+        currentStep: Number(view.currentStep),
+        evidence: validateEvidence(view.evidence),
+      };
+    } else if (view.kind === "change") {
+      if (
+        !exactKeys(view, ["kind", "before", "after", "impact", "evidence"]) ||
+        !boundedString(view.before, 1, 1_024) ||
+        !boundedString(view.after, 1, 1_024) ||
+        !boundedString(view.impact, 1, 1_024)
+      ) {
+        throw new PointableProtocolError(
+          "invalid_lookup_result",
+          "detail comprehension view is invalid",
+        );
+      }
+      comprehension = {
+        kind: "change",
+        before: view.before,
+        after: view.after,
+        impact: view.impact,
+        evidence: validateEvidence(view.evidence),
+      };
+    } else if (view.kind === "decision") {
+      if (
+        !exactKeys(view, ["kind", "problem", "choice", "consequence", "evidence"]) ||
+        !boundedString(view.problem, 1, 1_024) ||
+        !boundedString(view.choice, 1, 1_024) ||
+        !boundedString(view.consequence, 1, 1_024)
+      ) {
+        throw new PointableProtocolError(
+          "invalid_lookup_result",
+          "detail comprehension view is invalid",
+        );
+      }
+      comprehension = {
+        kind: "decision",
+        problem: view.problem,
+        choice: view.choice,
+        consequence: view.consequence,
+        evidence: validateEvidence(view.evidence),
+      };
+    } else {
+      throw new PointableProtocolError(
+        "invalid_lookup_result",
+        "detail comprehension view is invalid",
+      );
+    }
   }
   const changes = value.changes === undefined
     ? undefined

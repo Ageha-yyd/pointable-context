@@ -147,32 +147,49 @@ export function validatePointableRendererResponse(
     exact(candidate, ["excerpt", "source"]) &&
     bounded(candidate.excerpt, 1, 1_024) &&
     bounded(candidate.source, 1, 512);
-  const comprehensionView = (candidate: unknown): boolean =>
-    isRecord(candidate) &&
-    exact(candidate, [
-      "kind",
-      "meaning",
-      "context",
-      "boundary",
-      "sequence",
-      "currentStep",
-      "evidence",
-    ]) &&
-    candidate.kind === "concept" &&
-    bounded(candidate.meaning, 1, 1_024) &&
-    bounded(candidate.context, 1, 1_024) &&
-    bounded(candidate.boundary, 1, 1_024) &&
-    Array.isArray(candidate.sequence) &&
-    candidate.sequence.length >= 2 &&
-    candidate.sequence.length <= 4 &&
-    candidate.sequence.every((item) => bounded(item, 1, 256)) &&
-    Number.isSafeInteger(candidate.currentStep) &&
-    Number(candidate.currentStep) >= 0 &&
-    Number(candidate.currentStep) < candidate.sequence.length &&
-    Array.isArray(candidate.evidence) &&
-    candidate.evidence.length >= 1 &&
-    candidate.evidence.length <= 3 &&
-    candidate.evidence.every(evidenceView);
+  const comprehensionView = (candidate: unknown): boolean => {
+    if (
+      !isRecord(candidate) ||
+      !Array.isArray(candidate.evidence) ||
+      candidate.evidence.length < 1 ||
+      candidate.evidence.length > 3 ||
+      !candidate.evidence.every(evidenceView)
+    ) {
+      return false;
+    }
+    if (candidate.kind === "concept") {
+      return exact(candidate, [
+        "kind",
+        "meaning",
+        "context",
+        "boundary",
+        "sequence",
+        "currentStep",
+        "evidence",
+      ]) &&
+        bounded(candidate.meaning, 1, 1_024) &&
+        bounded(candidate.context, 1, 1_024) &&
+        bounded(candidate.boundary, 1, 1_024) &&
+        Array.isArray(candidate.sequence) &&
+        candidate.sequence.length >= 2 &&
+        candidate.sequence.length <= 4 &&
+        candidate.sequence.every((item) => bounded(item, 1, 256)) &&
+        Number.isSafeInteger(candidate.currentStep) &&
+        Number(candidate.currentStep) >= 0 &&
+        Number(candidate.currentStep) < candidate.sequence.length;
+    }
+    if (candidate.kind === "change") {
+      return exact(candidate, ["kind", "before", "after", "impact", "evidence"]) &&
+        bounded(candidate.before, 1, 1_024) &&
+        bounded(candidate.after, 1, 1_024) &&
+        bounded(candidate.impact, 1, 1_024);
+    }
+    return candidate.kind === "decision" &&
+      exact(candidate, ["kind", "problem", "choice", "consequence", "evidence"]) &&
+      bounded(candidate.problem, 1, 1_024) &&
+      bounded(candidate.choice, 1, 1_024) &&
+      bounded(candidate.consequence, 1, 1_024);
+  };
 
   if (
     !isRecord(value) ||
@@ -1140,95 +1157,116 @@ export function installPointableContextRenderer(
     reposition();
   }
 
-  function mountConceptComprehension(
+  function mountComprehension(
     body: HTMLElement,
     model: PointableComprehensionView,
   ): void {
     const surface = document.createElement("div");
     surface.setAttribute("data-pointable-context-role", "comprehension-model");
     surface.setAttribute("data-pointable-context-kind", model.kind);
-    surface.append(paragraph(model.meaning));
-
-    const context = document.createElement("div");
-    context.setAttribute("data-pointable-context-role", "comprehension-context");
-    Object.assign(context.style, {
-      marginTop: "10px",
-      padding: "8px 10px",
-      borderLeft: "3px solid #8ba8ff",
-      borderRadius: "0 8px 8px 0",
-      background: "#f7f9ff",
-    });
-    const contextLabel = document.createElement("strong");
-    contextLabel.textContent = "为什么现在出现";
-    Object.assign(contextLabel.style, {
-      display: "block",
-      marginBottom: "3px",
-      color: "#334155",
-      fontSize: "12px",
-    });
-    const contextText = paragraph(model.context, true);
-    context.append(contextLabel, contextText);
-    surface.append(context);
-
-    const flow = document.createElement("div");
-    flow.setAttribute("data-pointable-context-role", "comprehension-flow");
-    Object.assign(flow.style, { marginTop: "12px" });
-    const flowLabel = document.createElement("strong");
-    flowLabel.textContent = "你现在位于这里";
-    Object.assign(flowLabel.style, {
-      display: "block",
-      marginBottom: "6px",
-      color: "#334155",
-      fontSize: "12px",
-    });
-    flow.append(flowLabel);
-    for (let index = 0; index < model.sequence.length; index += 1) {
-      const step = document.createElement("div");
-      const current = index === model.currentStep;
-      step.setAttribute("data-pointable-context-role", "comprehension-step");
-      step.setAttribute("data-pointable-context-current", String(current));
-      step.textContent = `${current ? "当前 · " : ""}${model.sequence[index] ?? ""}`;
-      Object.assign(step.style, {
-        padding: "6px 9px",
-        border: current ? "1px solid #7798ff" : "1px solid #dce3ee",
-        borderRadius: "8px",
-        background: current ? "#edf2ff" : "#ffffff",
-        color: current ? "#1746c7" : "#52627a",
-        fontWeight: current ? "700" : "500",
+    const modelBlock = (
+      role: string,
+      label: string,
+      text: string,
+      tone: "neutral" | "primary" | "impact" = "neutral",
+    ): HTMLElement => {
+      const block = document.createElement("div");
+      block.setAttribute("data-pointable-context-role", role);
+      Object.assign(block.style, {
+        marginTop: "10px",
+        padding: "8px 10px",
+        borderLeft: tone === "primary" ? "3px solid #7798ff" : "3px solid #d7deea",
+        borderRadius: "0 8px 8px 0",
+        background: tone === "primary" ? "#edf2ff" : tone === "impact" ? "#fff7ed" : "#f8fafc",
+        color: tone === "primary" ? "#1746c7" : tone === "impact" ? "#8a4b00" : "#334155",
+      });
+      const heading = document.createElement("strong");
+      heading.textContent = label;
+      Object.assign(heading.style, {
+        display: "block",
+        marginBottom: "3px",
         fontSize: "12px",
       });
-      flow.append(step);
-      if (index < model.sequence.length - 1) {
-        const arrow = document.createElement("div");
-        arrow.textContent = "↓";
-        arrow.setAttribute("aria-hidden", "true");
-        Object.assign(arrow.style, {
-          height: "16px",
-          color: "#94a3b8",
-          textAlign: "center",
-          lineHeight: "16px",
-        });
-        flow.append(arrow);
-      }
-    }
-    surface.append(flow);
+      block.append(heading, paragraph(text, true));
+      return block;
+    };
+    const arrow = (): HTMLElement => {
+      const node = document.createElement("div");
+      node.textContent = "↓";
+      node.setAttribute("aria-hidden", "true");
+      Object.assign(node.style, {
+        height: "16px",
+        color: "#94a3b8",
+        textAlign: "center",
+        lineHeight: "16px",
+      });
+      return node;
+    };
 
-    const boundary = document.createElement("div");
-    boundary.setAttribute("data-pointable-context-role", "comprehension-boundary");
-    Object.assign(boundary.style, {
-      marginTop: "12px",
-      padding: "8px 10px",
-      borderRadius: "8px",
-      background: "#fff7ed",
-      color: "#8a4b00",
-      fontSize: "12px",
-    });
-    const boundaryLabel = document.createElement("strong");
-    boundaryLabel.textContent = "不会证明：";
-    const boundaryText = document.createElement("span");
-    boundaryText.textContent = model.boundary;
-    boundary.append(boundaryLabel, boundaryText);
-    surface.append(boundary);
+    if (model.kind === "concept") {
+      surface.append(paragraph(model.meaning));
+      surface.append(modelBlock(
+        "comprehension-context",
+        "为什么现在出现",
+        model.context,
+        "primary",
+      ));
+
+      const flow = document.createElement("div");
+      flow.setAttribute("data-pointable-context-role", "comprehension-flow");
+      Object.assign(flow.style, { marginTop: "12px" });
+      const flowLabel = document.createElement("strong");
+      flowLabel.textContent = "你现在位于这里";
+      Object.assign(flowLabel.style, {
+        display: "block",
+        marginBottom: "6px",
+        color: "#334155",
+        fontSize: "12px",
+      });
+      flow.append(flowLabel);
+      for (let index = 0; index < model.sequence.length; index += 1) {
+        const step = document.createElement("div");
+        const current = index === model.currentStep;
+        step.setAttribute("data-pointable-context-role", "comprehension-step");
+        step.setAttribute("data-pointable-context-current", String(current));
+        step.textContent = `${current ? "当前 · " : ""}${model.sequence[index] ?? ""}`;
+        Object.assign(step.style, {
+          padding: "6px 9px",
+          border: current ? "1px solid #7798ff" : "1px solid #dce3ee",
+          borderRadius: "8px",
+          background: current ? "#edf2ff" : "#ffffff",
+          color: current ? "#1746c7" : "#52627a",
+          fontWeight: current ? "700" : "500",
+          fontSize: "12px",
+        });
+        flow.append(step);
+        if (index < model.sequence.length - 1) flow.append(arrow());
+      }
+      surface.append(flow);
+
+      const boundary = modelBlock(
+        "comprehension-boundary",
+        "不会证明：",
+        model.boundary,
+        "impact",
+      );
+      boundary.style.borderLeft = "3px solid #f2b86b";
+      surface.append(boundary);
+    } else if (model.kind === "change") {
+      surface.append(
+        modelBlock("comprehension-before", "原来", model.before),
+        arrow(),
+        modelBlock("comprehension-after", "现在", model.after, "primary"),
+        modelBlock("comprehension-impact", "这会影响", model.impact, "impact"),
+      );
+    } else {
+      surface.append(
+        modelBlock("comprehension-problem", "要解决的问题", model.problem),
+        arrow(),
+        modelBlock("comprehension-choice", "选择", model.choice, "primary"),
+        modelBlock("comprehension-consequence", "结果与代价", model.consequence, "impact"),
+      );
+    }
 
     const evidenceDisclosure = document.createElement("div");
     evidenceDisclosure.setAttribute("data-pointable-context-role", "evidence-disclosure");
@@ -1288,7 +1326,7 @@ export function installPointableContextRenderer(
     state = "detail";
     const { body } = createShell(detail.label);
     if (presentationMode === "mental-model" && detail.comprehension !== undefined) {
-      mountConceptComprehension(body, detail.comprehension);
+      mountComprehension(body, detail.comprehension);
     } else {
       const summary = presentationMode === "record"
         ? detail.summary
