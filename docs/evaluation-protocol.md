@@ -1,6 +1,6 @@
 # Pointable Context evaluation protocol
 
-Status: pre-study protocol, 2026-08-18. This document defines measurement; it does not claim a proven efficiency improvement.
+Status: frozen pilot protocol v1, 2026-08-19. Materials are frozen but the pilot has not been run. This document defines measurement; it does not claim a proven efficiency improvement.
 
 ## 1. Separate the two questions
 
@@ -34,7 +34,7 @@ All three pilot conditions use the same native Chat Lane trigger, the same selec
 - **P-B — narrative:** a human-oriented explanation that combines meaning with the reason the object matters now;
 - **P-C — micro mental model:** meaning, current context, a short process with the current step highlighted, a visible boundary, and a collapsed `为什么这样说` evidence disclosure.
 
-Counterbalance P-A/P-B/P-C. Do not let a participant switch conditions within one task. The first frozen object is `pilot`, backed by `docs/concepts/pilot.md` and the verified evidence line in this protocol.
+Counterbalance P-A/P-B/P-C. Do not let a participant switch conditions within one task. The frozen v1 presentation pilot is between-subject: 12 anonymous slots assign four participants to each condition, and each participant sees `pilot` exactly once. The object is backed by `docs/concepts/pilot.md` and the verified evidence line in this protocol.
 
 The participant must answer, in their own words:
 
@@ -43,7 +43,7 @@ The participant must answer, in their own words:
 3. What can it not prove?
 4. What happens immediately before and after it?
 
-End timing only after the answer is submitted. Score the four answer units separately. Record evidence opening and evidence correctness, but do not require the evidence disclosure for the first three answers. Use [presentation-pilot-log.template.csv](presentation-pilot-log.template.csv); do not record raw selected text or unrelated Chat content.
+End timing only after the answer is submitted. Score the four answer units separately. Record evidence opening and evidence correctness, but do not require the evidence disclosure for the first three answers. Use the frozen [study-v1 presentation log](evaluation/study-v1/presentation-log.template.csv); do not record raw selected text or unrelated Chat content.
 
 A pilot of roughly 8–12 participants can expose unclear wording, wrong visual priority, hidden evidence, overflow, or task-instruction defects and provide a variance estimate. It cannot establish significance or replace the later linear-Chat efficiency comparison.
 
@@ -59,6 +59,20 @@ A pilot of roughly 8–12 participants can expose unclear wording, wrong visual 
 | Revision drift | Did the open detail change, and what changed? | updated notice + one correct finite diff | no silent snapshot replacement |
 
 Each task must have a frozen answer key derived from the same repository revision used in both conditions. Score fact units, not clicks or card opens.
+
+### 4.1 Frozen study pack v1
+
+The executable facilitator pack is [docs/evaluation/study-v1](evaluation/study-v1/README.md). It contains:
+
+- a hidden exact-evidence answer key for the four presentation units and six efficiency scenarios;
+- one frozen participant transcript;
+- an isolated workspace fixture plus deterministic `prepare` and `mutate` commands;
+- a 12-slot cyclic Latin-square assignment, repeated with the A/B phase inverted;
+- local CSV schemas that bind every row to the validated `pack_digest` and omit raw selections, file content, configuration values, ordinary Chat content, names, and email addresses.
+
+Generate the slot before observing performance. Each efficiency participant completes every scenario once, with three A and three B tasks. Across 12 slots, every scenario appears in each ordinal position twice and in each condition six times. Never reuse a participant workspace.
+
+Before any session, run `pnpm run study:validate`. A non-zero result or changed pack digest blocks data collection until the materials are deliberately re-frozen as a new version. Validation proves internal integrity only; it does not make the pack usable or establish a product effect.
 
 ## 5. Primary and secondary measures
 

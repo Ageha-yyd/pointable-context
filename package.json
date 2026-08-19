@@ -7,6 +7,7 @@
   "bin": {
     "pointable": "./dist/src/cli.js",
     "pointable-context-record-check": "./dist/src/records/check-cli.js",
+    "pointable-context-study": "./dist/src/evaluation/study-cli.js",
     "pointable-context-mcp-fixture": "./dist/src/mcp/stdio.js",
     "pointable-context-fixture-companion": "./host/fixture-companion.mjs",
     "pointable-context-workspace-companion": "./host/workspace-companion.mjs",
@@ -26,6 +27,8 @@
     "test:conversation-browser": "node scripts/conversation-client-browser-acceptance.mjs",
     "benchmark:workspace": "pnpm run build:ts && node scripts/workspace-lookup-benchmark.mjs",
     "records:check": "pnpm run build:ts && node dist/src/records/check-cli.js --workspace-root . --json",
+    "study:validate": "pnpm run build:ts && node dist/src/evaluation/study-cli.js validate --repository-root . --json",
+    "study:assignment": "pnpm run build:ts && node dist/src/evaluation/study-cli.js assignment --repository-root . --slot 1 --json",
     "probe:app-server-referent": "node scripts/probe-app-server-referent.mjs",
     "probe:app-server-conversation": "node scripts/probe-app-server-conversation.mjs",
     "client:app-server": "node dist/src/app-server/conversation-cli.js --workspace-root .",

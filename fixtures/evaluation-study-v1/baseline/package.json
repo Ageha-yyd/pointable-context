@@ -1,0 +1,8 @@
+{
+  "name": "pointable-evaluation-relay-cache",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

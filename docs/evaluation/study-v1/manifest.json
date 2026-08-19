@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "studyId": "pointable-context-study-v1",
+  "status": "frozen_materials_not_run",
+  "frozenOn": "2026-08-19",
+  "claimBoundary": "This pack can expose usability defects and estimate variance; it cannot establish a significant efficiency effect.",
+  "presentationPilot": {
+    "participantSlots": 12,
+    "assignmentRule": "slot modulo 3 maps to P-A, P-B, P-C; four participants per condition",
+    "object": "pilot",
+    "selectionText": "pilot",
+    "sourcePath": "docs/concepts/pilot.md",
+    "conditions": [
+      { "id": "P-A", "presentationMode": "record" },
+      { "id": "P-B", "presentationMode": "narrative" },
+      { "id": "P-C", "presentationMode": "mental-model" }
+    ],
+    "questions": [
+      "What is a pilot?",
+      "Why is it required at the current project stage?",
+      "What can it not prove?",
+      "What happens immediately before and after it?"
+    ],
+    "answerKeyRef": "docs/evaluation/study-v1/answer-key.json",
+    "logTemplate": "docs/evaluation/study-v1/presentation-log.template.csv"
+  },
+  "efficiencyPilot": {
+    "participantSlots": 12,
+    "assignmentRule": "six-row cyclic Latin square repeated with the A/B phase inverted",
+    "conditions": [
+      {
+        "id": "A",
+        "name": "linear-chat",
+        "quietReveal": false
+      },
+      {
+        "id": "B",
+        "name": "quiet-context-reveal",
+        "quietReveal": true
+      }
+    ],
+    "workspaceFixture": "fixtures/evaluation-study-v1",
+    "transcript": "docs/evaluation/study-v1/participant-transcript.md",
+    "answerKeyRef": "docs/evaluation/study-v1/answer-key.json",
+    "logTemplate": "docs/evaluation/study-v1/efficiency-log.template.csv",
+    "taskTimeoutMs": 300000,
+    "scenarios": [
+      {
+        "id": "DOC-1",
+        "kind": "changed_document",
+        "selectionText": "README.md",
+        "expectedEntity": "README.md",
+        "question": "What is README.md for, and what changed in its refresh behavior?"
+      },
+      {
+        "id": "MOD-1",
+        "kind": "source_module",
+        "selectionText": "src/context-record-index.ts",
+        "expectedEntity": "src/context-record-index.ts",
+        "question": "What is this module responsible for, and which source and test files directly reference it?"
+      },
+      {
+        "id": "TST-1",
+        "kind": "test_source",
+        "selectionText": "test/context-record-index.test.ts",
+        "expectedEntity": "test/context-record-index.test.ts",
+        "question": "Which behaviors does this test source define, and has the test been executed by opening it?"
+      },
+      {
+        "id": "CFG-1",
+        "kind": "json_configuration",
+        "selectionText": "package.json",
+        "expectedEntity": "package.json",
+        "question": "What configuration boundary is this, and which top-level keys are present without revealing their values?"
+      },
+      {
+        "id": "ADR-1",
+        "kind": "decision",
+        "selectionText": "docs/adr/ADR-001-explicit-refresh.md",
+        "expectedEntity": "docs/adr/ADR-001-explicit-refresh.md",
+        "question": "What refresh decision was accepted, why was it needed, and what consequence follows?"
+      },
+      {
+        "id": "REV-1",
+        "kind": "revision_drift",
+        "selectionText": "src/context-record-index.ts",
+        "expectedEntity": "src/context-record-index.ts",
+        "question": "After the facilitator applies the frozen revision mutation, did the open detail change and what changed?",
+        "mutationCommand": "node scripts/prepare-evaluation-workspace.mjs mutate --workspace-root <workspace>"
+      }
+    ]
+  },
+  "privacy": {
+    "allowedParticipantId": "anonymous study slot only",
+    "forbiddenLogFields": [
+      "raw_selected_text",
+      "file_contents",
+      "configuration_values",
+      "ordinary_chat_content",
+      "participant_name",
+      "participant_email"
+    ]
+  }
+}

@@ -3,15 +3,21 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 
-test("evaluation assets separate component latency and presentation pilot from human efficiency claims", async () => {
-  const [protocol, concept, benchmark, baselineText, v2BaselineText, pilotTemplate] = await Promise.all([
+test("evaluation assets separate frozen pilot integrity from human efficiency claims", async () => {
+  const [protocol, concept, benchmark, baselineText, v2BaselineText, pilotTemplate, manifestText] = await Promise.all([
     readFile(resolve("docs/evaluation-protocol.md"), "utf8"),
     readFile(resolve("docs/concepts/pilot.md"), "utf8"),
     readFile(resolve("scripts/workspace-lookup-benchmark.mjs"), "utf8"),
     readFile(resolve("docs/evaluation-baseline-2026-08-18.json"), "utf8"),
     readFile(resolve("docs/evaluation-baseline-2026-08-19-revision-v2.json"), "utf8"),
-    readFile(resolve("docs/presentation-pilot-log.template.csv"), "utf8"),
+    readFile(resolve("docs/evaluation/study-v1/presentation-log.template.csv"), "utf8"),
+    readFile(resolve("docs/evaluation/study-v1/manifest.json"), "utf8"),
   ]);
+  const manifest = JSON.parse(manifestText) as {
+    status?: string;
+    presentationPilot?: { participantSlots?: number };
+    efficiencyPilot?: { participantSlots?: number; taskTimeoutMs?: number };
+  };
   const baseline = JSON.parse(baselineText) as {
     kind?: string;
     targetMet?: boolean;
@@ -37,6 +43,9 @@ test("evaluation assets separate component latency and presentation pilot from h
   assert.match(protocol, /P-A\/P-B\/P-C/u);
   assert.match(protocol, /preferred P-C and judged P-A and P-B similarly/u);
   assert.match(protocol, /not a usability result, an efficiency effect/u);
+  assert.match(protocol, /frozen v1 presentation pilot is between-subject/u);
+  assert.match(protocol, /each ordinal position twice and in each condition six times/u);
+  assert.match(protocol, /changed pack digest blocks data collection/u);
   assert.match(protocol, /What can it not prove/u);
   const sourceLine = /docs\/evaluation-protocol\.md:(\d+)/u.exec(concept);
   const evidence = /## 证据\s+>\s*(.+)/u.exec(concept);
@@ -48,8 +57,13 @@ test("evaluation assets separate component latency and presentation pilot from h
     ?.replace(/^\s*(?:[-*+>])\s+/u, "")
     .trim();
   assert.equal(declaredEvidence, evidence?.[1]?.trim());
-  assert.match(pilotTemplate, /time_to_correct_understanding_ms/u);
+  assert.match(pilotTemplate, /pack_digest/u);
+  assert.match(pilotTemplate, /time_to_verified_fact_ms/u);
   assert.match(pilotTemplate, /meaning_correct,why_now_correct,boundary_correct,flow_correct/u);
+  assert.equal(manifest.status, "frozen_materials_not_run");
+  assert.equal(manifest.presentationPilot?.participantSlots, 12);
+  assert.equal(manifest.efficiencyPilot?.participantSlots, 12);
+  assert.equal(manifest.efficiencyPilot?.taskTimeoutMs, 300000);
   assert.match(benchmark, /kind: "technical_latency_only"/u);
   assert.match(benchmark, /workspaceMode: "git"/u);
   assert.match(benchmark, /revisionContract: "workspace-context-v2"/u);

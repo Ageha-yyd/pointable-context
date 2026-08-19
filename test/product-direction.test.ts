@@ -7,7 +7,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v2.6 freezes opt-in milestone records behind a read-only check", async () => {
+test("v2.7 freezes a non-inferential counterbalanced study pack", async () => {
   const [prd, readme, mainSkill, workspaceSkill] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -15,7 +15,7 @@ test("v2.6 freezes opt-in milestone records behind a read-only check", async () 
     text("skills/pointable-context-workspace/SKILL.md"),
   ]);
 
-  assert.match(prd, /版本：v2\.6/u);
+  assert.match(prd, /版本：v2\.7/u);
   assert.match(prd, /默认可视入口是用户选区后的轻量按钮/u);
   assert.match(prd, /selection 本身不读取详情、不调用模型/u);
   assert.match(prd, /产品不存在“识别更多概念”模型分支/u);
@@ -43,6 +43,9 @@ test("v2.6 freezes opt-in milestone records behind a read-only check", async () 
   assert.match(prd, /一次性创建\/更新指定记录/u);
   assert.match(prd, /当前有界长任务内维护 Pointable Context 记录/u);
   assert.match(prd, /只有 `valid: true` 的集合才可视为可用索引输入/u);
+  assert.match(prd, /Frozen counterbalanced study pack v1/u);
+  assert.match(prd, /每个 scenario 在每个序位出现两次、在 A\/B 各出现六次/u);
+  assert.match(prd, /验证器 PASS 只证明材料内部一致/u);
   assert.match(prd, /普通 prose、任意 Git diff 和隐含决策均不做语义推断/u);
   assert.match(prd, /stat\/Git\/字面关系\/evidence-source revision v2/u);
   assert.match(prd, /不建立语义依赖图/u);
@@ -66,6 +69,8 @@ test("v2.6 freezes opt-in milestone records behind a read-only check", async () 
   assert.match(readme, /problem\/choice\/consequence/u);
   assert.match(readme, /Agent record maintenance is opt-in/u);
   assert.match(readme, /read-only post-write gate/u);
+  assert.match(readme, /Frozen study pack v1/u);
+  assert.match(readme, /It has not been run and supports no efficiency claim/u);
   assert.match(readme, /bounded v2 background probe/u);
   assert.match(readme, /detects literal reference membership changes, not runtime dependencies/u);
   assert.match(readme, /keeps an open card visible when the user focuses the current Chat composer/u);

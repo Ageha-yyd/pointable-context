@@ -1,0 +1,1 @@
+participant_id,slot,pack_digest,condition,started_at,answered_at,time_to_verified_fact_ms,meaning_correct,why_now_correct,boundary_correct,flow_correct,evidence_opened,evidence_correct,chat_turns,lane_leave,wrong_entity,card_sufficient,confidence_1_5,aborted,timed_out,error_code,notes

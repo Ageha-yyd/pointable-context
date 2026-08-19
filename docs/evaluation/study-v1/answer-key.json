@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "studyId": "pointable-context-study-v1",
+  "presentation": {
+    "object": "pilot",
+    "units": [
+      {
+        "id": "meaning",
+        "criterion": "A small pre-study usability run used to find comprehension or workflow defects.",
+        "evidence": { "phase": "baseline", "path": "docs/concepts/pilot.md", "line": 5, "excerpt": "正式实验前的小规模可用性试跑，用来发现任务、卡片和研究流程中明显的理解障碍。" }
+      },
+      {
+        "id": "why_now",
+        "criterion": "The technical path exists, but human comprehension and study-flow usability are still unknown.",
+        "evidence": { "phase": "baseline", "path": "docs/concepts/pilot.md", "line": 9, "excerpt": "Pointable Context 已完成原生 Chat Lane 的技术链路与自动延迟基准，但还不知道人是否能从卡片中更快、正确地理解信息；因此正式效率实验前要先检查研究流程是否可用，并估计结果波动。" }
+      },
+      {
+        "id": "boundary",
+        "criterion": "It cannot prove a significant reduction in information time or Chat Turns.",
+        "evidence": { "phase": "baseline", "path": "docs/concepts/pilot.md", "line": 13, "excerpt": "Pilot 可以发现流程缺陷并帮助规划正式样本量，但不能证明产品已经显著降低信息获取时间或 Chat Turn 数。" }
+      },
+      {
+        "id": "flow",
+        "criterion": "It follows prototype and technical gates and precedes sample-size planning and the formal controlled study.",
+        "evidence": [
+          { "phase": "baseline", "path": "docs/concepts/pilot.md", "line": 17, "excerpt": "- 原型与技术门禁完成" },
+          { "phase": "baseline", "path": "docs/concepts/pilot.md", "line": 19, "excerpt": "- 根据错误与方差确定正式样本量" },
+          { "phase": "baseline", "path": "docs/concepts/pilot.md", "line": 20, "excerpt": "- 正式受控效率实验" }
+        ]
+      }
+    ]
+  },
+  "efficiency": {
+    "tasks": [
+      {
+        "id": "DOC-1",
+        "units": [
+          {
+            "id": "purpose",
+            "criterion": "Relay Cache keeps bounded development-context records available for deterministic point lookup.",
+            "evidence": { "phase": "active", "path": "README.md", "line": 3, "excerpt": "Relay Cache keeps bounded development-context records available for deterministic point lookup." }
+          },
+          {
+            "id": "change",
+            "criterion": "Revision is reported first; reload waits for a trusted action and preserves the card in place.",
+            "evidence": { "phase": "active", "path": "README.md", "line": 7, "excerpt": "The open card reports a detected revision first. It reloads content only after a trusted refresh action and preserves the card in place." }
+          }
+        ]
+      },
+      {
+        "id": "MOD-1",
+        "units": [
+          {
+            "id": "responsibility",
+            "criterion": "Build stable lookup identities without reading record details.",
+            "evidence": { "phase": "baseline", "path": "src/context-record-index.ts", "line": 2, "excerpt": " * Builds stable lookup identities for explicit context records without reading record details." }
+          },
+          {
+            "id": "source_reference",
+            "criterion": "src/consumer.ts directly imports the module.",
+            "evidence": { "phase": "baseline", "path": "src/consumer.ts", "line": 1, "excerpt": "import { indexContextRecordPaths } from \"./context-record-index.js\";" }
+          },
+          {
+            "id": "test_reference",
+            "criterion": "test/context-record-index.test.ts directly imports the module.",
+            "evidence": { "phase": "baseline", "path": "test/context-record-index.test.ts", "line": 3, "excerpt": "import { indexContextRecordPaths } from \"../src/context-record-index.js\";" }
+          }
+        ]
+      },
+      {
+        "id": "TST-1",
+        "units": [
+          {
+            "id": "behavior_duplicate",
+            "criterion": "Defines a case named rejects duplicate normalized identities.",
+            "evidence": { "phase": "baseline", "path": "test/context-record-index.test.ts", "line": 5, "excerpt": "test(\"rejects duplicate normalized identities\", () => {" }
+          },
+          {
+            "id": "behavior_types",
+            "criterion": "Defines a case named keeps Task and Verification types distinct.",
+            "evidence": { "phase": "baseline", "path": "test/context-record-index.test.ts", "line": 10, "excerpt": "test(\"keeps Task and Verification types distinct\", () => {" }
+          },
+          {
+            "id": "execution_boundary",
+            "criterion": "Opening source does not execute it and cannot establish PASS or FAIL.",
+            "evidence": { "phase": "baseline", "path": "docs/study-boundaries.md", "line": 1, "excerpt": "| Test source | What behavior does this file define? | detected static test title(s) + `not executed` | must not answer PASS/FAIL |" }
+          }
+        ]
+      },
+      {
+        "id": "CFG-1",
+        "units": [
+          {
+            "id": "boundary",
+            "criterion": "It is the Node package configuration for the Relay Cache evaluation workspace.",
+            "evidence": { "phase": "baseline", "path": "package.json", "line": 2, "excerpt": "  \"name\": \"pointable-evaluation-relay-cache\"," }
+          },
+          {
+            "id": "keys",
+            "criterion": "Top-level keys are name, private, type, and scripts; values must not be disclosed as the answer.",
+            "evidence": [
+              { "phase": "baseline", "path": "package.json", "line": 2, "excerpt": "  \"name\": \"pointable-evaluation-relay-cache\"," },
+              { "phase": "baseline", "path": "package.json", "line": 3, "excerpt": "  \"private\": true," },
+              { "phase": "baseline", "path": "package.json", "line": 4, "excerpt": "  \"type\": \"module\"," },
+              { "phase": "baseline", "path": "package.json", "line": 5, "excerpt": "  \"scripts\": {" },
+              { "phase": "baseline", "path": "docs/study-boundaries.md", "line": 2, "excerpt": "| JSON configuration | What configuration boundary is this? | purpose + expected top-level key name(s) | values and secrets stay hidden |" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "ADR-1",
+        "units": [
+          {
+            "id": "decision",
+            "criterion": "Detect revisions in the background but reload only after a trusted explicit refresh action.",
+            "evidence": { "phase": "baseline", "path": "docs/adr/ADR-001-explicit-refresh.md", "line": 13, "excerpt": "Detect source revisions in the background, but reload detail only after a trusted explicit refresh action." }
+          },
+          {
+            "id": "reason",
+            "criterion": "Automatic replacement makes the reader lose the snapshot being compared.",
+            "evidence": { "phase": "baseline", "path": "docs/adr/ADR-001-explicit-refresh.md", "line": 9, "excerpt": "Automatically replacing an open snapshot makes the reader lose the information they were comparing." }
+          },
+          {
+            "id": "consequence",
+            "criterion": "The old snapshot remains readable and refresh reuses the same card.",
+            "evidence": { "phase": "baseline", "path": "docs/adr/ADR-001-explicit-refresh.md", "line": 17, "excerpt": "The old snapshot remains readable until refresh, and the refreshed content must reuse the same card." }
+          }
+        ]
+      },
+      {
+        "id": "REV-1",
+        "units": [
+          {
+            "id": "updated",
+            "criterion": "The previously open detail is explicitly marked as updated before refresh.",
+            "evidence": { "phase": "baseline", "path": "docs/study-boundaries.md", "line": 3, "excerpt": "| Revision drift | Did the open detail change, and what changed? | updated notice + one correct finite diff | no silent snapshot replacement |" }
+          },
+          {
+            "id": "responsibility_change",
+            "criterion": "The responsibility now includes rejecting duplicate normalized IDs before exposing candidates.",
+            "evidence": { "phase": "revision", "path": "src/context-record-index.ts", "line": 2, "excerpt": " * Builds stable lookup identities and rejects duplicate normalized IDs before exposing candidates." }
+          },
+          {
+            "id": "export_change",
+            "criterion": "recordIdentityKey is a newly visible export.",
+            "evidence": { "phase": "revision", "path": "src/context-record-index.ts", "line": 9, "excerpt": "export function recordIdentityKey(path: string): string {" }
+          }
+        ]
+      }
+    ]
+  }
+}

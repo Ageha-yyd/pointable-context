@@ -1,0 +1,1 @@
+Define the formal sample size only after a non-inferential usability pilot estimates variance. A pilot of roughly 8–12 participants may find workflow defects but must not be used to claim significance.

@@ -1,6 +1,6 @@
 {
   "name": "pointable-context",
-  "version": "0.1.0+codex.20260819134609",
+  "version": "0.1.0+codex.20260819140827",
   "description": "Selection-triggered, zero-turn development context reveal in the native Codex Chat Lane.",
   "author": {
     "name": "Local developer"
@@ -30,6 +30,7 @@
       "Record the current stable task status for Pointable Context with exact workspace evidence.",
       "Record this observed verification result for Pointable Context, including its remaining gap.",
       "Maintain Pointable Context Task and Verification records for this bounded long task at stable milestones.",
+      "Validate the frozen Pointable Context study pack before a pilot session.",
       "Use the optional capsule renderer only as an explicit fixture diagnostic."
     ]
   }

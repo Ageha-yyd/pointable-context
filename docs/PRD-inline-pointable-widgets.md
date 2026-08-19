@@ -1,7 +1,7 @@
 # PRD：Quiet Context Reveal（选区式上下文速览）
 
-- 版本：v2.6
-- 状态：Quiet Reveal 主链、P-C 默认、动态 revision v2 与 Task/Verification 卡片均已获当前场景人工验收；Agent 记录产出策略与只读检查门禁已冻结
+- 版本：v2.7
+- 状态：Quiet Reveal 主链与记录产出门禁已冻结；12-slot counterbalanced study pack v1、答案键、隔离 workspace 与只读完整性检查已完成，但尚未运行参与者 pilot
 - 日期：2026-08-19
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
@@ -455,11 +455,14 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 
 ### 12.2 任务
 
-1. 找出某文档本次更新的关键点；
-2. 解释新模块的责任和依赖；
-3. 判断某决策为何采用；
-4. 判断测试 PASS 的真实覆盖边界；
-5. 判断旧消息和当前事实是否漂移。
+冻结 v1 使用六类开发点查任务：
+
+1. `DOC-1`：找出文档用途与当前刷新策略变化；
+2. `MOD-1`：解释模块职责与有界 source/test 引用；
+3. `TST-1`：识别静态测试定义，同时明确“未执行、不能判定 PASS/FAIL”；
+4. `CFG-1`：识别 JSON 配置边界与顶层键，不披露值；
+5. `ADR-1`：判断显式刷新决策、原因与后果；
+6. `REV-1`：在冻结 mutation 后识别 `updated` 与一项有限差异。
 
 ### 12.3 目标
 
@@ -478,6 +481,14 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 2026-08-18 首个隔离工作区基准对 document/module/test-source/configuration/decision 各运行 20 次，exact-detail median 为 3.22–40.71 ms，unchanged revision check median 为 1.74 ms，explicit refresh 为 43.47 ms，达到本机 `<500 ms median` 技术目标。这只证明当前机器和 fixture 的组件延迟，不证明人的 `time_to_verified_fact` 已下降。
 
 人工 A/B 必须采用相同 transcript、相同项目状态和冻结答案键，以最终正确事实提交为终点，同时记录 accuracy、Chat Turn、lane leave、wrong entity、card sufficiency 和 selection interference。协议见 `docs/evaluation-protocol.md`。
+
+### 12.5 Frozen counterbalanced study pack v1
+
+`docs/evaluation/study-v1` 已冻结但未运行。呈现 pilot 使用 12 个匿名 slot，把 `pilot` 按 P-A/P-B/P-C 各分配 4 人；每人只看一个固定 condition，避免同对象学习效应。效率 pilot 使用六行循环 Latin square 并在后六个 slot 反转 A/B phase：每位参与者完成六个不同任务，其中 A/B 各三项；跨 12 个 slot，每个 scenario 在每个序位出现两次、在 A/B 各出现六次。
+
+两条件共享同一 transcript、隔离 Git workspace、对象和 exact-evidence answer key。`prepare-evaluation-workspace.mjs` 只允许在产品仓库之外的新/空目录创建参与者 workspace；`mutate` 只接受带冻结 marker 的 workspace。每个 workspace 只供一名参与者使用。
+
+`study:validate` 在 session 前验证答案证据、日志隐私字段、scenario/condition/序位平衡，并生成 `packDigest`。所有 CSV 行必须绑定该 digest。验证器 PASS 只证明材料内部一致，不证明研究流程已获真人验收，更不证明效率提升。
 
 ## 13. P0 验收门禁
 
@@ -525,6 +536,9 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 - [ ] 同时报告速度、正确率、误触和 stale/error；
 - [ ] 未完成正式实验前不声称“显著提升”。
 - [ ] 自动延迟基准始终标记 `technical_latency_only`，不冒充 `time_to_verified_fact`；
+- [ ] session 前冻结 answer key、transcript、workspace fixture、slot assignment 与 `packDigest`；
+- [ ] 每个 scenario 在 12-slot 日程中 A/B 各 6 次、每个序位各 2 次；
+- [ ] 日志不含 raw selection、文件内容、配置值、普通 Chat、姓名或邮箱；
 - [ ] A/B 两条件使用相同 transcript、项目状态和事实答案键；
 - [ ] 呈现 pilot 的 P-A/P-B/P-C 使用同一对象、事实与证据，且条件内不可切换；
 - [ ] `pilot` 的四个理解单元分别计分，不以“打开卡片”代替理解完成；
@@ -571,6 +585,7 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 - 文件卡片的 pinned snapshot、stat/Git/字面关系/evidence-source revision v2 探测、`内容已更新` 提示、显式原位刷新和最多 3 项差异；
 - revision detail ref 的过期、task 重绑定、context 与容量 fail-closed 约束；
 - 无后台遥测的可重复技术延迟基准，以及 counterbalanced 人工 A/B 协议；
+- 冻结 study pack v1：P-A/P-B/P-C 与 A/B 两层分配、六类任务、exact-evidence answer key、隔离 Git workspace、revision mutation、隐私日志与 pack digest 校验；
 
 仍缺：
 
@@ -590,8 +605,9 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 6. 已完成人工采用 P-C 的 concept/change/decision 三种首批信息结构；P-A/P-B 继续只作为研究基线；
 7. 已完成 stat/Git/字面关系/evidence-source revision v2 的真实 Chat Lane 动态变化验收；
 8. 已完成轻量 Task/Verification 制品、Context Index 投影、自动回归和真实 Chat Lane 人工理解验收；
-9. 当前阶段：冻结 opt-in Agent 产出策略和只读 Record Check，防止记录泛滥并确保写后可验证；
-10. 下一阶段冻结 counterbalanced pilot 材料与答案键，再与线性 Chat 做受控效率研究。
+9. 已冻结 opt-in Agent 产出策略和只读 Record Check，防止记录泛滥并确保写后可验证；
+10. 已冻结 counterbalanced study pack v1、答案键、12-slot 分配、隔离 workspace、mutation 与完整性检查；
+11. 下一阶段先做 facilitator dry run，再运行 8–12 人非推断性 presentation/efficiency pilot；pilot 关闭后才确定正式样本量。
 
 ## 17. 已冻结决策
 
@@ -612,9 +628,11 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 15. 显式刷新必须复用当前卡片 DOM，并保留位置、滚动与渐进披露状态；数据更新不等于重建界面上下文。
 16. Agent 工作结果只有在稳定、结构完整且证据可复验时才进入 Task/Verification 索引；不从普通 Chat、测试源码或文件存在推断完成与 PASS/FAIL。
 17. Agent 记录维护默认关闭；一次性请求或当前有界任务的明确 opt-in 才能启用，且所有写入必须通过只读 Record Check。
+18. 研究数据只有在 frozen pack validation 通过且每行绑定同一 `packDigest` 时可纳入；材料校验和自动 Provider 回归不得冒充参与者结果。
 
 ## 18. 变更记录
 
+- v2.7：冻结未运行的 study pack v1：呈现 pilot 采用 P-A/P-B/P-C 各 4 个匿名 slot，效率 pilot 采用六行循环 Latin square 与 A/B phase inversion；加入六类实际开发任务、exact-evidence answer key、隔离 Git workspace、确定性 revision mutation、隐私日志、slot assignment CLI 与 pack digest 校验。自动端到端仅证明材料/Provider 一致，仍不构成用户效率证据。
 - v2.6：记录 Task/Verification 原生卡片已通过当前场景人工验收；冻结一次性/有界任务两种 opt-in 授权、四项里程碑资格和已有 identity 更新策略；新增只读 Record Check，对结构、ISO 时间、exact evidence 与跨类型 stem 唯一性 fail closed。该验收与检查仍不构成用户效率证据。
 - v2.5：新增证据绑定的显式 Agent Work Result 合同；`docs/tasks/*.md` 投影目标/状态/进展/下一步/阻塞，`docs/verifications/*.md` 投影 Claim/Result/Gap 并保留方式、验证修订和执行时间；两者进入同一 Quiet Reveal 与 P-C 原生卡片，普通 Chat 和测试源码仍不得自动产生完成/PASS 结论。
 - v2.4：修正真实关系变化刷新时的界面连续性；显式刷新改为复用同一卡片 DOM，保留位置、滚动、详情与证据展开状态，并加入真实 Edge 的对象身份和 UI 状态回归。

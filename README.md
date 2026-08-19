@@ -121,6 +121,12 @@ Only `qualified` permits the current runtime to be described as attached. `unava
 
 `pnpm run benchmark:workspace` measures deterministic component latency in an isolated temporary workspace. It explicitly reports `technical_latency_only`, invokes no model, and creates no Chat Turn. The first recorded local medians were below the 500 ms component target, but this is not evidence that people understand a project faster. Human `time_to_verified_fact`, answer accuracy, lane-leave rate, and Chat Turn reduction must be measured with the counterbalanced protocol in [docs/evaluation-protocol.md](docs/evaluation-protocol.md).
 
+### Frozen study pack v1
+
+The non-inferential facilitator pack in [docs/evaluation/study-v1](docs/evaluation/study-v1/README.md) freezes one P-A/P-B/P-C presentation task and six A/B development lookup tasks. It includes exact-evidence answer units, a privacy-bounded log schema, a deterministic 12-slot Latin-square assignment, and an isolated Git workspace with a reproducible revision mutation. It has not been run and supports no efficiency claim.
+
+`pnpm run study:validate` verifies the evidence lines, privacy fields and schedule balance and returns a `packDigest`. `pointable-context-study assignment --repository-root <root> --slot <1-12> --json` returns the preassigned order and condition for one anonymous slot. Every collected row must retain that digest.
+
 ## Reused foundations
 
 - Pure pre-click eligibility with no project-data request.
@@ -165,6 +171,7 @@ pnpm install
 pnpm run check
 pnpm test
 pnpm run records:check
+pnpm run study:validate
 
 # Headless fixture MCP server
 node mcp/server.mjs --fixture-root ./fixtures/mini-project --project-id PRJ-01
