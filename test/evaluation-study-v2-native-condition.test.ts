@@ -133,6 +133,56 @@ test("condition B mounts only on the exact active scripted task and fences looku
   assert.equal(adapter?.stops, 1);
 });
 
+test("condition B accepts the host-qualified thread identity emitted by Codex Desktop", async () => {
+  const assignment = studyV2AssignmentForSlot(7).trials[0];
+  assert.ok(assignment);
+  assert.equal(assignment.condition, "B");
+  const material = await loadStudyV2NativeTrialMaterial(resolve("."), assignment);
+  const bareThreadId = "thread-study-qualified";
+  const active = task(`host-1:${bareThreadId}`);
+  let lookup: PointableLookupCallback | undefined;
+  const adapter = new FakeConditionAdapter({ lookup: async () => ({ kind: "error" }) }, [active]);
+  const handle = await startStudyV2ConditionCompanion({
+    assignment,
+    material,
+    taskThreadId: bareThreadId,
+    packDigest: "e".repeat(64),
+    observedAt: "2026-08-20T09:00:00.000Z",
+  }, {
+    createAdapter: (options) => {
+      lookup = options.lookup;
+      return adapter;
+    },
+  });
+  assert.equal(handle.mounted, true);
+  assert.equal(handle.quietContextReveal, true);
+
+  const selectionText = material.entities[0]?.label ?? "";
+  assert.ok(lookup);
+  const result = await lookup({
+    operation: "resolve",
+    requestId: "request-study-qualified",
+    selection: {
+      text: selectionText,
+      digest: "f".repeat(64),
+      generation: 1,
+      surface: "assistant_message",
+    },
+    contextFingerprint: active.contextFingerprint,
+    requestedAt: "2026-08-20T09:00:01.000Z",
+    host: {
+      targetId: "main-1",
+      targetUrl: "app://-/index.html",
+      bindingGeneration: "binding-1",
+      task: active,
+      revalidateTask: async () => active,
+    },
+    signal: new AbortController().signal,
+  }) as { kind: string };
+  assert.equal(result.kind, "detail");
+  await handle.stop();
+});
+
 test("condition B fails closed and cleans up when another Codex task is active", async () => {
   const assignment = studyV2AssignmentForSlot(7).trials[0];
   assert.ok(assignment);

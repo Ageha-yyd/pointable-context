@@ -55,6 +55,16 @@ function timestamp(value: string): string {
   return value;
 }
 
+function isExpectedTask(
+  context: { readonly threadId: string; readonly hostId: string } | undefined,
+  expectedThreadId: string,
+): boolean {
+  return context !== undefined && (
+    context.threadId === expectedThreadId ||
+    context.threadId === `${context.hostId}:${expectedThreadId}`
+  );
+}
+
 function taskError(language: "zh-CN" | "en-US"): PointableLookupPresentation {
   return {
     kind: "error",
@@ -72,11 +82,15 @@ function bindLookupToTask(
   language: "zh-CN" | "en-US",
 ): PointableLookupCallback {
   return async (request) => {
-    if (request.host.task?.threadId !== taskThreadId || request.host.revalidateTask === undefined) {
+    if (!isExpectedTask(request.host.task, taskThreadId) || request.host.revalidateTask === undefined) {
       return taskError(language);
     }
     const current = await request.host.revalidateTask(request.signal);
-    if (current?.threadId !== taskThreadId || current.contextFingerprint !== request.contextFingerprint) {
+    if (
+      current === undefined ||
+      !isExpectedTask(current, taskThreadId) ||
+      current.contextFingerprint !== request.contextFingerprint
+    ) {
       return taskError(language);
     }
     return lookup(request);
@@ -118,7 +132,7 @@ export async function startStudyV2ConditionCompanion(
     const status = await adapter.refreshTargets();
     if (status.targetCount !== 1) throw new Error("study_v2_native_pointable_host_unavailable");
     const activeTasks = await adapter.activeTasks();
-    if (activeTasks.length !== 1 || activeTasks[0]?.threadId !== taskThreadId) {
+    if (activeTasks.length !== 1 || !isExpectedTask(activeTasks[0], taskThreadId)) {
       throw new Error("study_v2_native_task_not_active");
     }
     return Object.freeze({
