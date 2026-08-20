@@ -1,0 +1,20 @@
+{
+  "name": "pointable-context-experiment",
+  "interface": {
+    "displayName": "Pointable Context Experiment"
+  },
+  "plugins": [
+    {
+      "name": "pointable-context",
+      "source": {
+        "source": "local",
+        "path": "."
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

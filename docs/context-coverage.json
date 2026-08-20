@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "taskId": "pointable-context-long-task-productization",
+  "declaredAt": "2026-08-20T00:00:00+08:00",
+  "expected": [
+    {
+      "id": "local-workspace-provider",
+      "kind": "module",
+      "key": "src/adapters/local-workspace.ts"
+    },
+    {
+      "id": "codex-build-qualification",
+      "kind": "module",
+      "key": "src/compatibility/codex-build-qualification.ts"
+    },
+    {
+      "id": "context-artifact-check",
+      "kind": "module",
+      "key": "src/records/context-artifact-check.ts"
+    },
+    {
+      "id": "native-chat-lane-decision",
+      "kind": "decision",
+      "key": "docs/decisions/native-chat-lane.md"
+    },
+    {
+      "id": "work-result-context-task",
+      "kind": "task",
+      "key": "docs/tasks/work-result-context.md"
+    },
+    {
+      "id": "task-verification-contract",
+      "kind": "verification",
+      "key": "docs/verifications/task-verification-contract.md"
+    },
+    {
+      "id": "long-task-dogfood-comprehension",
+      "kind": "verification",
+      "key": "docs/verifications/long-task-dogfood-comprehension.md"
+    },
+    {
+      "id": "native-card-type-coverage",
+      "kind": "verification",
+      "key": "docs/verifications/native-card-type-coverage.md"
+    }
+  ]
+}

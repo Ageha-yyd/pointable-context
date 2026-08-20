@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "contract": "private-codex-chat-lane-v1",
+  "host": {
+    "packageName": "OpenAI.Codex",
+    "packageVersion": "26.814.5517.0",
+    "executableVersion": "151.0.7922.137",
+    "architecture": "x64",
+    "capturedAt": "2026-08-20T13:19:35+08:00"
+  },
+  "implementation": {
+    "productVersion": "v2.14",
+    "rendererBundleSha256": "d00e4620d5d9e99975f46939761970c0e2550c455070fe7295882ef1d8f52855"
+  },
+  "automatic": {
+    "checkedAt": "2026-08-20T05:32:35.775Z",
+    "state": "qualified",
+    "code": "qualified_current_runtime",
+    "gates": {
+      "exactMainTarget": "pass",
+      "mainFrame": "pass",
+      "mainExecutionContext": "pass",
+      "rendererLifecycle": "pass"
+    }
+  },
+  "manualChecks": [
+    {
+      "id": "selection_inert",
+      "result": "pass",
+      "observedAt": "2026-08-20T14:26:56+08:00",
+      "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-manual.txt:1",
+      "evidenceExcerpt": "selection_inert=PASS 2026-08-20T14:26:56+08:00 user confirmed selecting exact pilot and waiting exposed only the quiet action; detail did not open automatically."
+    },
+    {
+      "id": "trusted_click",
+      "result": "pass",
+      "observedAt": "2026-08-20T14:26:56+08:00",
+      "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-manual.txt:2",
+      "evidenceExcerpt": "trusted_click=PASS 2026-08-20T14:26:56+08:00 user confirmed the explicit Pointable Context action opened the deterministic pilot detail without another Chat turn."
+    },
+    {
+      "id": "anchored_card",
+      "result": "pass",
+      "observedAt": "2026-08-20T14:26:56+08:00",
+      "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-manual.txt:3",
+      "evidenceExcerpt": "anchored_card=PASS 2026-08-20T14:26:56+08:00 user confirmed the native detail appeared beside the selected Chat reference and did not open a browser."
+    },
+    {
+      "id": "progressive_disclosure",
+      "result": "pass",
+      "observedAt": "2026-08-20T14:26:56+08:00",
+      "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-manual.txt:4",
+      "evidenceExcerpt": "progressive_disclosure=PASS 2026-08-20T14:26:56+08:00 user confirmed summary-first display, 查看详情 expansion, and 收起详情 collapse in the same card."
+    },
+    {
+      "id": "close_and_focus_restore",
+      "result": "pass",
+      "observedAt": "2026-08-20T14:26:56+08:00",
+      "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-manual.txt:5",
+      "evidenceExcerpt": "close_and_focus_restore=PASS 2026-08-20T14:26:56+08:00 user confirmed the close control removed the card without a Chat scroll jump after returning focus from the composer."
+    },
+    {
+      "id": "composer_persistence",
+      "result": "pass",
+      "observedAt": "2026-08-20T14:26:56+08:00",
+      "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-manual.txt:6",
+      "evidenceExcerpt": "composer_persistence=PASS 2026-08-20T14:26:56+08:00 user confirmed focusing and temporarily typing in the current Chat composer kept the open card visible."
+    },
+    {
+      "id": "scroll_and_virtualization",
+      "result": "pass",
+      "observedAt": "2026-08-20T14:30:13+08:00",
+      "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-manual.txt:7",
+      "evidenceExcerpt": "scroll_and_virtualization=PASS 2026-08-20T14:30:13+08:00 user confirmed scrolling the selected message out of view caused safe card repositioning or cleanup, left no orphan surface, and permitted a fresh reveal after returning."
+    },
+    {
+      "id": "navigation_recovery",
+      "result": "pass",
+      "observedAt": "2026-08-20T14:30:13+08:00",
+      "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-manual.txt:8",
+      "evidenceExcerpt": "navigation_recovery=PASS 2026-08-20T14:30:13+08:00 user confirmed switching to another Codex task cleaned the old card and returning restored one action and one current card without stale or duplicate UI."
+    },
+    {
+      "id": "stale_response_cleanup",
+      "result": "pass",
+      "observedAt": "2026-08-20T14:37:59+08:00",
+      "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-manual.txt:10",
+      "evidenceExcerpt": "stale_response_cleanup=PASS 2026-08-20T14:37:59+08:00 user confirmed a controlled three-second stale-alpha response was discarded after selecting stale-beta; no old detail card mounted and the new selection did not auto-open detail."
+    },
+    {
+      "id": "refresh_continuity",
+      "result": "pass",
+      "observedAt": "2026-08-20T14:34:17+08:00",
+      "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-manual.txt:9",
+      "evidenceExcerpt": "refresh_continuity=PASS 2026-08-20T14:34:17+08:00 user confirmed a second real file revision produced 内容已更新 and trusted refresh reused the open card while preserving its moved position, internal scroll, expanded detail state, and zero Chat turns."
+    }
+  ]
+}

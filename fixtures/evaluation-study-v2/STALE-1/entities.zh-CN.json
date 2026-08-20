@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "entities": [{
+    "id": "STATE:OBSERVED-SNAPSHOT",
+    "label": "observed snapshot",
+    "type": "state",
+    "meaning": "来源在较早观察时刻和特定修订上报告内容的可追溯快照。",
+    "whyNow": "completed 快照生成后，兼容性失败改变了当前任务状态。",
+    "flow": ["观察到 completed", "后续失败重开事项", "刷新当前来源"],
+    "boundary": "历史上准确不代表它可以作为当前完成结论。",
+    "evidence": "workspace/PROJECT_STATE.md:7"
+  }]
+}

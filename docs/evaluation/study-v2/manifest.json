@@ -1,0 +1,194 @@
+{
+  "schemaVersion": 2,
+  "studyId": "pointable-context-study-v2",
+  "status": "prototype_materials_not_run",
+  "frozenOn": "2026-08-20",
+  "languages": ["zh-CN", "en-US"],
+  "defaultLanguage": "zh-CN",
+  "claimBoundary": {
+    "zh-CN": "该受控实验包可以在无实时模型的冻结条件下比较信息检索、导航和正确决策表现；它不能单独证明真实模型场景中的 Chat Turn 减少，也不能建立面向总体人群的因果结论。",
+    "en-US": "This controlled pack can compare retrieval, navigation, and correct-decision behavior under frozen no-model conditions. It cannot establish real-model chat-turn reduction or a population-level causal effect."
+  },
+  "participantSlots": 12,
+  "trainingScenarioId": "TRAIN-1",
+  "training": {
+    "id": "TRAIN-1",
+    "localizations": {
+      "zh-CN": {
+        "transcriptPath": "fixtures/evaluation-study-v2/TRAIN-1/transcript.zh-CN.md",
+        "conversationPath": "fixtures/evaluation-study-v2/TRAIN-1/conversation.zh-CN.json",
+        "entitiesPath": "fixtures/evaluation-study-v2/TRAIN-1/entities.zh-CN.json",
+        "workspacePath": "fixtures/evaluation-study-v2/TRAIN-1/workspace.zh-CN"
+      },
+      "en-US": {
+        "transcriptPath": "fixtures/evaluation-study-v2/TRAIN-1/transcript.md",
+        "conversationPath": "fixtures/evaluation-study-v2/TRAIN-1/conversation.json",
+        "entitiesPath": "fixtures/evaluation-study-v2/TRAIN-1/entities.json",
+        "workspacePath": "fixtures/evaluation-study-v2/TRAIN-1/workspace"
+      }
+    }
+  },
+  "presentationModel": "P-C",
+  "liveModelDuringTrials": false,
+  "taskTimeoutMs": 300000,
+  "conditions": [
+    { "id": "A", "name": "linear-chat", "quietContextReveal": false, "liveModel": false },
+    { "id": "B", "name": "quiet-context-reveal", "quietContextReveal": true, "presentationMode": "mental-model", "liveModel": false }
+  ],
+  "assignmentRule": "Six-row cyclic Latin square repeated with the A/B phase inverted; each participant receives three A and three B trials.",
+  "scenarios": [
+    {
+      "id": "RESUME-1", "projectId": "relay-cache",
+      "localizations": {
+        "zh-CN": {
+          "transcriptPath": "fixtures/evaluation-study-v2/RESUME-1/transcript.zh-CN.md",
+          "conversationPath": "fixtures/evaluation-study-v2/RESUME-1/conversation.zh-CN.json",
+          "entitiesPath": "fixtures/evaluation-study-v2/RESUME-1/entities.zh-CN.json",
+          "workspacePath": "fixtures/evaluation-study-v2/RESUME-1/workspace.zh-CN",
+          "taskPrompt": "在一次信息密集的模块拆分之后，判断新消费者当前应使用的受支持导入边界，并提交一个答案代码。"
+        },
+        "en-US": {
+          "transcriptPath": "fixtures/evaluation-study-v2/RESUME-1/transcript.md",
+          "conversationPath": "fixtures/evaluation-study-v2/RESUME-1/conversation.json",
+          "entitiesPath": "fixtures/evaluation-study-v2/RESUME-1/entities.json",
+          "workspacePath": "fixtures/evaluation-study-v2/RESUME-1/workspace",
+          "taskPrompt": "After a dense module split, choose the current supported import boundary and submit one answer code."
+        }
+      }
+    },
+    {
+      "id": "HANDOFF-1", "projectId": "handoff-gate",
+      "localizations": {
+        "zh-CN": {
+          "transcriptPath": "fixtures/evaluation-study-v2/HANDOFF-1/transcript.zh-CN.md",
+          "conversationPath": "fixtures/evaluation-study-v2/HANDOFF-1/conversation.zh-CN.json",
+          "entitiesPath": "fixtures/evaluation-study-v2/HANDOFF-1/entities.zh-CN.json",
+          "workspacePath": "fixtures/evaluation-study-v2/HANDOFF-1/workspace.zh-CN",
+          "taskPrompt": "在任务交接点，判断当前 Gate 真正要求的下一步，不要沿用已经过时的原始实施计划。"
+        },
+        "en-US": {
+          "transcriptPath": "fixtures/evaluation-study-v2/HANDOFF-1/transcript.md",
+          "conversationPath": "fixtures/evaluation-study-v2/HANDOFF-1/conversation.json",
+          "entitiesPath": "fixtures/evaluation-study-v2/HANDOFF-1/entities.json",
+          "workspacePath": "fixtures/evaluation-study-v2/HANDOFF-1/workspace",
+          "taskPrompt": "At handoff, choose the next action required by the current gate rather than an obsolete implementation step."
+        }
+      }
+    },
+    {
+      "id": "CONCEPT-1", "projectId": "authority-fence",
+      "localizations": {
+        "zh-CN": {
+          "transcriptPath": "fixtures/evaluation-study-v2/CONCEPT-1/transcript.zh-CN.md",
+          "conversationPath": "fixtures/evaluation-study-v2/CONCEPT-1/conversation.zh-CN.json",
+          "entitiesPath": "fixtures/evaluation-study-v2/CONCEPT-1/entities.zh-CN.json",
+          "workspacePath": "fixtures/evaluation-study-v2/CONCEPT-1/workspace.zh-CN",
+          "taskPrompt": "根据项目中 authority fence 的当前含义，判断它验证什么，以及它不能证明什么。"
+        },
+        "en-US": {
+          "transcriptPath": "fixtures/evaluation-study-v2/CONCEPT-1/transcript.md",
+          "conversationPath": "fixtures/evaluation-study-v2/CONCEPT-1/conversation.json",
+          "entitiesPath": "fixtures/evaluation-study-v2/CONCEPT-1/entities.json",
+          "workspacePath": "fixtures/evaluation-study-v2/CONCEPT-1/workspace",
+          "taskPrompt": "Use the current project meaning of authority fence to choose what it validates and what it cannot establish."
+        }
+      }
+    },
+    {
+      "id": "DECISION-1", "projectId": "explicit-refresh",
+      "localizations": {
+        "zh-CN": {
+          "transcriptPath": "fixtures/evaluation-study-v2/DECISION-1/transcript.zh-CN.md",
+          "conversationPath": "fixtures/evaluation-study-v2/DECISION-1/conversation.zh-CN.json",
+          "entitiesPath": "fixtures/evaluation-study-v2/DECISION-1/entities.zh-CN.json",
+          "workspacePath": "fixtures/evaluation-study-v2/DECISION-1/workspace.zh-CN",
+          "taskPrompt": "恢复团队已经接受的刷新策略，并选择与该决策一致的实现行为。"
+        },
+        "en-US": {
+          "transcriptPath": "fixtures/evaluation-study-v2/DECISION-1/transcript.md",
+          "conversationPath": "fixtures/evaluation-study-v2/DECISION-1/conversation.json",
+          "entitiesPath": "fixtures/evaluation-study-v2/DECISION-1/entities.json",
+          "workspacePath": "fixtures/evaluation-study-v2/DECISION-1/workspace",
+          "taskPrompt": "Recover the accepted refresh policy and choose the implementation behavior consistent with that decision."
+        }
+      }
+    },
+    {
+      "id": "STALE-1", "projectId": "snapshot-drift",
+      "localizations": {
+        "zh-CN": {
+          "transcriptPath": "fixtures/evaluation-study-v2/STALE-1/transcript.zh-CN.md",
+          "conversationPath": "fixtures/evaluation-study-v2/STALE-1/conversation.zh-CN.json",
+          "entitiesPath": "fixtures/evaluation-study-v2/STALE-1/entities.zh-CN.json",
+          "workspacePath": "fixtures/evaluation-study-v2/STALE-1/workspace.zh-CN",
+          "taskPrompt": "识别一个过去正确但现在已经过时的快照，并选择能够安全判断当前状态的操作。"
+        },
+        "en-US": {
+          "transcriptPath": "fixtures/evaluation-study-v2/STALE-1/transcript.md",
+          "conversationPath": "fixtures/evaluation-study-v2/STALE-1/conversation.json",
+          "entitiesPath": "fixtures/evaluation-study-v2/STALE-1/entities.json",
+          "workspacePath": "fixtures/evaluation-study-v2/STALE-1/workspace",
+          "taskPrompt": "Recognize that a previously correct snapshot is stale and choose the safe current-state action."
+        }
+      }
+    },
+    {
+      "id": "VERIFY-1", "projectId": "definition-evidence",
+      "localizations": {
+        "zh-CN": {
+          "transcriptPath": "fixtures/evaluation-study-v2/VERIFY-1/transcript.zh-CN.md",
+          "conversationPath": "fixtures/evaluation-study-v2/VERIFY-1/conversation.zh-CN.json",
+          "entitiesPath": "fixtures/evaluation-study-v2/VERIFY-1/entities.zh-CN.json",
+          "workspacePath": "fixtures/evaluation-study-v2/VERIFY-1/workspace.zh-CN",
+          "taskPrompt": "区分测试定义与实际执行证据，并选择当前能够被证据支持的验证状态。"
+        },
+        "en-US": {
+          "transcriptPath": "fixtures/evaluation-study-v2/VERIFY-1/transcript.md",
+          "conversationPath": "fixtures/evaluation-study-v2/VERIFY-1/conversation.json",
+          "entitiesPath": "fixtures/evaluation-study-v2/VERIFY-1/entities.json",
+          "workspacePath": "fixtures/evaluation-study-v2/VERIFY-1/workspace",
+          "taskPrompt": "Distinguish a test definition from an observed test result and choose the defensible verification status."
+        }
+      }
+    }
+  ],
+  "primaryMetrics": ["task_completion_ms", "success"],
+  "secondaryMetrics": ["time_to_first_correct_object_ms", "scripted_followup_requests", "navigation_count", "navigation_time_ms", "wrong_object_count", "card_open_count", "card_dwell_ms", "patch_attempt_count"],
+  "privacy": {
+    "explicitConsentBeforeSubmission": true,
+    "forbiddenFields": ["raw_selected_text", "ordinary_chat_content", "file_contents", "configuration_values", "participant_name", "participant_email", "absolute_paths"]
+  },
+  "materials": [
+    "docs/evaluation/study-v2/README.md",
+    "docs/evaluation/study-v2/STUDY_SETUP_AGENT.md",
+    "docs/evaluation/study-v2/PARTICIPANT_GUIDE.md",
+    "docs/evaluation/study-v2/ORGANIZER_GUIDE.md",
+    "docs/evaluation/study-v2/TROUBLESHOOTING.md",
+    "docs/evaluation/study-v2/DATA_DICTIONARY.md",
+    "docs/evaluation/study-v2/CONSENT.md",
+    "docs/evaluation/study-v2/GITHUB_SUBMISSION.md",
+    "docs/evaluation/study-v2/IMPLEMENTATION_STATUS.md",
+    "docs/compatibility/codex-desktop-current.json",
+    "docs/evidence/codex-compatibility-26.810.7004.0.txt",
+    "docs/evidence/codex-compatibility-26.814.5517.0.txt",
+    "SETUP-EXPERIMENT.cmd",
+    "START-STUDY-SETUP.cmd",
+    "scripts/launch-study-codex.mjs",
+    "scripts/prepare-study-v2-workspace.mjs",
+    "host/workspace-companion.mjs",
+    "fixtures/evaluation-study-v2/TRAIN-1/transcript.md", "fixtures/evaluation-study-v2/TRAIN-1/conversation.json", "fixtures/evaluation-study-v2/TRAIN-1/entities.json", "fixtures/evaluation-study-v2/TRAIN-1/workspace/PROJECT_STATE.md",
+    "fixtures/evaluation-study-v2/TRAIN-1/transcript.zh-CN.md", "fixtures/evaluation-study-v2/TRAIN-1/conversation.zh-CN.json", "fixtures/evaluation-study-v2/TRAIN-1/entities.zh-CN.json", "fixtures/evaluation-study-v2/TRAIN-1/workspace.zh-CN/PROJECT_STATE.md",
+    "fixtures/evaluation-study-v2/RESUME-1/transcript.md", "fixtures/evaluation-study-v2/RESUME-1/conversation.json", "fixtures/evaluation-study-v2/RESUME-1/entities.json", "fixtures/evaluation-study-v2/RESUME-1/workspace/PROJECT_STATE.md",
+    "fixtures/evaluation-study-v2/RESUME-1/transcript.zh-CN.md", "fixtures/evaluation-study-v2/RESUME-1/conversation.zh-CN.json", "fixtures/evaluation-study-v2/RESUME-1/entities.zh-CN.json", "fixtures/evaluation-study-v2/RESUME-1/workspace.zh-CN/PROJECT_STATE.md",
+    "fixtures/evaluation-study-v2/HANDOFF-1/transcript.md", "fixtures/evaluation-study-v2/HANDOFF-1/conversation.json", "fixtures/evaluation-study-v2/HANDOFF-1/entities.json", "fixtures/evaluation-study-v2/HANDOFF-1/workspace/PROJECT_STATE.md",
+    "fixtures/evaluation-study-v2/HANDOFF-1/transcript.zh-CN.md", "fixtures/evaluation-study-v2/HANDOFF-1/conversation.zh-CN.json", "fixtures/evaluation-study-v2/HANDOFF-1/entities.zh-CN.json", "fixtures/evaluation-study-v2/HANDOFF-1/workspace.zh-CN/PROJECT_STATE.md",
+    "fixtures/evaluation-study-v2/CONCEPT-1/transcript.md", "fixtures/evaluation-study-v2/CONCEPT-1/conversation.json", "fixtures/evaluation-study-v2/CONCEPT-1/entities.json", "fixtures/evaluation-study-v2/CONCEPT-1/workspace/PROJECT_STATE.md",
+    "fixtures/evaluation-study-v2/CONCEPT-1/transcript.zh-CN.md", "fixtures/evaluation-study-v2/CONCEPT-1/conversation.zh-CN.json", "fixtures/evaluation-study-v2/CONCEPT-1/entities.zh-CN.json", "fixtures/evaluation-study-v2/CONCEPT-1/workspace.zh-CN/PROJECT_STATE.md",
+    "fixtures/evaluation-study-v2/DECISION-1/transcript.md", "fixtures/evaluation-study-v2/DECISION-1/conversation.json", "fixtures/evaluation-study-v2/DECISION-1/entities.json", "fixtures/evaluation-study-v2/DECISION-1/workspace/PROJECT_STATE.md",
+    "fixtures/evaluation-study-v2/DECISION-1/transcript.zh-CN.md", "fixtures/evaluation-study-v2/DECISION-1/conversation.zh-CN.json", "fixtures/evaluation-study-v2/DECISION-1/entities.zh-CN.json", "fixtures/evaluation-study-v2/DECISION-1/workspace.zh-CN/PROJECT_STATE.md",
+    "fixtures/evaluation-study-v2/STALE-1/transcript.md", "fixtures/evaluation-study-v2/STALE-1/conversation.json", "fixtures/evaluation-study-v2/STALE-1/entities.json", "fixtures/evaluation-study-v2/STALE-1/workspace/PROJECT_STATE.md",
+    "fixtures/evaluation-study-v2/STALE-1/transcript.zh-CN.md", "fixtures/evaluation-study-v2/STALE-1/conversation.zh-CN.json", "fixtures/evaluation-study-v2/STALE-1/entities.zh-CN.json", "fixtures/evaluation-study-v2/STALE-1/workspace.zh-CN/PROJECT_STATE.md",
+    "fixtures/evaluation-study-v2/VERIFY-1/transcript.md", "fixtures/evaluation-study-v2/VERIFY-1/conversation.json", "fixtures/evaluation-study-v2/VERIFY-1/entities.json", "fixtures/evaluation-study-v2/VERIFY-1/workspace/PROJECT_STATE.md",
+    "fixtures/evaluation-study-v2/VERIFY-1/transcript.zh-CN.md", "fixtures/evaluation-study-v2/VERIFY-1/conversation.zh-CN.json", "fixtures/evaluation-study-v2/VERIFY-1/entities.zh-CN.json", "fixtures/evaluation-study-v2/VERIFY-1/workspace.zh-CN/PROJECT_STATE.md"
+  ]
+}

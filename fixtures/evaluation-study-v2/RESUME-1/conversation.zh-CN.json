@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "RESUME-1",
+  "exchanges": [
+    { "user": "在连接 sync worker 前，请先拆分旧的 relay-cache.ts。", "assistant": "我把持久化拆到 store.ts，把版本 1 快照读取放进 migration adapter，并创建 src/relay-cache/index.ts 作为面向消费者的入口。" },
+    { "user": "目前哪些验证已经完成？", "assistant": "序列化测试已通过，但第一次报告时还没有覆盖进程重启，因此当时不能宣称恢复路径已验证。" },
+    { "user": "restart fixture 现在通过了。可以删除迁移代码吗？", "assistant": "不能。重启缺口已经关闭，但仍有版本 1 快照需要 migration adapter；它是兼容读取路径，不是新消费者入口。" },
+    { "user": "store.ts 才是最新实现，为什么不让新消费者直接导入？", "assistant": "store.ts 拥有持久化细节，没有公共兼容承诺。直接导入会把内部布局变成事实 API。" },
+    { "user": "那新消费者现在应该依赖什么？", "assistant": "使用 relay-cache public entry，也就是 src/relay-cache/index.ts。内部 store 和旧快照 adapter 都不改变这个受支持边界。" }
+  ],
+  "referencedEntityIds": ["MODULE:RELAY-CACHE-ENTRY"]
+}

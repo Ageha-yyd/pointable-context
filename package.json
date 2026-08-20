@@ -1,13 +1,18 @@
 {
   "name": "pointable-context",
   "version": "0.1.0",
+  "packageManager": "pnpm@11.19.0",
   "private": true,
   "description": "Selection-triggered, zero-turn context reveal for the native Codex Chat Lane.",
   "type": "module",
   "bin": {
     "pointable": "./dist/src/cli.js",
     "pointable-context-record-check": "./dist/src/records/check-cli.js",
+    "pointable-context-artifact-check": "./dist/src/records/artifact-check-cli.js",
+    "pointable-context-coverage": "./dist/src/records/coverage-cli.js",
+    "pointable-context-compatibility": "./dist/src/compatibility/qualification-cli.js",
     "pointable-context-study": "./dist/src/evaluation/study-cli.js",
+    "pointable-context-study-v2": "./dist/src/evaluation/study-v2/cli.js",
     "pointable-context-mcp-fixture": "./dist/src/mcp/stdio.js",
     "pointable-context-fixture-companion": "./host/fixture-companion.mjs",
     "pointable-context-workspace-companion": "./host/workspace-companion.mjs",
@@ -20,6 +25,8 @@
     "build:host": "pnpm run build:host:fixture && pnpm run build:host:workspace",
     "build:host:fixture": "esbuild src/host/codex-cdp/fixture-companion-cli.ts --bundle --platform=node --format=esm --target=node20 --outfile=host/fixture-companion.mjs",
     "build:host:workspace": "esbuild src/host/codex-cdp/workspace-companion-cli.ts --bundle --platform=node --format=esm --target=node20 --outfile=host/workspace-companion.mjs",
+    "build:study-v2:bundle": "pnpm run build:ts && esbuild src/evaluation/study-v2/cli.ts --bundle --platform=node --format=esm --target=node24 --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" --outfile=study-dist/pointable-study.mjs",
+    "build:study-v2": "pnpm run build:study-v2:bundle && node scripts/build-study-v2-release.mjs",
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "pnpm run build && node --test \"dist/test/*.test.js\"",
     "test:host-browser": "node scripts/renderer-close-headless-acceptance.mjs",
@@ -27,10 +34,17 @@
     "test:conversation-browser": "node scripts/conversation-client-browser-acceptance.mjs",
     "benchmark:workspace": "pnpm run build:ts && node scripts/workspace-lookup-benchmark.mjs",
     "records:check": "pnpm run build:ts && node dist/src/records/check-cli.js --workspace-root . --json",
+    "artifacts:check": "pnpm run build:ts && node dist/src/records/artifact-check-cli.js --workspace-root . --json",
+    "coverage:check": "pnpm run build:ts && node dist/src/records/coverage-cli.js --workspace-root . --json",
+    "compatibility:check": "pnpm run build:ts && node dist/src/compatibility/qualification-cli.js --workspace-root . --renderer-bundle host/workspace-companion.mjs --json",
     "study:validate": "pnpm run build:ts && node dist/src/evaluation/study-cli.js validate --repository-root . --json",
     "study:assignment": "pnpm run build:ts && node dist/src/evaluation/study-cli.js assignment --repository-root . --slot 1 --json",
+    "study-v2:validate": "pnpm run build:ts && node dist/src/evaluation/study-v2/cli.js validate-pack --repository-root . --json",
+    "study-v2:doctor": "pnpm run build:ts && node dist/src/evaluation/study-v2/cli.js doctor --repository-root . --json",
     "probe:app-server-referent": "node scripts/probe-app-server-referent.mjs",
     "probe:app-server-conversation": "node scripts/probe-app-server-conversation.mjs",
+    "probe:native-conversation-injection": "pnpm run build:ts && node scripts/probe-native-conversation-replay.mjs create .",
+    "probe:native-scripted-turns": "pnpm run build:ts && node scripts/probe-scripted-codex-turns.mjs .",
     "client:app-server": "node dist/src/app-server/conversation-cli.js --workspace-root .",
     "pointable": "node dist/src/cli.js",
     "mcp:fixture": "node dist/src/mcp/stdio.js",
@@ -43,11 +57,13 @@
   "devDependencies": {
     "@modelcontextprotocol/client": "2.0.0",
     "@types/node": "24.13.3",
+    "@types/ws": "8.18.1",
     "esbuild": "0.28.2",
     "typescript": "7.0.2"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.0.0",
+    "ws": "8.21.3",
     "zod": "4.4.3"
   }
 }

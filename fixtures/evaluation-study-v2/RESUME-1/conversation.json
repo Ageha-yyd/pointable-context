@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "RESUME-1",
+  "exchanges": [
+    {
+      "user": "Please split the old relay-cache.ts before we connect the sync worker.",
+      "assistant": "I separated persistence into store.ts, kept migration reads in an adapter, and created src/relay-cache/index.ts as the consumer-facing entry. Serialization tests pass, but process restart has not been checked yet."
+    },
+    {
+      "user": "Which part of that first result is still only provisional?",
+      "assistant": "The public shape and serialization are covered, but recovery across a real process restart is still an evidence gap. I have not promoted the split to integration-ready yet."
+    },
+    {
+      "user": "The restart fixture is now green. Can we remove the migration code and import store.ts directly?",
+      "assistant": "The restart gap is closed, but version-1 snapshots still require the migration adapter. Direct store imports would expose persistence details that do not have a compatibility promise."
+    },
+    {
+      "user": "The store contains the current implementation. Why is it not the safest import?",
+      "assistant": "Implementation recency is not API authority. store.ts owns internal persistence layout, while the public entry owns the supported consumer contract."
+    },
+    {
+      "user": "A new consumer is ready. Which boundary should its integration use?",
+      "assistant": "Use the relay-cache public entry at src/relay-cache/index.ts. Treat store.ts as internal and the migration adapter as legacy read support; neither changes the supported import boundary."
+    }
+  ],
+  "referencedEntityIds": [
+    "MODULE:RELAY-CACHE-ENTRY"
+  ]
+}

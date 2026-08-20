@@ -1,6 +1,6 @@
 # Pointable Context evaluation protocol
 
-Status: frozen pilot protocol v1, 2026-08-19. Materials are frozen but the pilot has not been run. This document defines measurement; it does not claim a proven efficiency improvement.
+Status: native controlled-conversation runner integrated, 2026-08-20. Study pack v1 remains frozen and has not been run. Short-task presentation and efficiency pilots are not the current product gate. The default runner now creates fixed multi-turn exchanges as ordinary Codex Desktop messages, waits for the exact task, mounts a lightweight answer control, adds Quiet Context Reveal only in B, and connects terminal events to the existing checkpoint/result pipeline without a live model. Real A/B end-to-end validation, clean-machine deployment, and research governance remain incomplete. This document does not claim a proven efficiency improvement.
 
 ## 1. Separate the two questions
 
@@ -24,9 +24,11 @@ This hypothesis does not cover open-ended explanation, synthesis, design judgmen
 
 Use a within-subject, counterbalanced order. Randomize scenario order and assign A/B with a Latin-square schedule so practice and fatigue do not systematically favor one condition.
 
-### 3.1 Presentation pilot before the efficiency study
+The transcript must be a sequence of ordinary Codex user/assistant Turns in both conditions. Do not render the history inside a full-page or side-panel simulation and do not use `thread/inject_items` as a presentation shortcut: injected items may enter model history without becoming visible Chat Lane Turns. The research runner may use a loopback scripted Responses provider so every participant receives the same Agent replies, but it must not call a live model or retain prompts.
 
-Before comparing Quiet Context Reveal with linear Chat, run a smaller presentation-only pilot. Its purpose is to find comprehension and study-flow defects, not to claim an efficiency effect.
+### 3.1 Deferred presentation comparison
+
+P-A/P-B/P-C were prepared as a smaller presentation-only comparison whose purpose is to find comprehension and study-flow defects, not to claim an efficiency effect. The product now adopts P-C as its default without making a causal claim, so this comparison is deferred rather than used as the next development gate.
 
 All three pilot conditions use the same native Chat Lane trigger, the same selected object, the same authoritative facts, the same source excerpt, and zero added Chat Turns. Only the card projection changes:
 
@@ -46,6 +48,30 @@ The participant must answer, in their own words:
 End timing only after the answer is submitted. Score the four answer units separately. Record evidence opening and evidence correctness, but do not require the evidence disclosure for the first three answers. Use the frozen [study-v1 presentation log](evaluation/study-v1/presentation-log.template.csv); do not record raw selected text or unrelated Chat content.
 
 A pilot of roughly 8–12 participants can expose unclear wording, wrong visual priority, hidden evidence, overflow, or task-instruction defects and provide a variance estimate. It cannot establish significance or replace the later linear-Chat efficiency comparison.
+
+### 3.2 Product-roadmap decision on 2026-08-20
+
+- Use P-C (`mental-model`) as the only ordinary product presentation. Keep P-A/P-B as dormant research baselines.
+- Do not recruit participants for the frozen short-task pack during the current implementation phase.
+- Preserve study pack v1 and its digest as an audit artifact; do not reinterpret an unrun pack as evidence.
+- Prioritize real long-running development tasks where working memory has decayed and project state has changed.
+- If the product contract or research question changes, create and freeze a new study-pack version rather than editing or reusing v1 data rows.
+
+### 3.3 Controlled native conversation architecture
+
+Each measured scenario is authored as:
+
+1. an isolated project snapshot;
+2. a bounded sequence of fixed user prompts and fixed Agent replies that represent a realistic development history;
+3. a current task question with a finite answer key;
+4. the same deterministic Pointable Context objects used only in condition B;
+5. a non-obscuring answer/exit control and a white-listed event recorder.
+
+The runner creates a persistent Codex task through a dedicated App Server and sends each fixed exchange as a real `turn/start`. A private loopback custom model provider returns the next scripted Agent reply over bounded HTTP/SSE; WebSocket remains a tested compatibility transport but is disabled in the default isolated runner. The participant opens the exact generated task in Codex Desktop and reads/selects ordinary Chat Lane text. Timing begins only after that task is active. At terminal answer, exit, or timeout, the runner deletes only its generated task and stops its private provider/App Server.
+
+The A/B difference is therefore interface access, not conversation content. Condition A loads no Pointable Context companion. Condition B loads the same qualified Quiet Context Reveal host against the same transcript and workspace. The experiment control must not cover the Chat Lane, imitate Agent messages, or supply extra facts. Pre-scripted history is excluded from `chat_turns_to_fact`; only participant-created user Turns after `trial_shown` count.
+
+The current technical evidence establishes both the earlier two-exchange Desktop visibility probe and the v2.20 default-runner integration. A real App Server/custom-provider probe completed one persistent turn with one loopback request and exact task deletion; automated tests cover six-trial checkpoints, A/B condition isolation, exact-task activation, timeout cleanup, and the lightweight terminal path. The answer control passed a current-build formative walkthrough. None of this establishes end-to-end study readiness or a human-efficiency effect. The full-overlay native trial renderer is retained only for component qualification, training, and failure diagnosis.
 
 ## 4. Scenarios and correct-answer units
 
@@ -97,6 +123,7 @@ The system may record timings and interaction counts only in an explicit, local 
 - Start time: the task question and relevant transcript are both visible.
 - End time: the participant submits a final answer, not when they click a card.
 - Chat Turn: one new user message submitted to Codex after task start.
+- Pre-scripted Turn: a frozen user/assistant exchange created before `trial_shown`; it is part of the controlled stimulus and never counts as participant Chat effort.
 - Lane leave: focus or navigation moves to a file, browser, terminal, Dashboard, or another task for the purpose of answering.
 - Wrong entity: any opened card/file does not match the answer-key identity.
 
@@ -109,7 +136,7 @@ Record aborted and timed-out tasks. Do not silently discard errors, stale result
 - The directional product target is at least 30% lower median exact-lookup time with no material accuracy loss. Treat this as a target, not a statistical conclusion.
 - Define the formal sample size only after a non-inferential usability pilot estimates variance. A pilot of roughly 8–12 participants may find workflow defects but must not be used to claim significance.
 
-One formative owner walkthrough on 2026-08-19 preferred P-C and judged P-A and P-B similarly. Use that observation only to set the current product default to `mental-model`; it is not a usability result, an efficiency effect, or a substitute for the counterbalanced presentation pilot. Keep P-A and P-B available as fixed study baselines.
+One formative owner walkthrough on 2026-08-19 preferred P-C and judged P-A and P-B similarly. A 2026-08-20 roadmap decision therefore fixed `mental-model` as the product default and deferred the three-way comparison. This is not a usability result or an efficiency effect. Keep P-A and P-B only as dormant study baselines.
 
 - Separate exact point lookup from open-ended explanation in every chart and conclusion.
 
@@ -126,3 +153,19 @@ The benchmark creates an isolated temporary Git workspace, measures document/mod
 The PRD target for local exact detail is median below 500 ms on the qualified machine. A result above that threshold is a technical performance warning, not a user-study result.
 
 The first recorded qualified-machine snapshot is [evaluation-baseline-2026-08-18.json](evaluation-baseline-2026-08-18.json). It predates revision v2 and used a non-Git temporary workspace, so its 1.74 ms unchanged revision figure must not be used as a Git-v2 latency claim. The first Git-v2 snapshot is [evaluation-baseline-2026-08-19-revision-v2.json](evaluation-baseline-2026-08-19-revision-v2.json): unchanged revision median/p95 were 81.23/94.55 ms, changed detection was 93.47 ms, and explicit refresh was 195.99 ms. All component values remain machine-local and do not establish a human-efficiency effect.
+
+## 9. Long-horizon validation when product coverage is ready
+
+The eventual efficiency study should target the product's actual problem rather than immediate recall in a short scripted task. Candidate tasks should include:
+
+1. delayed return to a task after at least one intervening work session;
+2. resuming a project after files, modules, decisions, tasks, and verification state have changed;
+3. handing an Agent-developed task to a person who did not observe every preceding Chat Turn;
+4. locating a concept introduced earlier but needed for a current decision;
+5. detecting that a previously opened object is stale, updated, deleted, or no longer authoritative.
+
+The primary measure becomes `time_to_reconstruct_actionable_context`: from the resumption/handoff question becoming visible until the participant submits the correct current interpretation or next action. Continue to record fact accuracy, Chat Turns, lane leaves, wrong entities, stale decisions, card sufficiency, and workload. Add `delay_since_last_exposure`, `intervening_changes`, `handoff_role`, and `context_reconstruction_units`, but never log ordinary Chat content or raw project files.
+
+Do not start this study until object coverage, revision semantics, Codex Desktop compatibility, and the opt-in record-production policy are stable enough that missing infrastructure is not mistaken for a presentation failure.
+
+A 24–72 hour interruption is useful for ecological validity but is not mandatory for every first-phase trial. A single dense scripted Agent run can already test reconstruction after information accumulation, provided the participant must recover current state rather than recall the immediately preceding sentence. Use both strata later: `dense_same_session` for lower-cost controlled iteration and `delayed_return` for the stronger long-horizon claim; analyze them separately.

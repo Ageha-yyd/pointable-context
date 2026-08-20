@@ -1,6 +1,6 @@
 {
   "name": "pointable-context",
-  "version": "0.1.0+codex.20260819140827",
+  "version": "0.1.0+codex.20260820103649",
   "description": "Selection-triggered, zero-turn development context reveal in the native Codex Chat Lane.",
   "author": {
     "name": "Local developer"
@@ -15,7 +15,7 @@
   "interface": {
     "displayName": "Pointable Context",
     "shortDescription": "Select a reference and reveal verified context in place.",
-    "longDescription": "Keep the Codex Chat Lane quiet until the user selects a stable file, module, decision, test, configuration, or explicitly authored context reference. A trusted explicit action reveals bounded, type-specific detail beside the selection without opening a browser, calling a model, or creating another chat turn. Explicit concept, change, decision, task, and verification artifacts project compact mental models with evidence kept behind a local disclosure. Opt-in Agent record maintenance runs only at stable milestones and is gated by a read-only structure, identity, time, and exact-evidence check. Open workspace cards pin their snapshot, signal detected file revision drift, and refresh in place only after another trusted action. Test source never implies PASS/FAIL, task completion and verification results are never inferred, ordinary prose is never semantically mined, configuration values stay hidden, and browser clients plus DCPM/CWA are not product dependencies.",
+    "longDescription": "Keep the Codex Chat Lane quiet until the user selects a stable file, module, decision, test, configuration, or explicitly authored context reference. A trusted explicit action reveals bounded, type-specific detail beside the selection without opening a browser, calling a model, or creating another chat turn. The title bar can move an open card within the viewport so obscured Chat remains readable while body selection, disclosures, refresh, and close keep their normal behavior. Explicit concept, change, decision, task, and verification artifacts project compact mental models with evidence kept behind a local disclosure. Opt-in Agent milestone context maintenance runs only at stable milestones and is gated by read-only Artifact/Record Checks for structure, identity, time, non-circular exact evidence, and duplicate names. An optional explicit long-task declaration measures Module/Decision/Task/Verification coverage, omissions, projection failures, and record redundancy without mining Chat or exposing file content. Open workspace cards pin their snapshot, signal detected file revision drift, and refresh in place only after another trusted action; explicit refresh puts at most three deduplicated, type-prioritized changes before the full mental model while ordinary cards remain quiet. A per-build qualification record keeps automatic host gates separate from evidence-bound manual interaction checks and binds them to the exact Codex package plus renderer digest. Test source never implies PASS/FAIL, task completion and verification results are never inferred, ordinary prose is never semantically mined, configuration values stay hidden, and browser clients plus DCPM/CWA are not product dependencies.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
@@ -27,9 +27,12 @@
       "Start the fixture Quiet Mode so I can select ARCH-7 in this task.",
       "Check whether the Pointable Context selection companion is running.",
       "Check whether this Codex Desktop build passes the Pointable Context compatibility gate.",
+      "Inspect the exact Codex Desktop build qualification record without treating automatic gates as manual acceptance.",
       "Record the current stable task status for Pointable Context with exact workspace evidence.",
       "Record this observed verification result for Pointable Context, including its remaining gap.",
-      "Maintain Pointable Context Task and Verification records for this bounded long task at stable milestones.",
+      "Record this stable concept, change, or decision for Pointable Context with exact workspace evidence.",
+      "Maintain sparse Pointable Context milestone artifacts for this bounded long task.",
+      "Audit declared Pointable Context coverage for this bounded long task without reading Chat history.",
       "Validate the frozen Pointable Context study pack before a pilot session.",
       "Use the optional capsule renderer only as an explicit fixture diagnostic."
     ]

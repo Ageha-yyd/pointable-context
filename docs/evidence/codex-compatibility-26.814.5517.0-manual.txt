@@ -1,0 +1,10 @@
+selection_inert=PASS 2026-08-20T14:26:56+08:00 user confirmed selecting exact pilot and waiting exposed only the quiet action; detail did not open automatically.
+trusted_click=PASS 2026-08-20T14:26:56+08:00 user confirmed the explicit Pointable Context action opened the deterministic pilot detail without another Chat turn.
+anchored_card=PASS 2026-08-20T14:26:56+08:00 user confirmed the native detail appeared beside the selected Chat reference and did not open a browser.
+progressive_disclosure=PASS 2026-08-20T14:26:56+08:00 user confirmed summary-first display, 查看详情 expansion, and 收起详情 collapse in the same card.
+close_and_focus_restore=PASS 2026-08-20T14:26:56+08:00 user confirmed the close control removed the card without a Chat scroll jump after returning focus from the composer.
+composer_persistence=PASS 2026-08-20T14:26:56+08:00 user confirmed focusing and temporarily typing in the current Chat composer kept the open card visible.
+scroll_and_virtualization=PASS 2026-08-20T14:30:13+08:00 user confirmed scrolling the selected message out of view caused safe card repositioning or cleanup, left no orphan surface, and permitted a fresh reveal after returning.
+navigation_recovery=PASS 2026-08-20T14:30:13+08:00 user confirmed switching to another Codex task cleaned the old card and returning restored one action and one current card without stale or duplicate UI.
+refresh_continuity=PASS 2026-08-20T14:34:17+08:00 user confirmed a second real file revision produced 内容已更新 and trusted refresh reused the open card while preserving its moved position, internal scroll, expanded detail state, and zero Chat turns.
+stale_response_cleanup=PASS 2026-08-20T14:37:59+08:00 user confirmed a controlled three-second stale-alpha response was discarded after selecting stale-beta; no old detail card mounted and the new selection did not auto-open detail.

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "DECISION-1",
+  "exchanges": [
+    { "user": "来源文件一变化，就让打开的上下文卡同步更新。", "assistant": "第一版 watcher 会立即替换可见内容，但读者正在看的段落会跳动，决策所对应的证据版本也变得不清楚。" },
+    { "user": "那是否应该让卡片打开后永远冻结？", "assistant": "也不合适。永久冻结会隐藏 revision drift，让读者误以为旧内容仍然是当前状态。" },
+    { "user": "我们需要既保持阅读连续，又不隐藏变化。", "assistant": "接受的策略是 explicit refresh：固定打开 snapshot，后台检测 drift，只显示轻量的内容变化信号。" },
+    { "user": "什么时候允许替换可见内容？", "assistant": "只有用户执行可信 Refresh 后，系统才重新读取 authority，并在同一 Chat Lane 位置更新卡片。" },
+    { "user": "刷新后应该展示多少变化？", "assistant": "先显示最多三项去重且按类型优先的变化，然后保留完整心智模型；后台检测本身不能静默改写内容。" }
+  ],
+  "referencedEntityIds": ["DECISION:EXPLICIT-REFRESH"]
+}

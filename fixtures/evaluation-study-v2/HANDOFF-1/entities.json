@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "entities": [
+    {
+      "id": "GATE:HANDOFF",
+      "label": "handoff gate",
+      "type": "gate",
+      "meaning": "The evidence checkpoint between completed implementation and an accepted handoff.",
+      "whyNow": "Implementation is present, but the current task still lacks the two required environment observations.",
+      "flow": ["schema and serializer complete", "handoff evidence gate", "reviewable handoff"],
+      "boundary": "A unit test alone cannot establish the Windows run or clean-workspace readback.",
+      "evidence": "workspace/PROJECT_STATE.md:7"
+    }
+  ]
+}

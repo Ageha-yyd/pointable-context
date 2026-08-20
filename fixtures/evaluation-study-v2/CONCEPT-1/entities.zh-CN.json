@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "entities": [{
+    "id": "CONCEPT:AUTHORITY-FENCE",
+    "label": "authority fence",
+    "type": "concept",
+    "meaning": "通过重复身份与修订校验，阻止异步结果跨越交互上下文。",
+    "whyNow": "导航期间的 in-flight read 曾把前一个任务的结果带到当前卡片。",
+    "flow": ["绑定交互", "读取来源", "展示前重新验证"],
+    "boundary": "它不证明已验证来源之外的主张，也不把 stale 事实升级为 current。",
+    "evidence": "workspace/PROJECT_STATE.md:7"
+  }]
+}

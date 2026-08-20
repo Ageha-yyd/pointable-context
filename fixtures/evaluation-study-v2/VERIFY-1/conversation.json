@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "VERIFY-1",
+  "exchanges": [
+    {
+      "user": "Add coverage for silent refresh rejection, explicit refresh acceptance, and preservation of the stale warning.",
+      "assistant": "I added those three cases to context-policy.test.ts. Their source definitions now express the intended behaviors."
+    },
+    {
+      "user": "Was that exact file executed after its last edit?",
+      "assistant": "The retained evidence does not show such a run. The latest test definitions are newer than the last execution record we can bind to them."
+    },
+    {
+      "user": "The package build succeeded afterward. Can the handoff report mark all three cases PASS?",
+      "assistant": "Not from the build alone. The retained evidence does not show that context-policy.test.ts ran after its last edit, so execution is not bound to the current revision."
+    },
+    {
+      "user": "What can we safely extract from the test source right now?",
+      "assistant": "We can report the three intended behaviors as static definitions. We must keep execution status unverified until the exact test is observed on the current revision."
+    },
+    {
+      "user": "What status is defensible until we run that exact file?",
+      "assistant": "Use a definition-only check: report what the test source defines, while keeping PASS or FAIL unverified. Source presence and a successful package build are not observed execution evidence."
+    }
+  ],
+  "referencedEntityIds": [
+    "VERIFICATION:DEFINITION-ONLY"
+  ]
+}

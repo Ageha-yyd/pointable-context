@@ -47,6 +47,7 @@ export interface ContextRecordCheckResult {
   valid: boolean;
   workspaceRoot?: string;
   checkedAt: string;
+  candidateCount: number;
   records: readonly CheckedContextRecord[];
   issues: readonly ContextRecordIssue[];
 }
@@ -186,6 +187,7 @@ export async function checkContextRecords(
       schemaVersion: 1 as const,
       valid: false,
       checkedAt,
+      candidateCount: 0,
       records: Object.freeze([]),
       issues: Object.freeze([{ code: "workspace_unavailable" as const }]),
     });
@@ -251,6 +253,7 @@ export async function checkContextRecords(
     valid: issues.length === 0 && !options.signal?.aborted,
     workspaceRoot: root,
     checkedAt,
+    candidateCount: candidates.length,
     records: Object.freeze(records),
     issues: Object.freeze(issues),
   });

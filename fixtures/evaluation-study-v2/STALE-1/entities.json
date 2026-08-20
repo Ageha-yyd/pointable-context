@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "entities": [
+    {
+      "id": "STATE:OBSERVED-SNAPSHOT",
+      "label": "observed snapshot",
+      "type": "state",
+      "meaning": "A revision-bound statement of what the authoritative source reported at an earlier observation time.",
+      "whyNow": "A later compatibility failure changed the current task state after the completed snapshot was recorded.",
+      "flow": ["completed observed", "later failure reopens item", "refresh current source"],
+      "boundary": "Historical accuracy does not make the snapshot a current completion verdict.",
+      "evidence": "workspace/PROJECT_STATE.md:7"
+    }
+  ]
+}

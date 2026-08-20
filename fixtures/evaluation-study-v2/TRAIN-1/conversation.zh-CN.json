@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "TRAIN-1",
+  "exchanges": [
+    { "user": "研究包已经下载完成，可以直接打开练习任务吗？", "assistant": "还不可以。当前日志显示工作区在校验和验证之前就被打开，这会让受控实验使用未确认的材料。" },
+    { "user": "我已经把校验和检查移动到工作区启动之前。还缺什么？", "assistant": "还要确认 Codex Desktop 版本、原生 Chat Lane 和本地 loopback Host 都符合本次发布声明。" },
+    { "user": "把这些检查统一放在哪里比较合适？", "assistant": "使用 orientation gate：发布包摘要和 Host 资格都通过后，才允许进入训练任务；任一不匹配都应 fail closed。" },
+    { "user": "通过 orientation gate 是否意味着参与者理解了后续任务？", "assistant": "不意味着。它只建立环境兼容性，不能证明理解、正确率或产品效率。" },
+    { "user": "那通过之后的具体下一步是什么？", "assistant": "进入一次不计分练习：选中 orientation gate，查看卡片并提交训练答案，然后在 STUDY READY 停止。" }
+  ],
+  "referencedEntityIds": ["CONCEPT:ORIENTATION-GATE"]
+}

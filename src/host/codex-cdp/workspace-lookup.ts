@@ -295,16 +295,66 @@ function detailChanges(
 ): PointableChangeView[] {
   const previous = new Map(before.facts.map((fact) => [fact.label, fact.value]));
   const changes: PointableChangeView[] = [];
-  if (before.summary !== after.summary) {
-    changes.push({ label: "摘要", before: before.summary, after: after.summary });
+  const seenValues = new Set<string>();
+  const add = (label: string, oldValue: string, newValue: string): void => {
+    const boundedOld = truncate(oldValue, 1_024);
+    const boundedNew = truncate(newValue, 1_024);
+    if (boundedOld === boundedNew || changes.length >= 3) return;
+    const identity = `${boundedOld}\u0000${boundedNew}`;
+    if (seenValues.has(identity)) return;
+    seenValues.add(identity);
+    changes.push({ label: truncate(label, 128), before: boundedOld, after: boundedNew });
+  };
+  const beforeModel = before.comprehension;
+  const afterModel = after.comprehension;
+  if (beforeModel !== undefined && afterModel !== undefined && beforeModel.kind === afterModel.kind) {
+    if (beforeModel.kind === "concept" && afterModel.kind === "concept") {
+      add("当前语境", beforeModel.context, afterModel.context);
+      add(
+        "所处流程",
+        beforeModel.sequence.map((step, index) =>
+          index === beforeModel.currentStep ? `当前：${step}` : step).join(" → "),
+        afterModel.sequence.map((step, index) =>
+          index === afterModel.currentStep ? `当前：${step}` : step).join(" → "),
+      );
+      add("边界", beforeModel.boundary, afterModel.boundary);
+      add("定义", beforeModel.meaning, afterModel.meaning);
+    } else if (beforeModel.kind === "change" && afterModel.kind === "change") {
+      add("现在", beforeModel.after, afterModel.after);
+      add("影响", beforeModel.impact, afterModel.impact);
+      add("原来", beforeModel.before, afterModel.before);
+    } else if (beforeModel.kind === "decision" && afterModel.kind === "decision") {
+      add("选择", beforeModel.choice, afterModel.choice);
+      add("结果与代价", beforeModel.consequence, afterModel.consequence);
+      add("要解决的问题", beforeModel.problem, afterModel.problem);
+    } else if (beforeModel.kind === "task" && afterModel.kind === "task") {
+      add("当前状态", beforeModel.status, afterModel.status);
+      add("下一步", beforeModel.next, afterModel.next);
+      add("阻塞", beforeModel.blocker, afterModel.blocker);
+      add("已经完成", beforeModel.completed, afterModel.completed);
+      add("目标", beforeModel.goal, afterModel.goal);
+      add("更新时间", beforeModel.updatedAt, afterModel.updatedAt);
+    } else if (beforeModel.kind === "verification" && afterModel.kind === "verification") {
+      add("验证结果", beforeModel.result, afterModel.result);
+      add("仍未证明", beforeModel.gap, afterModel.gap);
+      add("要证明什么", beforeModel.claim, afterModel.claim);
+      add("执行时间", beforeModel.executedAt, afterModel.executedAt);
+    }
+  }
+  if (beforeModel === undefined && afterModel === undefined) {
+    add("摘要", before.summary, after.summary);
   }
   for (const fact of after.facts) {
     const oldValue = previous.get(fact.label);
-    if (oldValue !== undefined && oldValue !== fact.value) {
-      changes.push({ label: fact.label, before: oldValue, after: fact.value });
-    }
+    add(fact.label, oldValue ?? "（原先未显示）", fact.value);
     if (changes.length >= 3) break;
   }
+  const currentLabels = new Set(after.facts.map((fact) => fact.label));
+  for (const fact of before.facts) {
+    if (!currentLabels.has(fact.label)) add(fact.label, fact.value, "（已移除）");
+    if (changes.length >= 3) break;
+  }
+  if (changes.length === 0) add("摘要", before.summary, after.summary);
   return changes.slice(0, 3);
 }
 

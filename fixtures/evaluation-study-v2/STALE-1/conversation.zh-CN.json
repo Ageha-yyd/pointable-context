@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "STALE-1",
+  "exchanges": [
+    { "user": "记录 09:10 运行后的 migration 状态。", "assistant": "09:10 的来源报告 completed，我已把状态与 observation time 和 source revision 一起记录。" },
+    { "user": "11:40 的 compatibility job 失败并重新打开一个事项。", "assistant": "当前来源现在是未完成状态；它没有抹掉 09:10 的观察，只是使旧结论不再适合当前判断。" },
+    { "user": "为什么早期 completed 仍然出现在对话里？", "assistant": "那是一条 observed snapshot，作为历史对其原修订仍然准确；问题只会在把它误当成当前状态时发生。" },
+    { "user": "两个状态不同，是否说明来源冲突？", "assistant": "不一定。它们绑定到不同时间与修订，11:40 的后续变化可以解释差异。" },
+    { "user": "现在要判断是否完成，应该怎么做？", "assistant": "保留旧记录作为历史，但先刷新较新的来源再决定。旧 completed 已标记 stale，不能直接成为当前 verdict。" }
+  ],
+  "referencedEntityIds": ["STATE:OBSERVED-SNAPSHOT"]
+}

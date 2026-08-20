@@ -1,8 +1,8 @@
 # PRD：Quiet Context Reveal（选区式上下文速览）
 
-- 版本：v2.7
-- 状态：Quiet Reveal 主链与记录产出门禁已冻结；12-slot counterbalanced study pack v1、答案键、隔离 workspace 与只读完整性检查已完成，但尚未运行参与者 pilot
-- 日期：2026-08-19
+- 版本：v2.20
+- 状态：P-C 微型心智模型已选为产品默认；短任务 pilot 暂缓；精确 `OpenAI.Codex 26.814.5517.0`、executable `151.0.7922.137` 与 v2.14 renderer 已完成自动 4/4 和人工 10/10 evidence-bound 资格。TRAIN-1 与六个 measured scenario 已冻结为三轮原生 user/assistant script；默认六轮 runner 已接入私有 loopback scripted runtime、持久原生任务、轻量答题控件、条件 B companion、checkpoint 与结果管线。轻量答题控件已通过当前 build 的形成性人工验收；真实 A/B 各一次端到端、干净 Windows ZIP 和研究治理仍未完成，参与者数据收集继续关闭
+- 日期：2026-08-20
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
 - 首个场景：长时程软件开发任务
@@ -193,6 +193,9 @@ P0 不提供“识别更多概念”、自然语言语义扩展、LLM 候选生�
 ### 7.4 关闭与恢复
 
 - 明确、可操作的关闭按钮；
+- 卡片标题栏是唯一拖动热区；正文仍可选择，按钮仍可点击，拖动只能由可信主指针动作启动；
+- 拖动位置限制在当前可视区域内；窗口尺寸、视觉视口或卡片高度变化时自动夹回可用范围；
+- 后台 revision 提示与显式刷新复用同一卡片 DOM，并保留用户移动后的位置；新选区或关闭后不继承旧位置；
 - Escape 与普通外点关闭；
 - 详情卡打开时，点击当前 Chat composer 的 `textarea`、`input`、`contenteditable` 或 `role=textbox` 不属于外点关闭：输入框获得焦点，卡片继续作为回复时的阅读参照，后台 revision 检查不中断；
 - 仅入口尚未打开详情时，点击 composer 仍按普通外点清理入口；
@@ -282,6 +285,9 @@ v2.2 把首个 stat-only 切片扩展为可验证、仍然轻量的动态上下�
 - 后台不执行完整 Provider 投影，不读取引用文件内容，不建立语义依赖图；Git 子进程各自限制为 750ms/256KiB，可信 Git 根探针失败时返回 unavailable；
 - revision 未变时仅续期，不改变卡片；变化时只显示 `内容已更新`；
 - 用户可信点击 `刷新内容` 后才重新执行完整 Provider 读取，并在同一卡片显示最多 3 项 `before → after` 差异；
+- 显式刷新后的差异放在卡片首层、P-C 心智模型之前；普通未刷新卡片仍保持 Quiet，不预留常驻变化区；
+- 差异不是按底层字段顺序堆叠，而是按对象的理解任务排序：Task 优先“当前状态、下一步、阻塞”，Verification 优先“验证结果、仍未证明、要证明什么”，Decision 优先“选择、结果与代价、要解决的问题”，Concept/Change 同理优先当前语境或当前影响；
+- 同一 `before → after` 只出现一次；新增/移除字段明确标为“原先未显示”或“已移除”，每个 label/value 继续受协议长度上限约束；
 - 删除或探针不可用时保留旧卡并明确警告；过期、重新绑定、上下文漂移和容量耗尽均 fail closed；
 - 引用指纹只证明字面引用成员集合变化；它不证明运行时调用关系，也不对成员集合未变化时的任意语义影响作推断。
 
@@ -332,20 +338,33 @@ Agent 工作结果采用文件式、按需索引的最小制品合同，不引�
 - 证据漂移、必填字段缺失、时间格式无效或路径越界时 fail closed；
 - 这一步只让 Agent 已经明确知道的稳定结果进入轻量 Context Index，不要求每个 Chat Turn 或每个文件变化都生成记录。
 
-### 8.10 Agent Record Production Policy
+### 8.10 Agent Milestone Artifact Production Policy
 
-记录维护必须显式 opt-in，支持两种边界清楚的授权：一次性创建/更新指定记录，或用户明确要求在当前有界长任务内维护 Pointable Context 记录。后一授权在 task、workspace 或请求范围改变时自动结束，不能跨任务继承。
+里程碑制品维护必须显式 opt-in，支持两种边界清楚的授权：一次性创建/更新指定制品，或用户明确要求在当前有界长任务内维护 Pointable Context 上下文。后一授权在 task、workspace 或请求范围改变时自动结束，不能跨任务继承。
 
-只有同时满足以下四项才创建或更新记录：
+只有同时满足以下四项才创建或更新制品：
 
 1. 存在可被用户再次选取的稳定、可识别身份；
 2. 该信息预计在当前 Chat Turn 之后仍会被引用；
-3. 它改变下一决策、任务状态、交接状态，或记录一个实际发生的验证；
+3. 它形成稳定概念、实质变更、明确决策，改变任务/交接状态，或记录一个实际发生的验证；
 4. 当前 workspace 内存在一条可精确复验的有界证据行。
 
-合格里程碑包括用户可见制品、状态/Gate 变化、真实命令/审查/人工验收结果，以及交接或明确停止点。优先更新已有 identity；单个里程碑通常不新建超过一条 Task 和一条 Verification。中间推理、普通文件改动、计划中的测试、TODO、重复进度播报和可直接从源文件更快读取的静态事实不生成记录。
+合格里程碑包括当前工作明确建立的稳定 Concept、Change 或 Decision，用户可见制品、状态/Gate 变化、真实命令/审查/人工验收结果，以及交接或明确停止点。优先更新已有 identity；单个里程碑通常不新建超过一条解释性制品、一条 Task 和一条 Verification。中间推理、隐含概念/决策、普通文件改动、计划中的测试、TODO、重复进度播报和可直接从源文件更快读取的静态事实不生成制品。
 
-任何写入后必须运行只读 Record Check：只扫描两个冻结目录，验证结构、ISO 时间、exact evidence 与跨 Task/Verification 的文件 stem 唯一性。检查器不调用模型、不自动修复、不写文件；只有 `valid: true` 的集合才可视为可用索引输入。单用户人工验收已经证明两类卡片可打开且可理解其字段结构，但仍不证明信息获取时间或 Chat Turn 已下降。
+Concept/Change/Decision 必须使用冻结章节，文件 stem 与 H1 归一化身份一致，并引用受管上下文目录之外的一条 exact evidence；Task/Verification 继续使用冻结结构与时间字段。任何写入后必须运行适用的只读 Gate：`Artifact Check` 扫描前三类目录并拒绝额外章节、身份漂移、跨类型重名、循环/漂移证据；`Record Check` 扫描后两类目录并验证结构、ISO 时间、exact evidence 与跨类型 stem 唯一性。检查器不调用模型、不自动修复、不写文件；只有 `valid: true` 的集合才可视为可用索引输入。单用户人工验收只证明当前卡片字段可理解，仍不证明信息获取时间或 Chat Turn 已下降。
+
+### 8.11 Explicit Long-task Context Coverage
+
+结构覆盖不能通过扫描 Chat 或“猜哪些概念重要”获得。对已经 opt-in 的有界长任务，作者可维护严格的 `docs/context-coverage.json`，显式声明当前里程碑之后必须仍可恢复的 Module、Decision、Task 和 Verification。每项只包含稳定 `id`、类型 `kind` 与 workspace-relative `key`；声明本身不创建对象，也不改变 Provider authority。
+
+只读 Coverage Gate 逐项执行：Context Index exact key/type 匹配 → 当前 Local Workspace Provider detail read → Task/Verification Record Check。输出只包含身份、修订、新鲜度、issue code 和计数，不包含 raw selection、事实字段、文件内容或配置值：
+
+- `coverageRate = available / expected`；
+- `omissionRate = missing / expected`；
+- `projectionFailureRate = (type_mismatch + invalid + unavailable) / expected`；
+- `redundancyRate = duplicate Task/Verification record files / discovered record candidates`。
+
+这些指标只证明“显式声明的对象是否可恢复”，不能发现从未被声明的重要对象，也不证明真人信息获取效率。Coverage manifest 重名、越界、过大、结构无效或 Provider 不可读时 fail closed；工具不自动补写或修复记录。
 
 ## 9. P0 功能需求
 
@@ -391,7 +410,11 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 
 ### P0-11 Pinned snapshot and explicit refresh
 
-打开的卡片固定用户正在阅读的快照。后台仅做有界 revision 探测；变化后显示低干扰提示，只有可信 `刷新内容` 动作才能重读完整详情并在同一卡片投影最多 3 项差异。删除、不可用、过期或 binding 漂移必须保留旧快照或 fail closed，不能静默覆盖。
+打开的卡片固定用户正在阅读的快照。后台仅做有界 revision 探测；变化后显示低干扰提示，只有可信 `刷新内容` 动作才能重读完整详情并在同一卡片投影最多 3 项差异。显式刷新差异进入首层并按对象理解任务排序；普通未刷新卡片不显示该区域。删除、不可用、过期或 binding 漂移必须保留旧快照或 fail closed，不能静默覆盖。
+
+### P0-12 Declared long-task coverage gate
+
+对显式 opt-in 的长任务，系统提供只读结构覆盖审计，分开报告遗漏、类型/投影失败与记录冗余。该门禁不读取普通 Chat、不调用模型、不输出事实内容、不自动创建记录，并且不能把未声明对象计入“已覆盖”。
 
 ## 10. 明确非目标
 
@@ -434,6 +457,16 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 
 `unavailable/incompatible` 必须 fail closed，不绑定 workspace、不残留 action/card/binding，并保留有界诊断 code。该启动自检只能证明可安装性，不能替代每个 build 的真实 selection、trusted click、展开/收起、关闭、焦点、导航与虚拟化人工门禁。
 
+兼容性结论必须落到一个与宿主 build 和 renderer bundle digest 绑定的只读资格记录中，且自动与人工证据分栏：
+
+- 自动栏记录 `OpenAI.Codex` package/executable 版本、四层自检时间、状态、code 与 gates；
+- 人工栏固定为 selection inert、trusted click、锚定卡片、渐进披露、关闭/焦点恢复、composer 持续、滚动/虚拟化、导航恢复、stale response 清理与刷新连续性十项；
+- 每个 PASS/FAIL 人工项必须绑定 workspace 内 exact evidence line；未运行只能是 `pending`；
+- renderer bundle SHA-256、宿主 package 版本或证据行漂移时 fail closed；
+- 只有自动四层全 PASS 且十项人工门禁全部有证据地 PASS，才允许把该精确 build 标为 `qualified`；`manual_pending` 不能外推为兼容。
+
+当前 `OpenAI.Codex 26.814.5517.0`、executable `151.0.7922.137` 与 renderer digest `d00e4620…2855` 已完成自动 4/4 和人工 10/10 evidence-bound 门禁，可以标记为该精确组合 `qualified`。该结果不能写成其他 Codex build、其他 renderer digest 或公开稳定宿主合同已支持。
+
 ## 12. 成功指标与实验
 
 ### 12.1 对照条件
@@ -443,15 +476,17 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 
 两组使用相同项目状态和事实，B 不得获得额外信息。
 
-在上述正式效率对照之前，先做不带因果主张的呈现 pilot：
+P-A/P-B/P-C 曾被设计为不带因果主张的呈现比较：
 
 - P-A：当前记录式摘要 + 收起字段；
 - P-B：人类叙事摘要；
 - P-C：类型化微型心智模型 + 收起证据。
 
-三者必须使用同一对象、同一事实、同一 evidence 和同一原生 Chat Lane，仅改变 projection。首个 `pilot` 任务要求回答“是什么、为什么现在出现、不能证明什么、前后步骤”，并记录正确理解时间、四个答案单元、证据展开、Chat Turn、lane leave、错误对象和 card sufficiency。8–12 人只用于发现流程/表达缺陷和估计方差，不用于显著性声明。
+若未来恢复该比较，三者必须使用同一对象、同一事实、同一 evidence 和同一原生 Chat Lane，仅改变 projection。首个 `pilot` 任务要求回答“是什么、为什么现在出现、不能证明什么、前后步骤”，并记录正确理解时间、四个答案单元、证据展开、Chat Turn、lane leave、错误对象和 card sufficiency。8–12 人只用于发现流程/表达缺陷和估计方差，不用于显著性声明。
 
-2026-08-19 的一次产品负责人形成性走查认为 P-C 更好，P-A 与 P-B 体验接近。因此普通启动默认使用 P-C；P-A/P-B 仅保留为显式研究基线。该结果只代表当前设计偏好，不证明 P-C 更快、更准确或更能减少 Chat Turn，也不替代后续 counterbalanced pilot。
+2026-08-19 的一次产品负责人形成性走查认为 P-C 更好，P-A 与 P-B 体验接近。2026-08-20 的产品路线决策据此直接采用 P-C 作为产品默认，当前不再投入周期比较 P-A/P-B/P-C；P-A/P-B 只保留为未来研究基线。该选择是产品判断，不证明 P-C 更快、更准确或更能减少 Chat Turn。
+
+短任务效率对照同样暂缓。人在刚接触短任务时仍保有工作记忆，可能产生明显的 ceiling effect，无法代表 Pointable Context 面向的长时程、高信息密度和状态持续漂移问题。当前阶段先提升产品完整性，之后在真实长周期任务、延迟重返、跨会话恢复和任务交接中验证效果。
 
 ### 12.2 任务
 
@@ -486,9 +521,38 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 
 `docs/evaluation/study-v1` 已冻结但未运行。呈现 pilot 使用 12 个匿名 slot，把 `pilot` 按 P-A/P-B/P-C 各分配 4 人；每人只看一个固定 condition，避免同对象学习效应。效率 pilot 使用六行循环 Latin square 并在后六个 slot 反转 A/B phase：每位参与者完成六个不同任务，其中 A/B 各三项；跨 12 个 slot，每个 scenario 在每个序位出现两次、在 A/B 各出现六次。
 
+该 pack 从 2026-08-20 起作为冻结研究资产保留，不是当前产品开发门禁，也不立即招募参与者。未来若产品的数据合同、卡片结构或长任务研究问题发生实质变化，不得用旧 digest 收集新问题的数据；应复制为新版本、更新长周期任务后重新冻结。
+
 两条件共享同一 transcript、隔离 Git workspace、对象和 exact-evidence answer key。`prepare-evaluation-workspace.mjs` 只允许在产品仓库之外的新/空目录创建参与者 workspace；`mutate` 只接受带冻结 marker 的 workspace。每个 workspace 只供一名参与者使用。
 
 `study:validate` 在 session 前验证答案证据、日志隐私字段、scenario/condition/序位平衡，并生成 `packDigest`。所有 CSV 行必须绑定该 digest。验证器 PASS 只证明材料内部一致，不证明研究流程已获真人验收，更不证明效率提升。
+
+### 12.6 Controlled long-task study v2 measurement pipeline
+
+study-v2 使用六段冻结的长任务开发历史、无实时模型的 A/B 条件和 12-slot counterbalancing。原生 trial surface 只记录白名单事件和有界对象/答案 code；`monotonicMs` 是每个 trial 从 `trial_shown` 起算的相对时间，跨 trial 由全局 `sequence` 排序，不能由研究者手工秒表覆盖。
+
+严格结果管线从原生事件自动推导 `task_completion_ms`、答案正确性、首次正确对象时间、navigation 次数/时间、wrong object、card open/dwell 和 scripted follow-up；超时或退出固定写为 `NO_ANSWER`，不会伪造一个答案。六轮事件重新编号后进入同一个 session，结果先写入同目录临时区、完整校验 event/trial/assignment/scoring/privacy/integrity 一致性，再以 rename 原子发布。原始选区、Chat、文件内容、配置值、姓名、邮箱和绝对路径均不进入结果。
+
+该管线解决“客观指标如何自动、精确地记录”。六轮 runner 以 append-only、逐轮 digest checkpoint 保存有界 run；进程中断后只恢复已完整落盘的连续前缀，build、pack、participant、slot 或 session 漂移即拒绝。第一阶段完成六轮后返回 `awaiting_questionnaire`；第二阶段在当前 Codex Chat Lane 原位显示五项 1–7 量表，所有评分都选中后才允许提交。问卷不新增 Chat Turn、不调用模型、不接受自由文本，提交后从 checkpoint 原子生成结果；若六轮尚未完成，finalize 会在运行或显示问卷之前失败，不能借终结命令补跑试次。
+
+旧 runner 把 transcript、答案和控制器画在覆盖 Chat 的自定义 surface 中。它虽能验证事件、计时与结果管线，却不能代表真实 Agent 开发体验，因此从 v2.18 起只保留为 renderer 组件资格、培训与故障诊断工具，不再作为主效果实验。事件和结果管线可以复用，但 trial 的阅读表面必须替换。
+
+### 12.7 Native controlled conversation replay
+
+正式方向是在研究者提供的隔离 workspace 中，使用 Codex App Server 创建持久任务，并通过本机 loopback scripted Responses provider 逐轮产生固定回复。每个 scenario 由有界的多轮 user/assistant script、冻结项目状态、答案键和对象集合组成：
+
+1. 每条历史以普通 Codex Turn 物化，而不是 `thread/inject_items` 或覆盖网页；
+2. provider 同时保留 HTTP/SSE 与 Responses WebSocket 协议适配；默认 runner 使用独立的无认证 custom model provider 并关闭 WebSocket、plugins 与 apps，只消费预制回复，不保存原始 prompt，不访问线上模型；
+3. A/B 共享完全相同的原生消息、workspace 和答案，只有 B 加载 Quiet Context Reveal；
+4. 参与者始终在原生 Chat Lane 阅读、选择和打开卡片；实验控制只保留一个不遮挡阅读的有界答题/退出入口；
+5. 预制历史 Turn 不计入 `chat_turns_to_fact`，只有任务开始后参与者主动提交的新 user Turn 才计数；
+6. task 创建、每轮完成、Desktop 可见性和四个标准 selection surface 都必须分别验证，后端存在 Turn 不能替代桌面渲染证据。
+
+2026-08-20 的垂直探针已经用两轮固定脚本产生 2 个普通 user Turn 和 2 个普通 assistant reply；Desktop Chat Lane 四条消息均可见且分别落在标准可选 surface 中，provider 请求仅命中 loopback WebSocket，`liveOpenAIModelInvoked=false`。`thread/inject_items` 对照只进入模型历史而未进入可见 Turn，因此明确禁止作为主实验实现。该探针证明技术路径可行，不证明完整 session、答题编排、条件隔离、干净机部署或用户效率。
+
+v2.19 已把 TRAIN-1 和六个 measured scenario 分别冻结为三轮 `conversation.json`，并由同一个原生 task materializer 读取。pack validation 不只校验文件存在与 digest，还要求正确 answer code 仍在 transcript、正确 object 仍在 entity set、脚本引用完整且 Agent 输出含有可实际选取的 canonical label 或 ID；任一漂移均在创建任务前失败。低层 task materializer 仍故意返回 `answerControlMounted=false` 与 `quietContextCompanionMounted=false`，防止把“对话已物化”误报为“完整试次已接通”。
+
+v2.20 的默认 `runStudyV2NativeTrial` 在其上完成组合：独立 App Server 通过私有 loopback custom provider 创建三轮普通持久 Turn；只有当生成任务成为当前 Desktop task 后，才产生 `trial_shown` 并开始单调计时。A 仅挂载轻量答题/退出入口，B 在完全相同的 transcript、workspace 与答案键上额外挂载 Quiet Context Reveal。终态事件进入既有 checkpoint、问卷和原子结果管线；每轮结束只删除该 runner 创建的任务并关闭私有 runtime。创建任务、等待用户切换任务与清理的时间不计入参与者任务时间。自动回归和一次独立 App Server/loopback provider 探针已通过；它们不替代真实 A/B Desktop 端到端、干净机演练或人的效率结果。
 
 ## 13. P0 验收门禁
 
@@ -503,9 +567,15 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 - [ ] 打开、展开、关闭新增 Chat Turn 为 0；
 - [ ] revision 变化只出现卡内提示，可信刷新在原卡完成且新增 Chat Turn 为 0；
 - [ ] 刷新复用同一卡片 DOM，保持位置、滚动和 disclosure 状态，不出现视觉消失或跳回默认折叠；
+- [ ] 显式刷新差异位于 P-C 心智模型之前，并按对象类型优先呈现决定理解/行动的字段；普通卡片没有常驻差异区；
+- [ ] 同值差异不重复；新增、删除和值长度上限均有明确、可验证的投影语义；
 - [ ] 详情打开后聚焦当前 Chat composer 不关闭卡片，输入框获得焦点且 revision 检查继续；
 - [ ] 关闭按钮、Escape、普通外点和焦点恢复可用；
+- [ ] 可信标题栏拖动可移动卡片、正文和按钮不误触拖动、位置不越出视口，刷新后保持移动位置；
 - [ ] 普通复制、高亮、terminal、browser、diff 不误触。
+- [x] 当前宿主 package 版本、executable 版本与 renderer bundle digest 已写入兼容性记录；
+- [x] 自动四层状态与十项人工交互门禁分栏，pending/failed 不被表述为完整 build qualified；
+- [x] 每个手工 PASS/FAIL 均有 workspace 内 exact evidence line，版本或 bundle 漂移会使记录失配；
 
 ### 13.2 数据门禁
 
@@ -542,6 +612,14 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 - [ ] A/B 两条件使用相同 transcript、项目状态和事实答案键；
 - [ ] 呈现 pilot 的 P-A/P-B/P-C 使用同一对象、事实与证据，且条件内不可切换；
 - [ ] `pilot` 的四个理解单元分别计分，不以“打开卡片”代替理解完成；
+- [ ] trial 时间只来自原生 monotonic event；结果指标由事件推导并与 CSV 交叉校验，人工秒表不能覆盖；
+- [ ] 六轮结果先在临时目录完成 schema、assignment、scoring、privacy 与 integrity 校验，再原子发布；
+- [x] 受控固定回复可形成普通、持久的 Codex user/assistant Turn，Desktop 中可见且可选，同时只连接本机 loopback provider；
+- [x] TRAIN-1 与六个正式 scenario 已冻结为有界多轮脚本，并可由共享 materializer 形成普通原生 Turn；
+- [x] 六轮 session runner 的默认主路径已用原生 scripted task、轻量答题和条件 companion 替换覆盖 Chat 的旧 renderer；
+- [ ] A/B 在同一原生 transcript/workspace/answer key 上运行，B 只增加 Quiet Context Reveal；
+- [x] 轻量答题入口已在当前 build 完成人工形成性验收：展开不遮挡主要 Chat、收起后入口保留、重新展开选择答案后自动清理；
+- [ ] A/B 完整端到端中答题与退出入口不覆盖 Chat Lane，且不会把预制历史 Turn 计为参与者 Chat Turn；
 
 ## 14. 现有实现复用矩阵
 
@@ -557,12 +635,13 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 | `ui/message` / Ask Agent | 删除 | 不属于产品交互 |
 | 语义模型识别 | 删除 | 由 Codex 原生 Chat 能力覆盖 |
 | App Server 浏览器 client | 降级 | 协议研究 harness |
+| App Server + loopback scripted Responses | 主线研究基础 | 物化真实、固定、无线上模型的原生多轮 Codex 任务 |
 | DCPM/CWA | 可选参考 | 非产品主体和运行前提 |
 | Dashboard/workbench | 延后 | 比较、关系、批量与持续管理升级表面 |
 
 ## 15. 当前实现状态与缺口
 
-截至 2026-08-19，已有：
+截至 2026-08-20，已有：
 
 - 原生 Chat Lane 选区资格判断与锚定按钮；
 - selection inert、trusted click 查询、0/1/2–3/>3 路由；
@@ -583,17 +662,26 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 - 关闭、Escape、外点、导航清理与 stale-response 防护；
 - 现有 MCP App 胶囊零 `ui/message`、零浏览器导航。
 - 文件卡片的 pinned snapshot、stat/Git/字面关系/evidence-source revision v2 探测、`内容已更新` 提示、显式原位刷新和最多 3 项差异；
+- 显式刷新后的类型化差异优先级：Task/Verification/Decision/Concept/Change 分别先回答用户此刻最需要理解或行动的问题，且位于完整心智模型之前；
 - revision detail ref 的过期、task 重绑定、context 与容量 fail-closed 约束；
 - 无后台遥测的可重复技术延迟基准，以及 counterbalanced 人工 A/B 协议；
 - 冻结 study pack v1：P-A/P-B/P-C 与 A/B 两层分配、六类任务、exact-evidence answer key、隔离 Git workspace、revision mutation、隐私日志与 pack digest 校验；
+- 显式长任务 Context Coverage：严格声明 Module/Decision/Task/Verification，逐项复验 Index + Provider + Record Check，并分开输出 coverage/omission/projection-failure/redundancy；当前仓库首个四对象基线为 4/4 available。
+- 逐 build 兼容性资格记录与只读检查器：绑定 `OpenAI.Codex` package/executable 版本、renderer bundle digest、自动四层 gates 和十项 evidence-bound 人工门禁；renderer 变化后人工证据必须重做，不能沿用旧 digest；
+- study-v2 原生事件到严格结果的自动管线：trial-relative monotonic timing、冻结 scoring contract、客观指标推导、六轮 sequence 归一化、trial/event 交叉校验和临时目录原子发布；
+- study-v2 六轮 session orchestration：逐轮 digest checkpoint、连续前缀恢复、环境/pack/participant/slot/build 复验、`awaiting_questionnaire` 两阶段终结、未完成试次 fail-closed、原生 Chat Lane 五量表问卷和完成回执；
+- study-v2 原生受控会话主 runner：私有 loopback custom provider、普通持久 Codex Turn、精确当前-task 激活门禁、轻量答题、条件 B companion、逐轮 checkpoint、结果管线和精确 task/runtime 清理；
+- study-v2 原生场景材料：TRAIN-1 与六个 measured scenario 各三轮冻结对话，pack 对 answer code、correct object、完整引用与 Agent 输出中的 exact selectable term 做一致性门禁；共享 helper 已能将任一 measured scenario 物化为普通持久 Codex Turn；
 
 仍缺：
 
-- 让当前 workspace 文件之外的 Agent-known Module/Decision/Task 获得可靠 Provider；
+- 当前已能把稳定 Agent-known Concept/Change/Decision/Task/Verification 写成受门禁的 workspace 制品；仍缺不适合落盘的临时 Agent-known 对象 Provider；
 - 将显式 Verification 制品从文件式人工/Agent 记录扩展到可靠的测试运行事件接入；测试源码卡本身永远不能替代运行结果；
 - 在真实长任务中测量已冻结产出策略的覆盖率、冗余率与漏记率；
 - 证明不同 Codex Desktop 版本中的 Host Adapter 兼容性；
-- 完成受控效率研究。
+- 在真实长周期任务中完成延迟重返、跨会话恢复、状态漂移和交接场景的效果验证；短任务受控效率研究暂缓。
+- study-v2 原生 Chat Lane 问卷已通过当前 build 的有界形成性验收，包括未选满禁用、五项提交、无 Chat Turn、收起后可见重进入口、状态保留与最终清理；仍缺干净 Windows ZIP 演练与真实提交演练。当前两阶段 CLI 仅用于内部原型，不能替代研究治理门禁。
+- 旧 native trial renderer 仍保留作组件资格、培训与故障诊断，但默认试次已不再调用它；当前仍缺真实 A/B 各一次当前-build 端到端和干净 Windows ZIP 验收。
 
 ## 16. 推荐实施顺序
 
@@ -606,8 +694,15 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 7. 已完成 stat/Git/字面关系/evidence-source revision v2 的真实 Chat Lane 动态变化验收；
 8. 已完成轻量 Task/Verification 制品、Context Index 投影、自动回归和真实 Chat Lane 人工理解验收；
 9. 已冻结 opt-in Agent 产出策略和只读 Record Check，防止记录泛滥并确保写后可验证；
-10. 已冻结 counterbalanced study pack v1、答案键、12-slot 分配、隔离 workspace、mutation 与完整性检查；
-11. 下一阶段先做 facilitator dry run，再运行 8–12 人非推断性 presentation/efficiency pilot；pilot 关闭后才确定正式样本量。
+10. 已冻结 counterbalanced study pack v1、答案键、12-slot 分配、隔离 workspace、mutation 与完整性检查，并将其保留为非当前门禁的研究资产；
+11. 已完成首个显式长任务 Context Coverage 门禁：Module/Decision/Task/Verification 逐项验证、四类指标、隐私边界和当前仓库 4/4 基线；后续 dogfood 持续扩充真实期望对象；
+12. 已完成对象多轮修改后的 pinned snapshot、revision drift、同卡刷新、删除/不可用、任务重绑定，以及显式刷新差异的类型化优先级与首层投影；后续 dogfood 持续校准字段优先级；
+13. 已完成逐 build 兼容性证据入口、当前宿主/renderer 精确绑定、自动与人工门禁分栏及 fail-closed 检查；当前精确 `OpenAI.Codex 26.814.5517.0`、executable `151.0.7922.137` 与 v2.14 renderer digest `d00e4620…2855` 已通过自动 4/4、人工 10/10；
+14. 已完成 opt-in Agent 里程碑制品维护扩展：Concept/Change/Decision 与 Task/Verification 共用稀疏产出策略，前三类增加只读 Artifact Check；
+15. 开展长周期 dogfood，重点观察延迟重返、跨会话恢复、状态漂移和任务交接；当前显式 Coverage 随 Artifact Check 与首个原生理解验收扩展到七个期望对象；
+16. 已完成受控固定回复进入普通 Codex Turn 的技术垂直切片，并在 Desktop 验证四条消息可见、可选、零线上模型；
+17. 已把 TRAIN-1 与六个 measured scenario 冻结为三轮脚本，并完成答案/对象/可选词一致性门禁、私有 scripted runtime、原生 task 激活、轻量答题、B 条件 companion 与既有 checkpoint/result 管线接入；轻量答题控件的当前-build 人工形成性验收已通过；
+18. 完成 A/B 各一次当前-build 端到端和干净 Windows ZIP 演练；只有研究治理门禁也通过后，才运行效率实验，并据内部 pilot 方差决定正式样本量。
 
 ## 17. 已冻结决策
 
@@ -621,7 +716,7 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 8. 小项目按需索引，不预建复杂本体。
 9. 浏览器、DCPM/CWA 和完整工作台不是主线。
 10. 未完成用户研究前，只陈述假设和测量目标。
-11. 概念卡普通启动默认使用 P-C 微型心智模型；P-A/P-B 只作为显式研究基线，单用户偏好不得写成效率结论。
+11. 概念卡普通启动固定使用 P-C 微型心智模型；当前不运行 P-A/P-B/P-C 呈现比较，P-A/P-B 只作为未来研究基线，产品选择不得写成效率结论。
 12. P-C 首批只资格化显式 concept/change/decision 制品；普通 prose、任意 Git diff 和隐含决策均不做语义推断。
 13. 后台 revision v2 只散列有界 stat、Git 与字面关系信号；详情重读仍必须由可信刷新动作触发。
 14. 打开的卡片是回复时的临时阅读参照；聚焦当前 Chat composer 不关闭卡片，其他外点仍按 Quiet Reveal 规则清理。
@@ -629,9 +724,29 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 16. Agent 工作结果只有在稳定、结构完整且证据可复验时才进入 Task/Verification 索引；不从普通 Chat、测试源码或文件存在推断完成与 PASS/FAIL。
 17. Agent 记录维护默认关闭；一次性请求或当前有界任务的明确 opt-in 才能启用，且所有写入必须通过只读 Record Check。
 18. 研究数据只有在 frozen pack validation 通过且每行绑定同一 `packDigest` 时可纳入；材料校验和自动 Provider 回归不得冒充参与者结果。
+19. 短任务 presentation/efficiency pilot 不是当前开发门禁；效果验证优先放在真实长周期任务的延迟重返、跨会话恢复、状态漂移和交接场景。
+20. 动态刷新不复刻整张卡片；只在用户显式刷新后把最多三项、按对象理解任务排序的变化放在首层，普通阅读状态继续保持 Quiet。
+21. `qualified_current_runtime` 只是自动宿主合同结果；完整 build 资格必须再绑定精确宿主版本、renderer digest 与十项有证据的人工门禁，且不得从一个 build 外推到另一个 build。
+22. Agent 只在显式 opt-in 的稳定里程碑产出少量 Concept/Change/Decision/Task/Verification；Concept/Change/Decision 写后必须通过只读 Artifact Check，不能从普通 Chat 扫描或隐含推断。
+23. 详情卡允许用户通过标题栏临时移动位置以继续阅读被遮挡的 Chat；拖动不是新查询、不产生 Chat Turn，并且不得把正文、disclosure 或关闭按钮变成拖动热区。
+24. 受控实验必须把固定历史物化为普通 Codex Turn；`thread/inject_items` 和覆盖 Chat 的仿真 surface 均不能替代原生可见对话。旧 renderer 仅保留作组件资格、培训与诊断。
+25. 实验可使用本机 loopback scripted Responses provider 维持回复可控，但不得调用线上模型、记录原始 prompt 或把 provider 配置写入正式产品路径。
+26. 原生受控试次只有在 runner 创建的精确任务成为当前 Desktop task 后才开始计时；任务生成、用户切换与清理时间不计入参与者任务时间。每轮终止必须删除且只能删除本轮生成的任务，并关闭私有 provider/App Server。
 
 ## 18. 变更记录
 
+- v2.20：把原生 scripted task 接入默认单轮与六轮 session runner。每轮使用独立 loopback custom model provider 和 App Server 创建三轮普通持久 Turn，精确任务激活后才挂载轻量答题；A 不加载 companion，B 只增加 Quiet Context Reveal。终态进入既有 digest checkpoint、问卷与原子结果管线，结束时精确删除生成任务并关闭 runtime。当前 build 的轻量答题控件已通过“展开不遮挡、收起保留入口、重新展开答题后清理”的人工形成性验收；289/289 自动回归和独立 App Server/loopback provider 探针通过。真实 A/B 完整端到端、干净机与研究治理仍待完成，不构成人效结论。
+- v2.18：把 study-v2 主表面从覆盖 Chat 的仿真 trial 改为受控原生 Codex 多轮任务。实现本机 HTTP/SSE + Responses WebSocket scripted provider 和可复用 task materializer；两轮 live probe 在 Codex Desktop 中显示 2 条用户消息、2 条 Agent 回复及 4 个标准可选 surface，且只命中 loopback、未调用线上模型。对照证明 `thread/inject_items` 只有模型历史而没有可见 Turn。该结果只是原生重放技术资格，不代表完整 A/B runner、干净机部署或效率效果。
+- v2.17：完成当前精确 `OpenAI.Codex 26.814.5517.0`、executable `151.0.7922.137` 与 v2.14 renderer digest `d00e4620…2855` 的逐 build 资格。四层自动 gates 4/4、原生交互人工 gates 10/10 均绑定 exact evidence line 并通过只读检查器；study-v2 doctor 因而在当前开发机转为 ready。该结论不外推到其他宿主版本、其他 renderer、干净机可部署性或人的效率提升。
+- v2.16：把第二阶段评分从命令行参数改为 Codex Chat Lane 内的原生五量表问卷。五项全部选择后才允许提交；提交只经临时 Host binding 返回有界数字，不写入 Chat、不调用模型、不接受自由文本。真实形成性验收发现“稍后完成”缺少重进入口后，行为改为收起至“继续填写研究问卷”轻入口并保留已选状态；修复后的收起、恢复、提交、清理与零 Chat Turn 已在当前 build 通过。超时不发布结果，finalize 对不完整 session 仍在挂载问卷前 fail-closed。
+- v2.15：接通 study-v2 六轮可恢复 session、原生事件与严格结果管线。所有任务时间和交互指标从 trial-relative monotonic event 自动推导，冻结 scoring contract 决定正确答案/对象，超时和退出使用 `NO_ANSWER`；逐轮 digest checkpoint 只恢复连续完整前缀，六轮全局 sequence 归一化后先在临时目录交叉校验 event/trial/assignment/privacy/integrity，再原子发布。两阶段 CLI 在 `awaiting_questionnaire` 后只接受五个 1–7 数字；未完成六轮的 finalize 在运行试次或采集问卷前 fail-closed。该切片仍不授权参与者数据收集。
+- v2.14：根据原生形成性验收加入有界标题栏拖动。只有可信主指针按下标题栏才能启动；正文选择、按钮点击和关闭保持独立。位置被夹在视觉视口内，在同卡刷新时保留，关闭或新选区后清除；真实 Edge 连续三次覆盖拖动、composer 保持、revision 提示、同卡刷新与关闭，尚待当前 Codex build 人工复验。
+- v2.13：把已有 opt-in Task/Verification 记录维护扩展为五类稀疏里程碑制品；Agent 可在当前工作已明确建立稳定 Concept/Change/Decision 时写入冻结目录，但不得扫描普通 Chat 或推断隐含对象。新增只读 Artifact Check，验证严格章节顺序、文件/H1 身份、跨类型唯一性、非循环 exact evidence 与稳定文件读取；失败制品不进入可用索引。
+- v2.12：完成当前精确 `OpenAI.Codex 26.810.7004.0`、executable `151.0.7922.137` 与 renderer digest 的逐 build 资格；四层自动 gates 4/4、原生交互人工 gates 10/10 均以 exact evidence PASS。结论只覆盖该组合，不外推跨版本兼容。长任务 Coverage 同步声明新增的兼容性模块，产品进入延迟重返、跨会话恢复、状态漂移和交接 dogfood。
+- v2.11：新增逐 Codex Desktop build 的兼容性资格记录与只读检查器；记录精确 package/executable 版本和 renderer bundle SHA-256，把四层自动宿主自检与十项人工原生交互门禁分开。人工 PASS/FAIL 必须绑定 exact evidence line，pending、版本漂移、bundle 漂移或证据漂移均不能得到完整资格。当前 build 自动 PASS、人工 pending，尚不构成跨版本兼容性结论。
+- v2.10：把动态更新从“有限字段差异”收敛为类型化理解差异；显式刷新后，Task 优先状态/下一步/阻塞，Verification 优先结果/未证明/目标，Decision 优先选择/后果/问题，Concept/Change 优先当前语境或影响。差异置于 P-C 心智模型之前、去重并显式标记新增/删除；普通未刷新卡片仍不显示常驻变化区。该切片改善信息排序，但不构成人类效率证据。
+- v2.9：新增显式长任务 `docs/context-coverage.json` 与只读 Coverage Gate；只对作者声明的 Module/Decision/Task/Verification 逐项验证 Index、Provider detail 和 Record Check，分开计算 coverage、omission、projection failure 与 record redundancy，输出不含事实或文件内容。当前仓库首个真实基线为 4/4 available；该门禁不推断未声明的重要对象，也不构成效率证据。
+- v2.8：产品路线直接采用 P-C 微型心智模型，暂缓 P-A/P-B/P-C 呈现比较与短任务效率 pilot；冻结 study pack v1 继续保留但不作为当前门禁。下一阶段改为完善真实长周期开发任务的对象覆盖、动态 revision、原生兼容性与记录质量，之后在延迟重返、跨会话恢复、状态漂移和交接场景中重新冻结验证实验。
 - v2.7：冻结未运行的 study pack v1：呈现 pilot 采用 P-A/P-B/P-C 各 4 个匿名 slot，效率 pilot 采用六行循环 Latin square 与 A/B phase inversion；加入六类实际开发任务、exact-evidence answer key、隔离 Git workspace、确定性 revision mutation、隐私日志、slot assignment CLI 与 pack digest 校验。自动端到端仅证明材料/Provider 一致，仍不构成用户效率证据。
 - v2.6：记录 Task/Verification 原生卡片已通过当前场景人工验收；冻结一次性/有界任务两种 opt-in 授权、四项里程碑资格和已有 identity 更新策略；新增只读 Record Check，对结构、ISO 时间、exact evidence 与跨类型 stem 唯一性 fail closed。该验收与检查仍不构成用户效率证据。
 - v2.5：新增证据绑定的显式 Agent Work Result 合同；`docs/tasks/*.md` 投影目标/状态/进展/下一步/阻塞，`docs/verifications/*.md` 投影 Claim/Result/Gap 并保留方式、验证修订和执行时间；两者进入同一 Quiet Reveal 与 P-C 原生卡片，普通 Chat 和测试源码仍不得自动产生完成/PASS 结论。

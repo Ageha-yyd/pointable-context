@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "STALE-1",
+  "exchanges": [
+    {
+      "user": "Record the migration status after the 09:10 run.",
+      "assistant": "At 09:10 the source reported completed, so I recorded that status with its observation time and source revision."
+    },
+    {
+      "user": "At 11:40 the compatibility job failed and reopened one item. Why does the earlier completion still appear in the conversation?",
+      "assistant": "The earlier record remains historically accurate for its revision. It conflicts only if it is mistaken for the current task state; the newer source now carries the active status."
+    },
+    {
+      "user": "Do the two different statuses mean that both records are unreliable?",
+      "assistant": "No. Their observation times and revisions explain the change. The older one can remain valid history while being unsuitable for a current verdict."
+    },
+    {
+      "user": "Should we delete the old completion summary to avoid confusion?",
+      "assistant": "Keep it as traceable history, but mark its current-use boundary clearly and point to the newer revision for any present-state decision."
+    },
+    {
+      "user": "How should a reader use the old record when deciding whether the work is complete now?",
+      "assistant": "Treat it as an observed snapshot: useful history bound to 09:10, but stale for a current verdict. Refresh the newer source before deciding, and retain the old record only as historical evidence."
+    }
+  ],
+  "referencedEntityIds": [
+    "STATE:OBSERVED-SNAPSHOT"
+  ]
+}

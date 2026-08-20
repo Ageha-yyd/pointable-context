@@ -1,0 +1,22 @@
+2026-08-20 native scripted runner gate: the default single-trial and six-trial paths now use ordinary persistent Codex turns rather than the legacy full-overlay transcript. A private loopback custom model provider and dedicated App Server create the frozen three-turn history, the runner waits for the exact generated Desktop task before `trial_shown`, condition A mounts only the lightweight answer control, and condition B additionally mounts Quiet Context Reveal. Terminal events enter the existing append-only checkpoint and result pipeline; cleanup deletes only the generated task and stops the private runtime.
+
+Automated evidence:
+- `pnpm.cmd test` passed 289/289.
+- The runner integration tests cover three ordinary turns, exact-task activation, wrong-task rejection, B-only companion composition, terminal event recording, activation timeout, exact task deletion, private runtime shutdown, and all six checkpointed trials.
+- Provider tests cover the bounded local model catalog, HTTP/SSE, WebSocket compatibility, unsupported routes, and no prompt retention in request records.
+- Task tests cover current App Server completion notifications with or without `threadId`, exact turn identity, early-completion rejection, and bounded scripted material.
+
+Runtime evidence:
+- A real dedicated Codex App Server was configured with the private custom model provider on loopback.
+- One ordinary persistent scripted turn completed with exactly one provider request.
+- The generated task was deleted through `thread/delete`, and the provider/App Server were stopped.
+- The custom provider required no OpenAI authentication, invoked no live model, and disabled WebSocket prewarming, plugins, and apps for the isolated probe.
+
+Formative native answer-control evidence:
+- The product owner confirmed that expanding the lightweight control did not cover the primary Chat content.
+- Collapsing left a visible re-entry affordance.
+- Reopening and selecting an answer closed and cleaned the control.
+
+Boundary:
+- This evidence does not establish a completed A/B Desktop trial, clean-machine deployability, participant readiness, or improved human efficiency.
+- Participant data collection remains disabled until the remaining PRD research gates pass.

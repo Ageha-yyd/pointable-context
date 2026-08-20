@@ -1487,6 +1487,8 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   let cardElement;
   let revisionTimer;
   let holdCardPlacementUntil = 0;
+  let manualCardPlacement;
+  let dragState;
   let uninstalled = false;
   const activeObserver = new MutationObserver(() => {
     if (candidate !== void 0) scheduleReconcile();
@@ -1497,6 +1499,35 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     if (event.button === 0 && !ownedInteraction) {
       window.setTimeout(evaluateSelection, 0);
     }
+  };
+  const dragMoveHandler = (event) => {
+    const drag = dragState;
+    const shell = connectedOwnedElement("card");
+    if (!event.isTrusted || drag === void 0 || drag.pointerId !== event.pointerId || !(shell instanceof HTMLElement)) {
+      return;
+    }
+    const placement = clampCardPlacement(
+      drag.startLeft + event.clientX - drag.startClientX,
+      drag.startTop + event.clientY - drag.startClientY,
+      shell.offsetWidth || 380,
+      shell.offsetHeight || 320
+    );
+    manualCardPlacement = placement;
+    shell.style.left = `${placement.left}px`;
+    shell.style.top = `${placement.top}px`;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  const dragEndHandler = (event) => {
+    const drag = dragState;
+    if (!event.isTrusted || drag === void 0 || drag.pointerId !== event.pointerId) return;
+    drag.handle.style.cursor = "grab";
+    dragState = void 0;
+    if (drag.handle.hasPointerCapture(event.pointerId)) {
+      drag.handle.releasePointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+    event.stopPropagation();
   };
   const keyUpHandler = (event) => {
     if (event.key.startsWith("Arrow") || event.key === "Home" || event.key === "End") {
@@ -1528,6 +1559,9 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   };
   document.addEventListener("selectionchange", selectionHandler);
   document.addEventListener("pointerup", pointerUpHandler, true);
+  document.addEventListener("pointermove", dragMoveHandler, true);
+  document.addEventListener("pointerup", dragEndHandler, true);
+  document.addEventListener("pointercancel", dragEndHandler, true);
   document.addEventListener("keyup", keyUpHandler, true);
   document.addEventListener("keydown", keyDownHandler, true);
   window.addEventListener("scroll", viewportHandler, true);
@@ -1839,6 +1873,8 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     }
     const shell = existing2 ?? document.createElement("section");
     if (existing2 === null) {
+      manualCardPlacement = void 0;
+      dragState = void 0;
       shell.id = availableOwnedId(cardIdBase);
       shell.tabIndex = -1;
       shell.setAttribute("role", "dialog");
@@ -1871,8 +1907,13 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       justifyContent: "space-between",
       gap: "12px",
       padding: "10px 12px",
-      borderBottom: "1px solid #e2e8f0"
+      borderBottom: "1px solid #e2e8f0",
+      cursor: "grab",
+      userSelect: "none",
+      touchAction: "none"
     });
+    header.setAttribute("data-pointable-context-role", "drag-handle");
+    header.setAttribute("aria-label", "\u62D6\u52A8\u4E0A\u4E0B\u6587\u5361\u7247");
     const title = document.createElement("h2");
     title.id = `${shell.id}-title`;
     title.textContent = titleText;
@@ -1902,6 +1943,28 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       event.stopPropagation();
       window.getSelection()?.removeAllRanges();
       cleanup(true, true);
+    });
+    header.addEventListener("pointerdown", (event) => {
+      if (!event.isTrusted || event.button !== 0 || !(event.target instanceof Node) || close.contains(event.target)) {
+        return;
+      }
+      const rect = shell.getBoundingClientRect();
+      dragState = {
+        pointerId: event.pointerId,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        startLeft: rect.left,
+        startTop: rect.top,
+        handle: header
+      };
+      manualCardPlacement = { left: rect.left, top: rect.top };
+      try {
+        header.setPointerCapture(event.pointerId);
+      } catch {
+      }
+      header.style.cursor = "grabbing";
+      event.preventDefault();
+      event.stopPropagation();
     });
     header.append(title, close);
     const body = document.createElement("div");
@@ -2240,6 +2303,30 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     surface.append(evidenceDisclosure);
     body.append(surface);
   }
+  function mountRevisionChanges(body, changes) {
+    if (changes === void 0 || changes.length === 0) return;
+    const changeSummary = document.createElement("div");
+    changeSummary.setAttribute("data-pointable-context-role", "revision-changes");
+    Object.assign(changeSummary.style, {
+      marginTop: "8px",
+      padding: "8px 10px",
+      borderRadius: "8px",
+      background: "#eef4ff",
+      color: "#1746c7",
+      fontSize: "12px"
+    });
+    const heading = document.createElement("strong");
+    heading.textContent = "\u672C\u6B21\u5237\u65B0";
+    const list = document.createElement("ul");
+    Object.assign(list.style, { margin: "4px 0 0", paddingLeft: "18px" });
+    for (const change of changes) {
+      const item = document.createElement("li");
+      item.textContent = `${change.label}\uFF1A${change.before} \u2192 ${change.after}`;
+      list.append(item);
+    }
+    changeSummary.append(heading, list);
+    body.append(changeSummary);
+  }
   function mountDetail(detail, preserveUiState = false) {
     clearRevisionTimer();
     const previousCard = preserveUiState ? connectedOwnedElement("card") : null;
@@ -2247,34 +2334,12 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     const evidenceExpanded = previousCard?.querySelector('[data-pointable-context-role="evidence-toggle"]')?.getAttribute("aria-expanded") === "true";
     state = "detail";
     const { body } = createShell(detail.label, preserveUiState);
+    mountRevisionChanges(body, detail.changes);
     if (presentationMode === "mental-model" && detail.comprehension !== void 0) {
       mountComprehension(body, detail.comprehension, evidenceExpanded);
     } else {
       const summary = presentationMode === "record" ? detail.summary : detail.humanSummary ?? detail.summary;
       body.append(paragraph(summary));
-    }
-    if (detail.changes !== void 0 && detail.changes.length > 0) {
-      const changeSummary = document.createElement("div");
-      changeSummary.setAttribute("data-pointable-context-role", "revision-changes");
-      Object.assign(changeSummary.style, {
-        marginTop: "8px",
-        padding: "8px 10px",
-        borderRadius: "8px",
-        background: "#eef4ff",
-        color: "#1746c7",
-        fontSize: "12px"
-      });
-      const heading = document.createElement("strong");
-      heading.textContent = "\u672C\u6B21\u5237\u65B0";
-      const list = document.createElement("ul");
-      Object.assign(list.style, { margin: "4px 0 0", paddingLeft: "18px" });
-      for (const change of detail.changes) {
-        const item = document.createElement("li");
-        item.textContent = `${change.label}\uFF1A${change.before} \u2192 ${change.after}`;
-        list.append(item);
-      }
-      changeSummary.append(heading, list);
-      body.append(changeSummary);
     }
     const compactState = document.createElement("div");
     compactState.textContent = `${detail.entityType} \xB7 ${detail.freshness}`;
@@ -2521,6 +2586,18 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       const actionTarget = target.getAttribute("data-pointable-context-role") === "action";
       const width = target.offsetWidth || (actionTarget ? 150 : 380);
       const height = target.offsetHeight || (actionTarget ? 34 : 320);
+      if (!actionTarget && manualCardPlacement !== void 0) {
+        const placement = clampCardPlacement(
+          manualCardPlacement.left,
+          manualCardPlacement.top,
+          width,
+          height
+        );
+        manualCardPlacement = placement;
+        target.style.left = `${placement.left}px`;
+        target.style.top = `${placement.top}px`;
+        return;
+      }
       const minimumLeft = offsetLeft + inset;
       const maximumLeft = Math.max(minimumLeft, offsetLeft + viewportWidth - width - inset);
       const desiredLeft = rect.left + rect.width / 2 - width / 2;
@@ -2532,9 +2609,27 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       target.style.top = `${Math.min(Math.max(minimumTop, desiredTop), maximumTop)}px`;
     });
   }
+  function clampCardPlacement(desiredLeft, desiredTop, width, height) {
+    const viewport = window.visualViewport;
+    const offsetLeft = viewport?.offsetLeft ?? 0;
+    const offsetTop = viewport?.offsetTop ?? 0;
+    const viewportWidth = viewport?.width ?? window.innerWidth;
+    const viewportHeight = viewport?.height ?? window.innerHeight;
+    const inset = 12;
+    const minimumLeft = offsetLeft + inset;
+    const maximumLeft = Math.max(minimumLeft, offsetLeft + viewportWidth - width - inset);
+    const minimumTop = offsetTop + inset;
+    const maximumTop = Math.max(minimumTop, offsetTop + viewportHeight - height - inset);
+    return {
+      left: Math.min(Math.max(minimumLeft, desiredLeft), maximumLeft),
+      top: Math.min(Math.max(minimumTop, desiredTop), maximumTop)
+    };
+  }
   function cleanup(clearCandidate, restore) {
     clearRevisionTimer();
     holdCardPlacementUntil = 0;
+    manualCardPlacement = void 0;
+    dragState = void 0;
     removeOwned("action");
     removeOwned("card");
     resizeObserver?.disconnect();
@@ -2578,6 +2673,9 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     resizeObserver?.disconnect();
     document.removeEventListener("selectionchange", selectionHandler);
     document.removeEventListener("pointerup", pointerUpHandler, true);
+    document.removeEventListener("pointermove", dragMoveHandler, true);
+    document.removeEventListener("pointerup", dragEndHandler, true);
+    document.removeEventListener("pointercancel", dragEndHandler, true);
     document.removeEventListener("keyup", keyUpHandler, true);
     document.removeEventListener("keydown", keyDownHandler, true);
     window.removeEventListener("scroll", viewportHandler, true);

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "entities": [{
+    "id": "DECISION:EXPLICIT-REFRESH",
+    "label": "explicit refresh",
+    "type": "decision",
+    "meaning": "保持打开快照稳定并提示 drift，只在可信用户刷新后替换内容。",
+    "whyNow": "静默替换打断阅读，也模糊了用户决策依赖的证据版本。",
+    "flow": ["打开 snapshot", "检测 drift", "用户原位刷新"],
+    "boundary": "后台可以检测变化，但不得静默替换可见内容。",
+    "evidence": "workspace/PROJECT_STATE.md:7"
+  }]
+}

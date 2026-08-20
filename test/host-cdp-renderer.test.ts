@@ -194,6 +194,14 @@ test("install expression is namespaced, generic, click-gated, text-only, and cle
   assert.match(expression, /detailExpanded/u);
   assert.match(expression, /evidenceExpanded/u);
   assert.match(expression, /holdCardPlacementUntil/u);
+  assert.match(expression, /data-pointable-context-role", "drag-handle"/u);
+  assert.match(expression, /event\.isTrusted/u);
+  assert.match(expression, /addEventListener\("pointermove", dragMoveHandler, true\)/u);
+  assert.match(expression, /addEventListener\("pointerup", dragEndHandler, true\)/u);
+  assert.match(expression, /setPointerCapture/u);
+  assert.match(expression, /clampCardPlacement/u);
+  assert.match(expression, /manualCardPlacement/u);
+  assert.match(expression, /cursor = "grabbing"/u);
   assert.match(expression, /state === "resolving"/u);
   assert.match(expression, /detailBody\.hidden = !detailExpanded/u);
   assert.match(expression, /detailExpanded \? "block" : "none"/u);
@@ -206,6 +214,10 @@ test("install expression is namespaced, generic, click-gated, text-only, and cle
   assert.match(expression, /operation === "check"/u);
   assert.match(expression, /operation === "refresh"/u);
   assert.match(expression, /data-pointable-context-role", "revision-changes"/u);
+  assert.match(
+    expression,
+    /mountRevisionChanges\(body, detail\.changes\);\s+if \(presentationMode === "mental-model"/u,
+  );
   assert.match(expression, /data-pointable-context-role", "comprehension-model"/u);
   assert.match(expression, /data-pointable-context-role", "comprehension-flow"/u);
   assert.match(expression, /modelBlock\("comprehension-boundary"/u);

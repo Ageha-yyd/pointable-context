@@ -23,6 +23,10 @@ test("repository mental-model samples keep exact evidence references", async () 
       parse: extractContextConceptArtifact,
     },
     {
+      artifactPath: "docs/concepts/long-task-dogfood.md",
+      parse: extractContextConceptArtifact,
+    },
+    {
       artifactPath: "docs/changes/presentation-default.md",
       parse: extractContextChangeArtifact,
     },

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "entities": [
+    {
+      "id": "CONCEPT:AUTHORITY-FENCE",
+      "label": "authority fence",
+      "type": "concept",
+      "meaning": "A repeated identity and revision check that prevents an asynchronous result from crossing interaction context.",
+      "whyNow": "Navigation during an in-flight read previously allowed a prior task result to reach the current card.",
+      "flow": ["bind interaction", "read source", "revalidate before presentation"],
+      "boundary": "It neither proves claims outside the verified source nor upgrades stale facts to current.",
+      "evidence": "workspace/PROJECT_STATE.md:7"
+    }
+  ]
+}

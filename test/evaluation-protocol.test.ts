@@ -42,7 +42,7 @@ test("evaluation assets separate frozen pilot integrity from human efficiency cl
   assert.match(protocol, /must not be used to claim significance/u);
   assert.match(protocol, /P-A\/P-B\/P-C/u);
   assert.match(protocol, /preferred P-C and judged P-A and P-B similarly/u);
-  assert.match(protocol, /not a usability result, an efficiency effect/u);
+  assert.match(protocol, /not a usability result or an efficiency effect/u);
   assert.match(protocol, /frozen v1 presentation pilot is between-subject/u);
   assert.match(protocol, /each ordinal position twice and in each condition six times/u);
   assert.match(protocol, /changed pack digest blocks data collection/u);

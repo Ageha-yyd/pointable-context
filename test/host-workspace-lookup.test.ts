@@ -74,6 +74,40 @@ async function fixture(): Promise<{
   };
 }
 
+function longTaskRecord(
+  status: string,
+  next: string,
+  blocker: string,
+  updatedAt: string,
+): string {
+  return `# Long Task
+
+## 目标
+让用户在多轮变化后仍能恢复当前工作状态。
+
+## 当前状态
+${status}
+
+## 已完成
+显式任务记录已经进入原生卡片。
+
+## 下一步
+${next}
+
+## 阻塞
+${blocker}
+
+## 更新时间
+${updatedAt}
+
+## 证据
+> EVIDENCE: long-task state
+
+## 来源
+evidence/state.txt:1
+`;
+}
+
 test("workspace lookup returns current detail only after explicit task binding", async () => {
   const item = await fixture();
   try {
@@ -163,6 +197,61 @@ test("workspace detail detects revision drift and refreshes in place with a fini
     }));
     assert.equal(deleted.kind, "revision");
     if (deleted.kind === "revision") assert.equal(deleted.revision.state, "deleted");
+  } finally {
+    await rm(item.root, { recursive: true, force: true });
+  }
+});
+
+test("task refresh prioritizes status, next action, and blocker without duplicate summary noise", async () => {
+  const item = await fixture();
+  try {
+    await mkdir(join(item.workspace, "docs", "tasks"), { recursive: true });
+    await mkdir(join(item.workspace, "evidence"), { recursive: true });
+    const path = join(item.workspace, "docs", "tasks", "long-task.md");
+    await writeFile(join(item.workspace, "evidence", "state.txt"), "EVIDENCE: long-task state\n", "utf8");
+    await writeFile(
+      path,
+      longTaskRecord("索引覆盖已经接通。", "实现动态变化排序。", "无。", "2026-08-20T01:00:00+08:00"),
+      "utf8",
+    );
+    const activeTask = task();
+    await item.registry.bind(activeTask, item.workspace);
+    const callback = createWorkspaceLookupCallback({ registry: item.registry });
+    const initial = await invoke(callback, request(activeTask, "long-task"));
+    assert.equal(initial.kind, "detail");
+    if (initial.kind !== "detail") return;
+    const detailRef = initial.detail.detailRef;
+    assert.ok(detailRef);
+
+    await writeFile(
+      path,
+      longTaskRecord(
+        "动态刷新优先级已经接通。",
+        "验证多个 Codex Desktop build。",
+        "等待兼容性样本。",
+        "2026-08-20T01:30:00+08:00",
+      ),
+      "utf8",
+    );
+    const updated = await invoke(callback, request(activeTask, "long-task", {
+      operation: "check",
+      detailRef,
+      requestId: "request-task-check-updated",
+    }));
+    assert.equal(updated.kind, "revision");
+    if (updated.kind === "revision") assert.equal(updated.revision.state, "updated");
+
+    const refreshed = await invoke(callback, request(activeTask, "long-task", {
+      operation: "refresh",
+      detailRef,
+      requestId: "request-task-refresh-priority",
+    }));
+    assert.equal(refreshed.kind, "detail");
+    if (refreshed.kind !== "detail") return;
+    assert.deepEqual(refreshed.detail.changes?.map((change) => change.label), [
+      "当前状态", "下一步", "阻塞",
+    ]);
+    assert.ok(refreshed.detail.changes?.every((change) => change.label !== "摘要"));
   } finally {
     await rm(item.root, { recursive: true, force: true });
   }

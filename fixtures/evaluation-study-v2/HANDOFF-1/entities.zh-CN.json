@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "entities": [{
+    "id": "GATE:HANDOFF",
+    "label": "handoff gate",
+    "type": "gate",
+    "meaning": "实现完成与可接受交接之间的证据检查点。",
+    "whyNow": "实现已存在，但仍缺少 Windows 运行和 clean-workspace readback 两项环境观察。",
+    "flow": ["schema 与 serializer 完成", "handoff evidence gate", "可审阅交接"],
+    "boundary": "单元测试不能替代 Windows 运行或 clean-workspace readback。",
+    "evidence": "workspace/PROJECT_STATE.md:7"
+  }]
+}

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Pointable Context Study Setup"
+  short_description: "Prepare the frozen local study without entering trials"
+  default_prompt: "Use $pointable-context-study to verify and prepare my assigned local study slot, then stop at STUDY READY."
+policy:
+  allow_implicit_invocation: false

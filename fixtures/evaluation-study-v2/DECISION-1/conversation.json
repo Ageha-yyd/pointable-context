@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "DECISION-1",
+  "exchanges": [
+    {
+      "user": "Keep an open context card synchronized whenever its source file changes.",
+      "assistant": "The first prototype silently replaced visible details on every watcher event. During review, the reader's paragraph moved and it became unclear which snapshot supported the decision."
+    },
+    {
+      "user": "Would freezing the card forever protect the reading experience?",
+      "assistant": "It would preserve the paragraph, but it would also hide revision drift and let an old snapshot continue to look current."
+    },
+    {
+      "user": "Compare freezing forever with updating automatically. We need something that preserves reading without hiding drift.",
+      "assistant": "The accepted policy is explicit refresh: pin the open snapshot, detect revision drift in the background, and show a compact content-changed signal without replacing the visible text."
+    },
+    {
+      "user": "Who authorizes the visible replacement after drift is detected?",
+      "assistant": "Only a trusted user Refresh action. The watcher can create the signal, but it cannot mutate the card that the reader is using."
+    },
+    {
+      "user": "What happens when the reader acts on that signal?",
+      "assistant": "A trusted Refresh action re-reads authority, replaces the card in place, and summarizes at most three prioritized changes. Until that action, detected drift must not silently rewrite the card."
+    }
+  ],
+  "referencedEntityIds": [
+    "DECISION:EXPLICIT-REFRESH"
+  ]
+}

@@ -1,0 +1,2 @@
+2026-08-20 cross-type native card human acceptance: Long Task Dogfood (Concept), Work Result Context (Task), and context-artifact-check.ts (Module) each opened an in-place card in the current Codex Chat Lane.
+2026-08-20 native card type coverage milestone: human acceptance passed for Concept, Task, and Module cards; Artifact Check validated 4/4, Record Check validated 4/4, declared Context Coverage returned 8/8 available with zero omission/projection-failure/redundancy, and the full regression passed 244/244.

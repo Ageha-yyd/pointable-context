@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "TRAIN-1",
+  "exchanges": [
+    {
+      "user": "The study package is downloaded. Can I open the practice task now?",
+      "assistant": "Not yet. The setup log shows that the workspace was opened before the package checksum was verified, so the setup order is not safe enough for a controlled session."
+    },
+    {
+      "user": "The checksum now runs before workspace launch. Is release integrity the only setup gate?",
+      "assistant": "No. The declared Codex Desktop build, native Chat Lane contract, and private loopback Host must also match the qualified release."
+    },
+    {
+      "user": "I moved checksum verification ahead of workspace launch. What should guard the transition into practice?",
+      "assistant": "Add an orientation gate after release verification and before practice. It should confirm the declared package and the qualified Codex host, then fail closed if either one differs."
+    },
+    {
+      "user": "Does passing that gate prove the participant understands the later tasks?",
+      "assistant": "No. The orientation gate establishes environment compatibility only. The next step is an unscored practice lookup; comprehension and product effectiveness remain unproven."
+    },
+    {
+      "user": "What exactly should happen after the gate passes?",
+      "assistant": "Run one unscored selection, context-card, and answer rehearsal, then stop at STUDY READY without opening any measured scenario."
+    }
+  ],
+  "referencedEntityIds": [
+    "CONCEPT:ORIENTATION-GATE"
+  ]
+}

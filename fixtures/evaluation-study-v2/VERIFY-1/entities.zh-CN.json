@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "entities": [{
+    "id": "VERIFICATION:DEFINITION-ONLY",
+    "label": "definition-only check",
+    "type": "verification",
+    "meaning": "描述测试源码定义了什么，但不声称当前修订已经执行。",
+    "whyNow": "测试源码在最后一次保留执行证据后发生变化，而后续 build 不能证明该文件运行。",
+    "flow": ["定义测试行为", "缺少执行证据", "运行并绑定当前修订"],
+    "boundary": "源码存在与 build 成功都不能建立测试 PASS 或 FAIL。",
+    "evidence": "workspace/PROJECT_STATE.md:7"
+  }]
+}

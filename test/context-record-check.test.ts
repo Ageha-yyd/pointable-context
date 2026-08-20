@@ -89,6 +89,7 @@ test("record checker accepts bounded Task and Verification records with exact ev
     });
     assert.equal(result.valid, true);
     assert.equal(result.checkedAt, "2026-08-19T08:00:00.000Z");
+    assert.equal(result.candidateCount, 2);
     assert.deepEqual(result.records.map((record) => record.kind), ["task", "verification"]);
     assert.ok(result.records.every((record) => record.evidenceSource === "evidence/task.txt:1"));
     assert.deepEqual(result.issues, []);
@@ -150,17 +151,50 @@ test("record checker rejects circular evidence sourced from another context reco
 
 test("repository work-result records pass the read-only checker", async () => {
   const beforeTask = await readFile("docs/tasks/work-result-context.md", "utf8");
+  const beforeNativeRunnerTask = await readFile(
+    "docs/tasks/study-v2-native-runner.md",
+    "utf8",
+  );
   const beforeVerification = await readFile(
     "docs/verifications/task-verification-contract.md",
     "utf8",
   );
+  const beforeDogfoodVerification = await readFile(
+    "docs/verifications/long-task-dogfood-comprehension.md",
+    "utf8",
+  );
+  const beforeNativeCardVerification = await readFile(
+    "docs/verifications/native-card-type-coverage.md",
+    "utf8",
+  );
+  const beforeStudyBootstrapVerification = await readFile(
+    "docs/verifications/study-v2-environment-bootstrap.md",
+    "utf8",
+  );
   const result = await checkContextRecords(resolve("."));
   assert.equal(result.valid, true, JSON.stringify(result.issues));
-  assert.equal(result.records.length, 2);
+  assert.equal(result.records.length, 6);
+  assert.equal(result.candidateCount, 6);
   assert.equal(await readFile("docs/tasks/work-result-context.md", "utf8"), beforeTask);
+  assert.equal(
+    await readFile("docs/tasks/study-v2-native-runner.md", "utf8"),
+    beforeNativeRunnerTask,
+  );
   assert.equal(
     await readFile("docs/verifications/task-verification-contract.md", "utf8"),
     beforeVerification,
+  );
+  assert.equal(
+    await readFile("docs/verifications/long-task-dogfood-comprehension.md", "utf8"),
+    beforeDogfoodVerification,
+  );
+  assert.equal(
+    await readFile("docs/verifications/native-card-type-coverage.md", "utf8"),
+    beforeNativeCardVerification,
+  );
+  assert.equal(
+    await readFile("docs/verifications/study-v2-environment-bootstrap.md", "utf8"),
+    beforeStudyBootstrapVerification,
   );
 });
 

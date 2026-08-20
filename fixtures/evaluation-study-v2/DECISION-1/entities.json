@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "entities": [
+    {
+      "id": "DECISION:EXPLICIT-REFRESH",
+      "label": "explicit refresh",
+      "type": "decision",
+      "meaning": "Keep an open snapshot stable while signaling drift; replace it only after a trusted user refresh.",
+      "whyNow": "Silent replacement disrupted reading and obscured which evidence supported the user's decision.",
+      "flow": ["snapshot open", "drift detected", "user refreshes in place"],
+      "boundary": "Detection may run in the background, but visible content is not silently replaced.",
+      "evidence": "workspace/PROJECT_STATE.md:7"
+    }
+  ]
+}

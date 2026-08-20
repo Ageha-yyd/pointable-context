@@ -1,0 +1,2 @@
+2026-08-20 long-task dogfood baseline: Long Task Dogfood resolved uniquely as a concept; authoritative detail returned current with local_workspace_file and project_evidence sources; the revision probe returned current; targeted mental-model checks passed 5/5.
+2026-08-20 native comprehension acceptance: after selecting Long Task Dogfood in the current Codex Chat Lane, the user confirmed that the card directly answered what it is, why it is being done now, what it cannot prove, and the current flow.

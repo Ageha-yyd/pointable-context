@@ -1,4 +1,5 @@
 import type {
+  PointableChangeView,
   PointableComprehensionView,
   PointableDetailView,
   PointableLookupResponseV1,
@@ -448,6 +449,14 @@ export function installPointableContextRenderer(
     detailRef?: string;
     timeout: number;
   };
+  type DragState = {
+    pointerId: number;
+    startClientX: number;
+    startClientY: number;
+    startLeft: number;
+    startTop: number;
+    handle: HTMLElement;
+  };
 
   let state: PointableRendererStatus["state"] = "idle";
   let generation = 0;
@@ -461,6 +470,8 @@ export function installPointableContextRenderer(
   let cardElement: HTMLElement | undefined;
   let revisionTimer: number | undefined;
   let holdCardPlacementUntil = 0;
+  let manualCardPlacement: { left: number; top: number } | undefined;
+  let dragState: DragState | undefined;
   let uninstalled = false;
   const activeObserver = new MutationObserver(() => {
     if (candidate !== undefined) scheduleReconcile();
@@ -476,6 +487,40 @@ export function installPointableContextRenderer(
     if (event.button === 0 && !ownedInteraction) {
       window.setTimeout(evaluateSelection, 0);
     }
+  };
+  const dragMoveHandler = (event: PointerEvent): void => {
+    const drag = dragState;
+    const shell = connectedOwnedElement("card");
+    if (
+      !event.isTrusted ||
+      drag === undefined ||
+      drag.pointerId !== event.pointerId ||
+      !(shell instanceof HTMLElement)
+    ) {
+      return;
+    }
+    const placement = clampCardPlacement(
+      drag.startLeft + event.clientX - drag.startClientX,
+      drag.startTop + event.clientY - drag.startClientY,
+      shell.offsetWidth || 380,
+      shell.offsetHeight || 320,
+    );
+    manualCardPlacement = placement;
+    shell.style.left = `${placement.left}px`;
+    shell.style.top = `${placement.top}px`;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  const dragEndHandler = (event: PointerEvent): void => {
+    const drag = dragState;
+    if (!event.isTrusted || drag === undefined || drag.pointerId !== event.pointerId) return;
+    drag.handle.style.cursor = "grab";
+    dragState = undefined;
+    if (drag.handle.hasPointerCapture(event.pointerId)) {
+      drag.handle.releasePointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+    event.stopPropagation();
   };
   const keyUpHandler = (event: KeyboardEvent): void => {
     if (
@@ -516,6 +561,9 @@ export function installPointableContextRenderer(
 
   document.addEventListener("selectionchange", selectionHandler);
   document.addEventListener("pointerup", pointerUpHandler, true);
+  document.addEventListener("pointermove", dragMoveHandler, true);
+  document.addEventListener("pointerup", dragEndHandler, true);
+  document.addEventListener("pointercancel", dragEndHandler, true);
   document.addEventListener("keyup", keyUpHandler, true);
   document.addEventListener("keydown", keyDownHandler, true);
   window.addEventListener("scroll", viewportHandler, true);
@@ -932,6 +980,8 @@ export function installPointableContextRenderer(
     }
     const shell = existing ?? document.createElement("section");
     if (existing === null) {
+      manualCardPlacement = undefined;
+      dragState = undefined;
       shell.id = availableOwnedId(cardIdBase);
       shell.tabIndex = -1;
       shell.setAttribute("role", "dialog");
@@ -965,7 +1015,12 @@ export function installPointableContextRenderer(
       gap: "12px",
       padding: "10px 12px",
       borderBottom: "1px solid #e2e8f0",
+      cursor: "grab",
+      userSelect: "none",
+      touchAction: "none",
     });
+    header.setAttribute("data-pointable-context-role", "drag-handle");
+    header.setAttribute("aria-label", "拖动上下文卡片");
     const title = document.createElement("h2");
     title.id = `${shell.id}-title`;
     title.textContent = titleText;
@@ -998,6 +1053,34 @@ export function installPointableContextRenderer(
       // selectionchange/reconcile pass to recreate the affordance.
       window.getSelection()?.removeAllRanges();
       cleanup(true, true);
+    });
+    header.addEventListener("pointerdown", (event) => {
+      if (
+        !event.isTrusted ||
+        event.button !== 0 ||
+        !(event.target instanceof Node) ||
+        close.contains(event.target)
+      ) {
+        return;
+      }
+      const rect = shell.getBoundingClientRect();
+      dragState = {
+        pointerId: event.pointerId,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        startLeft: rect.left,
+        startTop: rect.top,
+        handle: header,
+      };
+      manualCardPlacement = { left: rect.left, top: rect.top };
+      try {
+        header.setPointerCapture(event.pointerId);
+      } catch {
+        // Document-level drag listeners remain the bounded fallback.
+      }
+      header.style.cursor = "grabbing";
+      event.preventDefault();
+      event.stopPropagation();
     });
     header.append(title, close);
     const body = document.createElement("div");
@@ -1385,6 +1468,34 @@ export function installPointableContextRenderer(
     body.append(surface);
   }
 
+  function mountRevisionChanges(
+    body: HTMLElement,
+    changes: PointableChangeView[] | undefined,
+  ): void {
+    if (changes === undefined || changes.length === 0) return;
+    const changeSummary = document.createElement("div");
+    changeSummary.setAttribute("data-pointable-context-role", "revision-changes");
+    Object.assign(changeSummary.style, {
+      marginTop: "8px",
+      padding: "8px 10px",
+      borderRadius: "8px",
+      background: "#eef4ff",
+      color: "#1746c7",
+      fontSize: "12px",
+    });
+    const heading = document.createElement("strong");
+    heading.textContent = "本次刷新";
+    const list = document.createElement("ul");
+    Object.assign(list.style, { margin: "4px 0 0", paddingLeft: "18px" });
+    for (const change of changes) {
+      const item = document.createElement("li");
+      item.textContent = `${change.label}：${change.before} → ${change.after}`;
+      list.append(item);
+    }
+    changeSummary.append(heading, list);
+    body.append(changeSummary);
+  }
+
   function mountDetail(detail: PointableDetailView, preserveUiState = false): void {
     clearRevisionTimer();
     const previousCard = preserveUiState ? connectedOwnedElement("card") : null;
@@ -1396,6 +1507,7 @@ export function installPointableContextRenderer(
       ?.getAttribute("aria-expanded") === "true";
     state = "detail";
     const { body } = createShell(detail.label, preserveUiState);
+    mountRevisionChanges(body, detail.changes);
     if (presentationMode === "mental-model" && detail.comprehension !== undefined) {
       mountComprehension(body, detail.comprehension, evidenceExpanded);
     } else {
@@ -1403,29 +1515,6 @@ export function installPointableContextRenderer(
         ? detail.summary
         : detail.humanSummary ?? detail.summary;
       body.append(paragraph(summary));
-    }
-    if (detail.changes !== undefined && detail.changes.length > 0) {
-      const changeSummary = document.createElement("div");
-      changeSummary.setAttribute("data-pointable-context-role", "revision-changes");
-      Object.assign(changeSummary.style, {
-        marginTop: "8px",
-        padding: "8px 10px",
-        borderRadius: "8px",
-        background: "#eef4ff",
-        color: "#1746c7",
-        fontSize: "12px",
-      });
-      const heading = document.createElement("strong");
-      heading.textContent = "本次刷新";
-      const list = document.createElement("ul");
-      Object.assign(list.style, { margin: "4px 0 0", paddingLeft: "18px" });
-      for (const change of detail.changes) {
-        const item = document.createElement("li");
-        item.textContent = `${change.label}：${change.before} → ${change.after}`;
-        list.append(item);
-      }
-      changeSummary.append(heading, list);
-      body.append(changeSummary);
     }
     const compactState = document.createElement("div");
     compactState.textContent = `${detail.entityType} · ${detail.freshness}`;
@@ -1725,6 +1814,18 @@ export function installPointableContextRenderer(
       const actionTarget = target.getAttribute("data-pointable-context-role") === "action";
       const width = target.offsetWidth || (actionTarget ? 150 : 380);
       const height = target.offsetHeight || (actionTarget ? 34 : 320);
+      if (!actionTarget && manualCardPlacement !== undefined) {
+        const placement = clampCardPlacement(
+          manualCardPlacement.left,
+          manualCardPlacement.top,
+          width,
+          height,
+        );
+        manualCardPlacement = placement;
+        target.style.left = `${placement.left}px`;
+        target.style.top = `${placement.top}px`;
+        return;
+      }
       const minimumLeft = offsetLeft + inset;
       const maximumLeft = Math.max(minimumLeft, offsetLeft + viewportWidth - width - inset);
       const desiredLeft = rect.left + rect.width / 2 - width / 2;
@@ -1737,9 +1838,33 @@ export function installPointableContextRenderer(
     });
   }
 
+  function clampCardPlacement(
+    desiredLeft: number,
+    desiredTop: number,
+    width: number,
+    height: number,
+  ): { left: number; top: number } {
+    const viewport = window.visualViewport;
+    const offsetLeft = viewport?.offsetLeft ?? 0;
+    const offsetTop = viewport?.offsetTop ?? 0;
+    const viewportWidth = viewport?.width ?? window.innerWidth;
+    const viewportHeight = viewport?.height ?? window.innerHeight;
+    const inset = 12;
+    const minimumLeft = offsetLeft + inset;
+    const maximumLeft = Math.max(minimumLeft, offsetLeft + viewportWidth - width - inset);
+    const minimumTop = offsetTop + inset;
+    const maximumTop = Math.max(minimumTop, offsetTop + viewportHeight - height - inset);
+    return {
+      left: Math.min(Math.max(minimumLeft, desiredLeft), maximumLeft),
+      top: Math.min(Math.max(minimumTop, desiredTop), maximumTop),
+    };
+  }
+
   function cleanup(clearCandidate: boolean, restore: boolean): void {
     clearRevisionTimer();
     holdCardPlacementUntil = 0;
+    manualCardPlacement = undefined;
+    dragState = undefined;
     removeOwned("action");
     removeOwned("card");
     resizeObserver?.disconnect();
@@ -1785,6 +1910,9 @@ export function installPointableContextRenderer(
     resizeObserver?.disconnect();
     document.removeEventListener("selectionchange", selectionHandler);
     document.removeEventListener("pointerup", pointerUpHandler, true);
+    document.removeEventListener("pointermove", dragMoveHandler, true);
+    document.removeEventListener("pointerup", dragEndHandler, true);
+    document.removeEventListener("pointercancel", dragEndHandler, true);
     document.removeEventListener("keyup", keyUpHandler, true);
     document.removeEventListener("keydown", keyDownHandler, true);
     window.removeEventListener("scroll", viewportHandler, true);

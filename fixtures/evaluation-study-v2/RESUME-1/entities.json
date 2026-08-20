@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "entities": [
+    {
+      "id": "MODULE:RELAY-CACHE-ENTRY",
+      "label": "relay-cache public entry",
+      "type": "module",
+      "meaning": "The stable import boundary for cache consumers after the module split.",
+      "whyNow": "A new consumer is being connected after persistence and migration responsibilities diverged.",
+      "flow": ["single module", "split persistence and entry", "new consumers use public entry"],
+      "boundary": "The entry does not guarantee the internal store layout or remove legacy snapshot support.",
+      "evidence": "workspace/PROJECT_STATE.md:7"
+    }
+  ]
+}

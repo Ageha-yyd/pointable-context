@@ -1,5 +1,7 @@
 node_modules/
 dist/
+study-dist/
+study-release/
 coverage/
 *.log
 .DS_Store
@@ -7,6 +9,7 @@ coverage/
 .env.*
 !.env.example
 *.tsbuildinfo
+.pointable-study-language
 .idea/
 .vscode/
 *.pem

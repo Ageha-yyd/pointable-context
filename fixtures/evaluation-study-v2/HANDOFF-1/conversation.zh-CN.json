@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "HANDOFF-1",
+  "exchanges": [
+    { "user": "按 schema、serializer、命令入口的顺序完成 handoff result。", "assistant": "结果 schema 和 serializer 已完成，相关单元测试通过；命令入口尚未新增。" },
+    { "user": "新增命令前先检查现有入口。", "assistant": "发现已有一个 feature-flagged 命令调用同一 serializer。再加一个入口会重复，所以我把该实施步骤移出范围。" },
+    { "user": "单元测试通过是否足够交接？", "assistant": "不够。它没有观察 Windows 下真实命令行为，也没有证明 clean workspace 能读回结果。" },
+    { "user": "当前还能继续写新功能吗？", "assistant": "不能。实现已经存在，当前 handoff gate 只授权补齐环境证据。" },
+    { "user": "接手者现在应该做什么？", "assistant": "运行现有 Windows 命令并捕获 clean-workspace readback。两项都完成后，handoff gate 才能进入可审阅状态。" }
+  ],
+  "referencedEntityIds": ["GATE:HANDOFF"]
+}

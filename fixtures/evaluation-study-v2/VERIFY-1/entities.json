@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "entities": [
+    {
+      "id": "VERIFICATION:DEFINITION-ONLY",
+      "label": "definition-only check",
+      "type": "verification",
+      "meaning": "A source-level account of what tests define without claiming that the current revision was executed.",
+      "whyNow": "The test source changed after the last retained execution evidence, while a later build did not prove this file ran.",
+      "flow": ["test behaviors defined", "execution evidence missing", "run and bind current revision"],
+      "boundary": "Source presence and build success do not establish test PASS or FAIL.",
+      "evidence": "workspace/PROJECT_STATE.md:7"
+    }
+  ]
+}

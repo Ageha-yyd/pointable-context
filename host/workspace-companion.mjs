@@ -1417,6 +1417,8 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   let cardElement;
   let revisionTimer;
   let holdCardPlacementUntil = 0;
+  let manualCardPlacement;
+  let dragState;
   let uninstalled = false;
   const activeObserver = new MutationObserver(() => {
     if (candidate !== void 0) scheduleReconcile();
@@ -1427,6 +1429,35 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     if (event.button === 0 && !ownedInteraction) {
       window.setTimeout(evaluateSelection, 0);
     }
+  };
+  const dragMoveHandler = (event) => {
+    const drag = dragState;
+    const shell = connectedOwnedElement("card");
+    if (!event.isTrusted || drag === void 0 || drag.pointerId !== event.pointerId || !(shell instanceof HTMLElement)) {
+      return;
+    }
+    const placement = clampCardPlacement(
+      drag.startLeft + event.clientX - drag.startClientX,
+      drag.startTop + event.clientY - drag.startClientY,
+      shell.offsetWidth || 380,
+      shell.offsetHeight || 320
+    );
+    manualCardPlacement = placement;
+    shell.style.left = `${placement.left}px`;
+    shell.style.top = `${placement.top}px`;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  const dragEndHandler = (event) => {
+    const drag = dragState;
+    if (!event.isTrusted || drag === void 0 || drag.pointerId !== event.pointerId) return;
+    drag.handle.style.cursor = "grab";
+    dragState = void 0;
+    if (drag.handle.hasPointerCapture(event.pointerId)) {
+      drag.handle.releasePointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+    event.stopPropagation();
   };
   const keyUpHandler = (event) => {
     if (event.key.startsWith("Arrow") || event.key === "Home" || event.key === "End") {
@@ -1458,6 +1489,9 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   };
   document.addEventListener("selectionchange", selectionHandler);
   document.addEventListener("pointerup", pointerUpHandler, true);
+  document.addEventListener("pointermove", dragMoveHandler, true);
+  document.addEventListener("pointerup", dragEndHandler, true);
+  document.addEventListener("pointercancel", dragEndHandler, true);
   document.addEventListener("keyup", keyUpHandler, true);
   document.addEventListener("keydown", keyDownHandler, true);
   window.addEventListener("scroll", viewportHandler, true);
@@ -1769,6 +1803,8 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     }
     const shell = existing2 ?? document.createElement("section");
     if (existing2 === null) {
+      manualCardPlacement = void 0;
+      dragState = void 0;
       shell.id = availableOwnedId(cardIdBase);
       shell.tabIndex = -1;
       shell.setAttribute("role", "dialog");
@@ -1801,8 +1837,13 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       justifyContent: "space-between",
       gap: "12px",
       padding: "10px 12px",
-      borderBottom: "1px solid #e2e8f0"
+      borderBottom: "1px solid #e2e8f0",
+      cursor: "grab",
+      userSelect: "none",
+      touchAction: "none"
     });
+    header.setAttribute("data-pointable-context-role", "drag-handle");
+    header.setAttribute("aria-label", "\u62D6\u52A8\u4E0A\u4E0B\u6587\u5361\u7247");
     const title = document.createElement("h2");
     title.id = `${shell.id}-title`;
     title.textContent = titleText;
@@ -1832,6 +1873,28 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       event.stopPropagation();
       window.getSelection()?.removeAllRanges();
       cleanup(true, true);
+    });
+    header.addEventListener("pointerdown", (event) => {
+      if (!event.isTrusted || event.button !== 0 || !(event.target instanceof Node) || close.contains(event.target)) {
+        return;
+      }
+      const rect = shell.getBoundingClientRect();
+      dragState = {
+        pointerId: event.pointerId,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        startLeft: rect.left,
+        startTop: rect.top,
+        handle: header
+      };
+      manualCardPlacement = { left: rect.left, top: rect.top };
+      try {
+        header.setPointerCapture(event.pointerId);
+      } catch {
+      }
+      header.style.cursor = "grabbing";
+      event.preventDefault();
+      event.stopPropagation();
     });
     header.append(title, close);
     const body = document.createElement("div");
@@ -2170,6 +2233,30 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     surface.append(evidenceDisclosure);
     body.append(surface);
   }
+  function mountRevisionChanges(body, changes) {
+    if (changes === void 0 || changes.length === 0) return;
+    const changeSummary = document.createElement("div");
+    changeSummary.setAttribute("data-pointable-context-role", "revision-changes");
+    Object.assign(changeSummary.style, {
+      marginTop: "8px",
+      padding: "8px 10px",
+      borderRadius: "8px",
+      background: "#eef4ff",
+      color: "#1746c7",
+      fontSize: "12px"
+    });
+    const heading = document.createElement("strong");
+    heading.textContent = "\u672C\u6B21\u5237\u65B0";
+    const list = document.createElement("ul");
+    Object.assign(list.style, { margin: "4px 0 0", paddingLeft: "18px" });
+    for (const change of changes) {
+      const item = document.createElement("li");
+      item.textContent = `${change.label}\uFF1A${change.before} \u2192 ${change.after}`;
+      list.append(item);
+    }
+    changeSummary.append(heading, list);
+    body.append(changeSummary);
+  }
   function mountDetail(detail, preserveUiState = false) {
     clearRevisionTimer();
     const previousCard = preserveUiState ? connectedOwnedElement("card") : null;
@@ -2177,34 +2264,12 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     const evidenceExpanded = previousCard?.querySelector('[data-pointable-context-role="evidence-toggle"]')?.getAttribute("aria-expanded") === "true";
     state = "detail";
     const { body } = createShell(detail.label, preserveUiState);
+    mountRevisionChanges(body, detail.changes);
     if (presentationMode === "mental-model" && detail.comprehension !== void 0) {
       mountComprehension(body, detail.comprehension, evidenceExpanded);
     } else {
       const summary = presentationMode === "record" ? detail.summary : detail.humanSummary ?? detail.summary;
       body.append(paragraph(summary));
-    }
-    if (detail.changes !== void 0 && detail.changes.length > 0) {
-      const changeSummary = document.createElement("div");
-      changeSummary.setAttribute("data-pointable-context-role", "revision-changes");
-      Object.assign(changeSummary.style, {
-        marginTop: "8px",
-        padding: "8px 10px",
-        borderRadius: "8px",
-        background: "#eef4ff",
-        color: "#1746c7",
-        fontSize: "12px"
-      });
-      const heading = document.createElement("strong");
-      heading.textContent = "\u672C\u6B21\u5237\u65B0";
-      const list = document.createElement("ul");
-      Object.assign(list.style, { margin: "4px 0 0", paddingLeft: "18px" });
-      for (const change of detail.changes) {
-        const item = document.createElement("li");
-        item.textContent = `${change.label}\uFF1A${change.before} \u2192 ${change.after}`;
-        list.append(item);
-      }
-      changeSummary.append(heading, list);
-      body.append(changeSummary);
     }
     const compactState = document.createElement("div");
     compactState.textContent = `${detail.entityType} \xB7 ${detail.freshness}`;
@@ -2451,6 +2516,18 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       const actionTarget = target.getAttribute("data-pointable-context-role") === "action";
       const width = target.offsetWidth || (actionTarget ? 150 : 380);
       const height = target.offsetHeight || (actionTarget ? 34 : 320);
+      if (!actionTarget && manualCardPlacement !== void 0) {
+        const placement = clampCardPlacement(
+          manualCardPlacement.left,
+          manualCardPlacement.top,
+          width,
+          height
+        );
+        manualCardPlacement = placement;
+        target.style.left = `${placement.left}px`;
+        target.style.top = `${placement.top}px`;
+        return;
+      }
       const minimumLeft = offsetLeft + inset;
       const maximumLeft = Math.max(minimumLeft, offsetLeft + viewportWidth - width - inset);
       const desiredLeft = rect.left + rect.width / 2 - width / 2;
@@ -2462,9 +2539,27 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       target.style.top = `${Math.min(Math.max(minimumTop, desiredTop), maximumTop)}px`;
     });
   }
+  function clampCardPlacement(desiredLeft, desiredTop, width, height) {
+    const viewport = window.visualViewport;
+    const offsetLeft = viewport?.offsetLeft ?? 0;
+    const offsetTop = viewport?.offsetTop ?? 0;
+    const viewportWidth = viewport?.width ?? window.innerWidth;
+    const viewportHeight = viewport?.height ?? window.innerHeight;
+    const inset = 12;
+    const minimumLeft = offsetLeft + inset;
+    const maximumLeft = Math.max(minimumLeft, offsetLeft + viewportWidth - width - inset);
+    const minimumTop = offsetTop + inset;
+    const maximumTop = Math.max(minimumTop, offsetTop + viewportHeight - height - inset);
+    return {
+      left: Math.min(Math.max(minimumLeft, desiredLeft), maximumLeft),
+      top: Math.min(Math.max(minimumTop, desiredTop), maximumTop)
+    };
+  }
   function cleanup(clearCandidate, restore) {
     clearRevisionTimer();
     holdCardPlacementUntil = 0;
+    manualCardPlacement = void 0;
+    dragState = void 0;
     removeOwned("action");
     removeOwned("card");
     resizeObserver?.disconnect();
@@ -2508,6 +2603,9 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     resizeObserver?.disconnect();
     document.removeEventListener("selectionchange", selectionHandler);
     document.removeEventListener("pointerup", pointerUpHandler, true);
+    document.removeEventListener("pointermove", dragMoveHandler, true);
+    document.removeEventListener("pointerup", dragEndHandler, true);
+    document.removeEventListener("pointercancel", dragEndHandler, true);
     document.removeEventListener("keyup", keyUpHandler, true);
     document.removeEventListener("keydown", keyDownHandler, true);
     window.removeEventListener("scroll", viewportHandler, true);
@@ -6228,16 +6326,64 @@ function detailView(outcome, options = {}) {
 function detailChanges(before, after) {
   const previous = new Map(before.facts.map((fact) => [fact.label, fact.value]));
   const changes = [];
-  if (before.summary !== after.summary) {
-    changes.push({ label: "\u6458\u8981", before: before.summary, after: after.summary });
+  const seenValues = /* @__PURE__ */ new Set();
+  const add = (label, oldValue, newValue) => {
+    const boundedOld = truncate(oldValue, 1024);
+    const boundedNew = truncate(newValue, 1024);
+    if (boundedOld === boundedNew || changes.length >= 3) return;
+    const identity2 = `${boundedOld}\0${boundedNew}`;
+    if (seenValues.has(identity2)) return;
+    seenValues.add(identity2);
+    changes.push({ label: truncate(label, 128), before: boundedOld, after: boundedNew });
+  };
+  const beforeModel = before.comprehension;
+  const afterModel = after.comprehension;
+  if (beforeModel !== void 0 && afterModel !== void 0 && beforeModel.kind === afterModel.kind) {
+    if (beforeModel.kind === "concept" && afterModel.kind === "concept") {
+      add("\u5F53\u524D\u8BED\u5883", beforeModel.context, afterModel.context);
+      add(
+        "\u6240\u5904\u6D41\u7A0B",
+        beforeModel.sequence.map((step, index) => index === beforeModel.currentStep ? `\u5F53\u524D\uFF1A${step}` : step).join(" \u2192 "),
+        afterModel.sequence.map((step, index) => index === afterModel.currentStep ? `\u5F53\u524D\uFF1A${step}` : step).join(" \u2192 ")
+      );
+      add("\u8FB9\u754C", beforeModel.boundary, afterModel.boundary);
+      add("\u5B9A\u4E49", beforeModel.meaning, afterModel.meaning);
+    } else if (beforeModel.kind === "change" && afterModel.kind === "change") {
+      add("\u73B0\u5728", beforeModel.after, afterModel.after);
+      add("\u5F71\u54CD", beforeModel.impact, afterModel.impact);
+      add("\u539F\u6765", beforeModel.before, afterModel.before);
+    } else if (beforeModel.kind === "decision" && afterModel.kind === "decision") {
+      add("\u9009\u62E9", beforeModel.choice, afterModel.choice);
+      add("\u7ED3\u679C\u4E0E\u4EE3\u4EF7", beforeModel.consequence, afterModel.consequence);
+      add("\u8981\u89E3\u51B3\u7684\u95EE\u9898", beforeModel.problem, afterModel.problem);
+    } else if (beforeModel.kind === "task" && afterModel.kind === "task") {
+      add("\u5F53\u524D\u72B6\u6001", beforeModel.status, afterModel.status);
+      add("\u4E0B\u4E00\u6B65", beforeModel.next, afterModel.next);
+      add("\u963B\u585E", beforeModel.blocker, afterModel.blocker);
+      add("\u5DF2\u7ECF\u5B8C\u6210", beforeModel.completed, afterModel.completed);
+      add("\u76EE\u6807", beforeModel.goal, afterModel.goal);
+      add("\u66F4\u65B0\u65F6\u95F4", beforeModel.updatedAt, afterModel.updatedAt);
+    } else if (beforeModel.kind === "verification" && afterModel.kind === "verification") {
+      add("\u9A8C\u8BC1\u7ED3\u679C", beforeModel.result, afterModel.result);
+      add("\u4ECD\u672A\u8BC1\u660E", beforeModel.gap, afterModel.gap);
+      add("\u8981\u8BC1\u660E\u4EC0\u4E48", beforeModel.claim, afterModel.claim);
+      add("\u6267\u884C\u65F6\u95F4", beforeModel.executedAt, afterModel.executedAt);
+    }
+  }
+  if (beforeModel === void 0 && afterModel === void 0) {
+    add("\u6458\u8981", before.summary, after.summary);
   }
   for (const fact of after.facts) {
     const oldValue = previous.get(fact.label);
-    if (oldValue !== void 0 && oldValue !== fact.value) {
-      changes.push({ label: fact.label, before: oldValue, after: fact.value });
-    }
+    add(fact.label, oldValue ?? "\uFF08\u539F\u5148\u672A\u663E\u793A\uFF09", fact.value);
     if (changes.length >= 3) break;
   }
+  const currentLabels = new Set(after.facts.map((fact) => fact.label));
+  for (const fact of before.facts) {
+    if (!currentLabels.has(fact.label)) add(fact.label, fact.value, "\uFF08\u5DF2\u79FB\u9664\uFF09");
+    if (changes.length >= 3) break;
+  }
+  if (changes.length === 0) add("\u6458\u8981", before.summary, after.summary);
   return changes.slice(0, 3);
 }
 function outcomeError(outcome) {

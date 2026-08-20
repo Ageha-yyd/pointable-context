@@ -10,6 +10,8 @@ export * from "./adapters/json-files.js";
 export * from "./adapters/local-workspace.js";
 export * from "./adapters/context-concept.js";
 export * from "./records/context-record-check.js";
+export * from "./records/context-coverage.js";
+export * from "./compatibility/codex-build-qualification.js";
 export * from "./evaluation/study-pack.js";
 export * from "./app-server/client.js";
 export * from "./app-server/referent.js";

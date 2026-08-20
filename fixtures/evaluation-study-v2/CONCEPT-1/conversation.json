@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "CONCEPT-1",
+  "exchanges": [
+    {
+      "user": "A detail read started in task A, but after I navigated to task B its result appeared in the new card. Fix that crossing.",
+      "assistant": "I reproduced the race. The response was fresh in time, but it no longer belonged to the active task, selection generation, or scope when presentation occurred."
+    },
+    {
+      "user": "Would attaching only an observedAt timestamp prevent the crossing?",
+      "assistant": "No. A timestamp answers when the read occurred, not whether its task, selection generation, scope, and source revision still match the interaction that will display it."
+    },
+    {
+      "user": "Can we call all of those checks freshness checks?",
+      "assistant": "That name merges two different questions. Freshness describes when data was observed; identity and revision continuity need a separate authority fence around the asynchronous read."
+    },
+    {
+      "user": "Why check again immediately before presentation if the read was already revalidated?",
+      "assistant": "Navigation or selection drift can occur after the read-level check and before the DOM update. The presentation fence closes that final race window."
+    },
+    {
+      "user": "What exactly does that fence establish?",
+      "assistant": "The authority fence binds the interaction before the read, revalidates after the read, and checks again before presentation. It prevents cross-context results, but it does not prove claims beyond the verified source or turn stale evidence into current evidence."
+    }
+  ],
+  "referencedEntityIds": [
+    "CONCEPT:AUTHORITY-FENCE"
+  ]
+}

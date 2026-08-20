@@ -16,6 +16,16 @@ The primary interaction is **Quiet Context Reveal**:
 
 There is deliberately no "identify more concepts" or semantic-model branch. General semantic questions already belong in Codex Chat; adding another model pass inside the selection path would increase latency and ambiguity. The browser App Server client, DCPM/CWA integration ideas, and a full Dashboard are research references, not the default product route.
 
+## Per-build Codex Desktop qualification
+
+The private Chat Lane adapter is qualified per exact Codex Desktop build, never by product-family assumption. `pointable-context-compatibility` validates a strict record under `docs/compatibility/`: the `OpenAI.Codex` package/executable version, the renderer bundle SHA-256, the four automatic host-contract gates, and ten manual interaction gates. Automatic `qualified_current_runtime` is kept separate from manual selection, click, card, disclosure, close/focus, composer, virtualization, navigation, stale-response, and refresh-continuity evidence. A manual PASS/FAIL needs one exact workspace evidence line; an unrun check stays `pending`.
+
+The current `OpenAI.Codex 26.814.5517.0` / executable `151.0.7922.137` record has all four automatic gates and all ten evidence-bound manual gates passing against renderer digest `d00e4620…2855`. It is qualified only for that exact combination; it is not a cross-version support claim. Run the read-only inspector with the actual host version and current bundle:
+
+```powershell
+node dist/src/compatibility/qualification-cli.js --workspace-root . --renderer-bundle host/workspace-companion.mjs --host-version 26.814.5517.0 --json
+```
+
 ## Live Markdown artifact context
 
 For an explicitly bound local Git workspace, Markdown documents now expose a deterministic five-fact view after the trusted click:
@@ -42,7 +52,7 @@ Supported extensions are `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, a
 
 ## Dynamic detail refresh
 
-An open workspace detail card pins the snapshot the user is reading. The bounded v2 background probe fingerprints the selected file stat and, for a verified Git root, its porcelain status, latest selected-file commit, and the bounded literal-reference path set used by the Provider. Explicit concept/change/decision artifacts also bind the stat of their declared workspace evidence source. These signals never enter the card and the probe does not re-project full detail. When the fingerprint changes, the same card shows a quiet `内容已更新` notice. Only a trusted `刷新内容` click performs a new authoritative detail read, reuses the same card DOM in place, preserves its position, scroll, and disclosure state, and shows at most three changed fields. This path opens no browser, calls no model, and creates no Chat Turn.
+An open workspace detail card pins the snapshot the user is reading. The bounded v2 background probe fingerprints the selected file stat and, for a verified Git root, its porcelain status, latest selected-file commit, and the bounded literal-reference path set used by the Provider. Explicit concept/change/decision artifacts also bind the stat of their declared workspace evidence source. These signals never enter the card and the probe does not re-project full detail. When the fingerprint changes, the same card shows a quiet `内容已更新` notice. Only a trusted `刷新内容` click performs a new authoritative detail read, reuses the same card DOM in place, preserves its position, scroll, and disclosure state, and shows at most three changed fields. Those explicit-refresh changes appear before the full P-C model and follow type-specific comprehension priority: a Task starts with status/next action/blocker, a Verification with result/unproven boundary/claim, and a Decision with choice/consequence/problem. Duplicate before/after pairs are removed; additions and removals are explicit. An ordinary unrefreshed card has no persistent change panel. This path opens no browser, calls no model, and creates no Chat Turn.
 
 If the file is deleted or the probe becomes unavailable, the prior snapshot stays visible with an explicit warning. Task rebinding, expired references, context drift, or capacity exhaustion disable refresh rather than widening authority. Non-Git workspaces degrade to stat-only. Each Git process is capped at 750ms and 256KiB; a qualifying Git root that cannot be checked reports unavailable. The relation fingerprint detects literal reference membership changes, not runtime dependencies or arbitrary semantic impact.
 
@@ -62,20 +72,29 @@ An author can now give a high-value project concept a deterministic identity by 
 
 The native renderer supports three fixed research conditions over the same detail payload: `record`, `narrative`, and `mental-model`. `mental-model` is the ordinary product default after a single-user formative comparison preferred P-C while judging P-A and P-B similarly. This is a design preference, not efficiency evidence. P-C supports five explicitly authored, evidence-bound structures: `docs/concepts/*.md` for meaning/context/flow/boundary, `docs/changes/*.md` for before/after/impact, `docs/decisions/*.md` for problem/choice/consequence, `docs/tasks/*.md` for task progress, and `docs/verifications/*.md` for claim/result/gap. Exact evidence stays behind an in-card `为什么这样说` disclosure. Research assignments still select one fixed condition when the companion starts; participants never switch conditions inside a task.
 
-## Explicit Agent work results
+## Explicit Agent milestone context
 
-Agent-known work results can now enter the same lightweight Context Index through two strict, file-backed records:
+Agent-known stable milestone context can enter the same lightweight Context Index through five strict, file-backed artifacts:
 
+- `docs/concepts/*.md` records meaning, current context, boundary, and a 2–4 step flow;
+- `docs/changes/*.md` records before, after, and impact;
+- `docs/decisions/*.md` records problem, explicit choice, and consequence;
 - `docs/tasks/*.md` records goal, current status, completed work, next step, blocker, update time, and one exact workspace evidence line;
 - `docs/verifications/*.md` records claim, explicit result, remaining gap, verification method, verified revision, execution time, and one exact workspace evidence line.
 
-These are author-supplied records, not automatic conclusions. Ordinary Chat prose, TODOs, commits, test filenames, and static test definitions never become “completed” or PASS/FAIL by inference. Missing fields, invalid timestamps, or evidence drift fail closed. The current implementation re-reads these files on demand; it does not require a Dashboard or persistent semantic index. In P-C, Task foregrounds current status and next action, while Verification foregrounds result and the boundary it still does not prove. Exact evidence remains locally collapsible.
+These are author-supplied artifacts, not automatic extraction or conclusions. Ordinary Chat prose, implicit concepts/decisions, TODOs, commits, test filenames, and static test definitions never become context records, “completed”, or PASS/FAIL by inference. Missing fields, identity drift, invalid timestamps, circular evidence, or evidence drift fail closed. The current implementation re-reads these files on demand; it does not require a Dashboard or persistent semantic index.
 
-### Opt-in production policy and record check
+### Opt-in production policy and post-write gates
 
-Agent record maintenance is opt-in, either for one explicit create/update request or for one bounded long-running task. Authorization does not carry to another task or workspace. A record is created or updated only when it has a stable selectable identity, is likely to matter after the current turn, changes a decision/status/handoff or captures an observed verification, and has one exact workspace evidence line. Stable milestones include a user-visible deliverable, a state/Gate change, a real command/review/human acceptance result, and handoff. Existing identities are updated instead of duplicated; routine turns and file edits produce nothing.
+Agent milestone context maintenance is opt-in, either for one explicit create/update request or for one bounded long-running task. Authorization does not carry to another task or workspace. An artifact is created or updated only when it has a stable selectable identity, is likely to matter after the current turn, captures an established concept/change/decision or changes status/handoff, and has one exact workspace evidence line. Existing identities are updated instead of duplicated; routine turns, implicit objects, and file edits produce nothing.
 
-`pointable-context-record-check` is a read-only post-write gate. It scans only `docs/tasks/*.md` and `docs/verifications/*.md`, validates their strict schema and timestamps, rechecks exact evidence, and rejects duplicate file stems across both types. It does not infer, repair, or write records. Invalid records remain unavailable to the usable Context Index.
+`pointable-context-artifact-check` is the read-only post-write gate for Concept/Change/Decision. It validates strict section order, normalized file/H1 identity, exact evidence outside all managed context directories, stable reads, and duplicate stems across the three types. `pointable-context-record-check` continues to validate strict Task/Verification schema, timestamps, exact evidence, and cross-type identity. Neither gate infers, repairs, or writes artifacts; invalid output remains unavailable to the usable Context Index.
+
+### Explicit long-task coverage gate
+
+`pointable-context-coverage` reads a strict `docs/context-coverage.json` declaration for one bounded long task. The declaration names only the Module, Decision, Task, and Verification identities that the user or Agent has explicitly decided must remain recoverable at the current milestone. The gate confirms that every declared key is indexed under the expected type and that the live workspace Provider can return a verified detail snapshot. It also incorporates the Task/Verification record check.
+
+The result separates `coverageRate`, `omissionRate`, `projectionFailureRate`, and `redundancyRate`. It returns identities, revisions, freshness, issue codes, and counts—never selected text, facts, file contents, or configuration values. These measures establish structural coverage against an explicit declaration; they cannot discover an important object that nobody declared, and they are not evidence of human-efficiency improvement.
 
 ## Current fixture
 
@@ -119,13 +138,21 @@ Only `qualified` permits the current runtime to be described as attached. `unava
 
 ## Evaluation boundary
 
-`pnpm run benchmark:workspace` measures deterministic component latency in an isolated temporary workspace. It explicitly reports `technical_latency_only`, invokes no model, and creates no Chat Turn. The first recorded local medians were below the 500 ms component target, but this is not evidence that people understand a project faster. Human `time_to_verified_fact`, answer accuracy, lane-leave rate, and Chat Turn reduction must be measured with the counterbalanced protocol in [docs/evaluation-protocol.md](docs/evaluation-protocol.md).
+`pnpm run benchmark:workspace` measures deterministic component latency in an isolated temporary workspace. It explicitly reports `technical_latency_only`, invokes no model, and creates no Chat Turn. The first recorded local medians were below the 500 ms component target, but this is not evidence that people understand a project faster. Short-task presentation/efficiency pilots are currently deferred; later validation will focus on long-horizon context reconstruction after delay, state drift, cross-session resumption, or handoff, using [docs/evaluation-protocol.md](docs/evaluation-protocol.md).
 
 ### Frozen study pack v1
 
-The non-inferential facilitator pack in [docs/evaluation/study-v1](docs/evaluation/study-v1/README.md) freezes one P-A/P-B/P-C presentation task and six A/B development lookup tasks. It includes exact-evidence answer units, a privacy-bounded log schema, a deterministic 12-slot Latin-square assignment, and an isolated Git workspace with a reproducible revision mutation. It has not been run and supports no efficiency claim.
+The non-inferential facilitator pack in [docs/evaluation/study-v1](docs/evaluation/study-v1/README.md) freezes one P-A/P-B/P-C presentation task and six A/B development lookup tasks. It includes exact-evidence answer units, a privacy-bounded log schema, a deterministic 12-slot Latin-square assignment, and an isolated Git workspace with a reproducible revision mutation. It has not been run, is not the current product gate, and supports no efficiency claim.
 
 `pnpm run study:validate` verifies the evidence lines, privacy fields and schedule balance and returns a `packDigest`. `pointable-context-study assignment --repository-root <root> --slot <1-12> --json` returns the preassigned order and condition for one anonymous slot. Every collected row must retain that digest.
+
+### Controlled long-task study v2 prototype
+
+[docs/evaluation/study-v2](docs/evaluation/study-v2/README.md) defines the controlled long-task experiment proposed for the next validation stage. It uses six frozen development histories, no live model during measured trials, a counterbalanced three-A/three-B schedule, bounded automatic timing and interaction events, participant-visible result preview, public-key encryption, and an explicit GitHub pull-request submission step. Native trial events now feed a strict result pipeline: trial-relative monotonic time and frozen scoring derive objective metrics, six streams receive one session sequence, CSV/event disagreement fails validation, and only a fully validated staging directory is atomically published. The included setup Skill may prepare and diagnose the package, but it must stop at `STUDY READY` and may not answer a measured task or submit data on the participant's behalf.
+
+`pnpm run study-v2:validate` checks the pack contract and digest. `pnpm run build:study-v2 -- --destination <new-absolute-directory> --zip <new-absolute-zip>` creates a prototype release. The current qualification status and remaining release gates are recorded in [IMPLEMENTATION_STATUS.md](docs/evaluation/study-v2/IMPLEMENTATION_STATUS.md); in particular, these materials are not yet an approved participant-data collection release.
+
+The bundled internal runner now supports a resumable two-stage session. `run-native-session` executes or resumes the six assigned trials and stops at `awaiting_questionnaire`; each completed trial is an append-only digest checkpoint bound to the exact participant/slot/session/pack/build tuple. `finalize-native-session` consumes all six without rerunning them, rejects incomplete sessions before mounting a questionnaire, and opens a native five-scale questionnaire in the current Codex Chat Lane. The questionnaire sends no Chat turn, invokes no model, accepts no free text, and publishes the validated result only after all five ratings are submitted. This remains an internal prototype until native usability acceptance and the clean-machine rehearsal are complete.
 
 ## Reused foundations
 
@@ -171,6 +198,7 @@ pnpm install
 pnpm run check
 pnpm test
 pnpm run records:check
+pnpm run coverage:check
 pnpm run study:validate
 
 # Headless fixture MCP server

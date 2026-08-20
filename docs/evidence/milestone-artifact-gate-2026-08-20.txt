@@ -1,0 +1,1 @@
+2026-08-20 milestone artifact gate: Artifact Check validated 4/4 explicit Concept/Change/Decision artifacts, Record Check validated 3/3 Task/Verification records, declared long-task Context Coverage returned 7/7 available with zero omission/projection-failure/redundancy, and the full regression passed 244/244.

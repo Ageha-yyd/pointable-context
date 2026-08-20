@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "entities": [{
+    "id": "CONCEPT:ORIENTATION-GATE",
+    "label": "orientation gate",
+    "type": "concept",
+    "meaning": "在进入练习之前执行的发布包完整性与 Codex Host 兼容性检查。",
+    "whyNow": "受控实验必须在材料或 Host 不匹配时，于任何计分工作之前停止。",
+    "flow": ["验证发布包", "通过 orientation gate", "进入不计分练习"],
+    "boundary": "它不证明参与者理解，也不证明实验产品有效。",
+    "evidence": "workspace/PROJECT_STATE.md:5"
+  }]
+}

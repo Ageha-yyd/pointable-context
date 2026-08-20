@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "entities": [{
+    "id": "MODULE:RELAY-CACHE-ENTRY",
+    "label": "relay-cache public entry",
+    "type": "module",
+    "meaning": "模块拆分后，缓存消费者使用的稳定导入边界。",
+    "whyNow": "持久化、迁移读取和公共入口已经分离，一个新消费者正准备接入。",
+    "flow": ["单体模块", "拆分持久化与入口", "新消费者使用公共入口"],
+    "boundary": "公共入口不承诺内部 store 布局稳定，也不会移除旧快照读取支持。",
+    "evidence": "workspace/PROJECT_STATE.md:7"
+  }]
+}

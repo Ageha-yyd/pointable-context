@@ -1,0 +1,48 @@
+2026-08-20 native scripted conversation probe: built-in OpenAI provider identity was redirected only to a loopback Responses endpoint; two WebSocket `response.create` requests consumed two fixed replies, App Server persisted two ordinary turns, and Codex Desktop rendered two user plus two assistant messages on four standard selectable surfaces. No live OpenAI model was invoked. Raw `thread/inject_items` was separately shown not to create visible Desktop turns.
+
+Study-v2 native controlled-conversation replay evidence
+
+Scope
+- Workspace: D:\github repository\CHI\pointable-context
+- Codex App Server user agent: pointable_context_app_host/0.146.0 on Windows x86_64
+- Desktop host inspected: OpenAI.Codex 26.814.5517.0
+- This is a technical qualification probe, not participant data and not evidence of an efficiency effect.
+
+Negative control: raw history injection
+- A persistent task was created and four Responses message items were sent through `thread/inject_items`.
+- `thread/read` returned zero ordinary turns and Codex Desktop showed a blank conversation body.
+- Conclusion: model-visible injected history is not a valid substitute for native visible Chat Lane turns.
+- The probe task was deleted after inspection.
+
+Positive path: fixed replies through ordinary turns
+- A loopback-only scripted Responses provider was started on an ephemeral 127.0.0.1 port.
+- Codex App Server used the built-in `openai` provider identity with `openai_base_url` overridden only for that child process.
+- The provider implemented `/v1/responses` WebSocket `response.create` and returned a bounded, fixed event sequence.
+- Two ordinary `turn/start` calls produced two completed turns. Each turn contained one user message and one scripted assistant reply.
+- Provider audit contained exactly two WebSocket requests, ordinals 1 and 2, model `gpt-4.1`; no prompt text was retained.
+- `thread/read` contained all four unique message markers.
+- `liveOpenAIModelInvoked` was false; all model traffic was loopback.
+
+Desktop inspection
+- The persistent task was opened in Codex Desktop by exact thread id.
+- `document.body.innerText` contained the task title, both user messages, and both assistant replies.
+- Querying `[data-selected-text-overlay-target]` returned four matching surfaces: U1=1, A1=1, U2=1, A2=1.
+- Therefore the stimulus is visible and selectable in the native Chat Lane rather than a browser or study imitation surface.
+- The probe task was deleted and Desktop returned to the original development task after inspection.
+
+Implementation and automated checks
+- `src/evaluation/study-v2/scripted-responses-provider.ts`: bounded HTTP/SSE and WebSocket scripted transport; loopback only; no prompt retention.
+- `src/evaluation/study-v2/native-scripted-task.ts`: reusable real-turn materializer with exact task cleanup on failure.
+- `src/evaluation/study-v2/native-conversation-probe.ts`: retained negative-control injection probe.
+- `pnpm run check`: PASS.
+- Native conversation/provider/materializer tests: 11/11 PASS, including completion-before-RPC-response race coverage.
+
+Qualified claim
+- A controlled fixed multi-turn stimulus can be materialized as ordinary, persistent, selectable Codex Desktop messages without invoking a live model.
+
+Not established
+- Conversion of all seven study scenarios to multi-turn scripts.
+- Non-obscuring answer and exit interaction.
+- Condition B companion lifecycle and A/B isolation.
+- Six-trial checkpoint/result integration on the new surface.
+- Clean-machine packaging, cross-version compatibility, participant usability, or efficiency improvement.

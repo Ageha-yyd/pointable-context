@@ -238,7 +238,7 @@ try {
     }),
   ]);
   const detailRef = `pdet:${Buffer.alloc(32, 7).toString("base64url")}`;
-  const revisionIntentPromise = waitForBindingIntent(connection, bindingName, "check");
+  const revisionIntentPromise = waitForBindingIntent(connection, bindingName, "check", 10_000);
   const response = createPointableLookupResponse(intent, {
     kind: "detail",
     detail: {
@@ -272,6 +272,87 @@ try {
     createDeliverPointableResultExpression(response, lifecycleId),
   );
   if (delivered?.outcome !== "applied") throw new Error("detail was not applied");
+  await evaluate(connection, `new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
+  })`);
+
+  const cardDrag = await waitFor(connection, `(() => {
+    const card = document.querySelector('[data-pointable-context-role="card"]');
+    const handle = document.querySelector('[data-pointable-context-role="drag-handle"]');
+    if (!(card instanceof HTMLElement) || !(handle instanceof HTMLElement)) return null;
+    const cardRect = card.getBoundingClientRect();
+    const handleRect = handle.getBoundingClientRect();
+    if (cardRect.width <= 0 || handleRect.height <= 0) return null;
+    const deltaX = handleRect.left < 100 ? 72 :
+      handleRect.right > innerWidth - 100 ? -72 : 72;
+    const deltaY = handleRect.top < 100 ? 48 :
+      handleRect.bottom > innerHeight - 100 ? -48 : 48;
+    return {
+      startX: handleRect.left + Math.min(56, handleRect.width / 3),
+      startY: handleRect.top + handleRect.height / 2,
+      endX: handleRect.left + Math.min(56, handleRect.width / 3) + deltaX,
+      endY: handleRect.top + handleRect.height / 2 + deltaY,
+      beforeLeft: cardRect.left,
+      beforeTop: cardRect.top,
+    };
+  })()`);
+  await evaluate(connection, `(() => {
+    window.__pointableHeadlessDragEvents = [];
+    for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
+      document.addEventListener(type, (event) => {
+        const path = event.composedPath();
+        if (!path.some((item) => item instanceof Element && item.getAttribute('data-pointable-context-role') === 'card')) return;
+        window.__pointableHeadlessDragEvents.push({
+          type,
+          trusted: event.isTrusted,
+          pointerId: event.pointerId,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          targetRole: event.target?.getAttribute?.('data-pointable-context-role') ?? null,
+        });
+      }, true);
+    }
+    return true;
+  })()`);
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mousePressed", x: cardDrag.startX, y: cardDrag.startY, button: "left", clickCount: 1,
+  });
+  for (let step = 1; step <= 6; step += 1) {
+    const progress = step / 6;
+    await connection.send("Input.dispatchMouseEvent", {
+      type: "mouseMoved",
+      x: cardDrag.startX + (cardDrag.endX - cardDrag.startX) * progress,
+      y: cardDrag.startY + (cardDrag.endY - cardDrag.startY) * progress,
+      button: "left",
+      buttons: 1,
+    });
+  }
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mouseReleased", x: cardDrag.endX, y: cardDrag.endY, button: "left", clickCount: 1,
+  });
+  await sleep(200);
+  const movedCard = await evaluate(connection, `(() => {
+    const card = document.querySelector('[data-pointable-context-role="card"]');
+    if (!(card instanceof HTMLElement)) return null;
+    const rect = card.getBoundingClientRect();
+    const moved = Math.abs(rect.left - ${JSON.stringify(cardDrag.beforeLeft)}) > 20 ||
+      Math.abs(rect.top - ${JSON.stringify(cardDrag.beforeTop)}) > 20;
+    const bounded = rect.left >= 11 && rect.top >= 11 &&
+      rect.right <= innerWidth - 11 && rect.top <= innerHeight - 11;
+    return {
+      moved,
+      bounded,
+      left: rect.left,
+      top: rect.top,
+      styleLeft: card.style.left,
+      styleTop: card.style.top,
+      events: window.__pointableHeadlessDragEvents,
+      status: window.__pointableContextRenderer?.status?.(),
+    };
+  })()`);
+  if (movedCard === null || movedCard.moved !== true || movedCard.bounded !== true) {
+    throw new Error(`trusted title-bar drag did not move the card within the viewport: ${JSON.stringify(movedCard)}`);
+  }
 
   const composer = await evaluate(connection, `(() => {
     const editor = document.getElementById('fixture-composer');
@@ -509,6 +590,7 @@ try {
     browser: "Microsoft Edge headless",
     selectedText: intent.selectionText,
     trustedActionProducedDetail: true,
+    trustedTitleBarDragMovedCard: true,
     composerFocusPreservedCard: true,
     mentalModelRenderedInLane: true,
     evidenceExpandedInPlace: true,

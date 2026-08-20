@@ -1,0 +1,13 @@
+2026-08-20 first-round human acceptance: selection_inert passed in the native Codex Chat Lane; selection alone did not open detail.
+2026-08-20 first-round human acceptance: trusted_click passed; explicit action opened the bound workspace detail.
+2026-08-20 first-round human acceptance: anchored_card passed; detail appeared beside the current Chat Lane selection.
+2026-08-20 first-round human acceptance: progressive_disclosure passed; detail and evidence disclosures expanded and collapsed in place.
+2026-08-20 first-round human acceptance: close_and_focus_restore passed; the native card closed and the conversation remained usable.
+2026-08-20 first-round human acceptance: composer_persistence passed; focusing the current composer kept the open card available.
+2026-08-20 first-round human acceptance: scroll_and_virtualization passed; scrolling preserved usable native interaction.
+2026-08-20 second-round human acceptance: navigation_recovery passed; leaving and returning to the task restored a fresh native interaction path.
+2026-08-20 second-round human acceptance: stale_response_cleanup passed; the prior card did not follow the route or reappear after returning.
+2026-08-20 compatibility milestone: automatic host gates pass and 9 of 10 evidence-bound manual interaction checks pass; refresh_continuity remains pending.
+2026-08-20 third-round human acceptance: refresh_continuity passed; the revision notice appeared for the old snapshot and trusted refresh reused the same native card as guided.
+2026-08-20 Codex build qualification: OpenAI.Codex 26.810.7004.0 with renderer 02d0ff49ba84893aa1d52d5cf9d1baf3996b6bc037b07860af155189161c2551 passed automatic 4/4 and manual 10/10; qualification applies only to this exact build and digest.
+2026-08-20 qualified milestone: pnpm test completed with 240 passed, 0 failed; declared long-task context coverage completed with 5/5 available, omissionRate=0, projectionFailureRate=0, and redundancyRate=0; OpenAI.Codex 26.810.7004.0 with renderer 02d0ff49ba84893aa1d52d5cf9d1baf3996b6bc037b07860af155189161c2551 passed automatic 4/4 and manual 10/10 for this exact build only.

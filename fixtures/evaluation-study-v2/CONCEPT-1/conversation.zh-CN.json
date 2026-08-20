@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "CONCEPT-1",
+  "exchanges": [
+    { "user": "任务 A 的详情读取还没结束，我切到任务 B 后，旧结果却出现在新卡片里。", "assistant": "我复现了这个 race。结果在时间上很新，但展示时已经不属于当前任务、选区 generation 或 scope。" },
+    { "user": "给读取结果加 observedAt 是否就能解决？", "assistant": "不能。observedAt 只回答何时读取，不回答结果是否仍属于发起它的交互。" },
+    { "user": "那应该增加什么约束？", "assistant": "增加 authority fence：读取前绑定任务、选区 generation、scope 和 source revision，读取后重新验证。" },
+    { "user": "为什么展示前还要再检查一次？", "assistant": "读取后的校验到实际展示之间仍可能发生导航或 selection drift，因此展示前还要进行最后一道 Fence。" },
+    { "user": "通过 authority fence 能否证明业务结论完全正确？", "assistant": "不能。它防止跨上下文结果，只保证已验证来源与当前交互连续；它不证明来源之外的主张，也不会把 stale 事实变成 current。" }
+  ],
+  "referencedEntityIds": ["CONCEPT:AUTHORITY-FENCE"]
+}

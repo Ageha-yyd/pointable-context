@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "HANDOFF-1",
+  "exchanges": [
+    {
+      "user": "Implement the handoff result: schema first, serializer second, then add the command.",
+      "assistant": "The result schema and serializer are complete, and their unit tests pass. I have not added the command yet."
+    },
+    {
+      "user": "Before adding it, check whether another entry already exists.",
+      "assistant": "There is already a feature-flagged command wired to the serializer. A second command would duplicate the entry, so I removed that implementation step from the current scope."
+    },
+    {
+      "user": "The serializer unit tests are green. Can that close the handoff?",
+      "assistant": "No. They establish local logic only; they do not observe the existing command on Windows or prove that a clean workspace can read the produced result."
+    },
+    {
+      "user": "Should the next developer keep coding while collecting that evidence?",
+      "assistant": "Not in this gate. New feature work is not authorized; the remaining work is bounded evidence collection for the implementation that already exists."
+    },
+    {
+      "user": "What remains before another developer can accept the handoff?",
+      "assistant": "The handoff gate now requires an observed Windows run of the existing command and a clean-workspace readback. The unit test is supporting evidence, but it cannot replace either environment observation."
+    }
+  ],
+  "referencedEntityIds": [
+    "GATE:HANDOFF"
+  ]
+}

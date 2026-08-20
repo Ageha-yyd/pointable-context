@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "entities": [
+    {
+      "id": "CONCEPT:ORIENTATION-GATE",
+      "label": "orientation gate",
+      "type": "concept",
+      "meaning": "A release and host compatibility check performed before practice.",
+      "whyNow": "Setup must fail before measured work when the package or Codex host is unsupported.",
+      "flow": ["verify release", "orientation gate", "practice lookup"],
+      "boundary": "It does not prove participant comprehension or experimental effectiveness.",
+      "evidence": "workspace/PROJECT_STATE.md:5"
+    }
+  ]
+}

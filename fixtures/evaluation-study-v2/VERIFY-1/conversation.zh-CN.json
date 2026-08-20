@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "VERIFY-1",
+  "exchanges": [
+    { "user": "为 silent refresh rejection、explicit refresh acceptance 和 stale warning preservation 增加测试。", "assistant": "我已把三项写进 context-policy.test.ts，源码现在明确定义了预期行为。" },
+    { "user": "这些测试在修改后运行了吗？", "assistant": "现有保留输出没有显示该文件在最后一次编辑后被执行，因此不能绑定当前 revision。" },
+    { "user": "但后续 package build 成功了。", "assistant": "Build 成功不自动证明每个测试文件都执行，除非构建证据明确包含该命令与当前修订。" },
+    { "user": "至少可以根据源码报告什么？", "assistant": "可以使用 definition-only check 描述三个已定义行为，但 execution status 必须保持 unverified。" },
+    { "user": "什么时候才能报告 PASS？", "assistant": "运行精确测试文件并把结果绑定当前 source revision 后，才有资格把 definition-only check 升级为观察到的 PASS 或 FAIL。" }
+  ],
+  "referencedEntityIds": ["VERIFICATION:DEFINITION-ONLY"]
+}
