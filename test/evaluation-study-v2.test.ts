@@ -123,6 +123,28 @@ test("study-v2 pack is separate, counterbalanced, privacy-bounded, and digest-st
   assert.equal(second.packDigest, first.packDigest);
 });
 
+test("study-v2 pack digest is stable across Git line-ending conversion", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pointable-study-v2-crlf-"));
+  try {
+    await copyStudyV2Pack(root);
+    const manifestPath = "docs/evaluation/study-v2/manifest.json";
+    const manifest = JSON.parse(await readFile(join(root, ...manifestPath.split("/")), "utf8")) as {
+      materials: string[];
+    };
+    for (const path of [manifestPath, ...manifest.materials]) {
+      const target = join(root, ...path.split("/"));
+      const text = await readFile(target, "utf8");
+      await writeFile(target, text.replace(/\r\n?/gu, "\n").replace(/\n/gu, "\r\n"), "utf8");
+    }
+    const source = await validateStudyV2Pack(resolve("."));
+    const converted = await validateStudyV2Pack(root);
+    assert.equal(converted.valid, true, JSON.stringify(converted.issues));
+    assert.equal(converted.packDigest, source.packDigest);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("study-v2 pack rejects scripted answer, object, and selectable-term drift", async () => {
   const cases = [
     {

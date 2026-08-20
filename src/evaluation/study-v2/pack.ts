@@ -182,6 +182,10 @@ function decoded(buffer: Buffer): string {
   return new TextDecoder("utf-8", { fatal: true }).decode(buffer);
 }
 
+function canonicalDigestText(buffer: Buffer): string {
+  return decoded(buffer).replace(/\r\n?/gu, "\n");
+}
+
 async function validateScenarioMaterials(
   root: string,
   issues: StudyV2PackIssue[],
@@ -227,7 +231,7 @@ async function calculateDigest(root: string, paths: readonly string[]): Promise<
   for (const path of [MANIFEST_PATH, ...paths].sort()) {
     hash.update(path, "utf8");
     hash.update("\0", "utf8");
-    hash.update(await readBounded(root, path));
+    hash.update(canonicalDigestText(await readBounded(root, path)), "utf8");
     hash.update("\n", "utf8");
   }
   return hash.digest("hex");
