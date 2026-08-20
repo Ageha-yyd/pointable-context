@@ -1,6 +1,6 @@
 # Study v2 implementation status
 
-Status: native controlled-conversation runner integrated; participant data collection is not enabled.
+Status: native controlled-conversation runner integrated and six-trial technical QA completed; the package is a pilot candidate, while recruitment remains fail-closed behind governance approval.
 
 ## Implemented and verified
 
@@ -24,6 +24,7 @@ Status: native controlled-conversation runner integrated; participant data colle
 - Five-turn frozen development conversations for `TRAIN-1` and all six measured scenarios in both `zh-CN` and `en-US`. Language is selected before training, bound into the resumable session checkpoint and final result manifest, and cannot change within a session. Both languages share answer keys, object IDs, assignment, and scoring rules. Pack validation binds every localized conversation to its correct answer, correct object, complete entity references, and an exact selectable label or ID in assistant output.
 - The default single-trial and six-trial runners now compose that materializer with a private loopback custom model provider, a dedicated App Server, exact generated-task activation, the lightweight answer control, condition-B Quiet Context Reveal, append-only checkpoints, and the existing result pipeline. Condition A never mounts the companion. Trial timing begins only after the exact generated task is active, and terminal cleanup deletes only that task and stops the private runtime.
 - The first five completed measured tasks are deleted after checkpointing, while the sixth is migrated to a clean retained review task without the scripted provider override. That retained task is activated before the old runtime task is deleted, and submitting the questionnaire does not delete it. Task restoration after switching away and back is a release regression gate.
+- A pilot-governance validator binds ethics determination, organizer contact, recruitment window, deletion/freeze/retention dates, target sample, dedicated submission repository, RSA public-key digest, immutable Git commit, release tag, and organizer sign-off. The release builder emits only `pilot_candidate_not_for_recruitment` without that complete record and actual key.
 
 ## Current native-interaction status
 
@@ -45,6 +46,6 @@ The repository TypeScript check, complete product regression suite, study pack v
 2. Repeat both A and B end to end against the qualified build; visible but inert cards, missing native turns, wrong task activation, or covered Chat content are failures.
 3. Complete a clean Windows-machine rehearsal from the exact ZIP, including install, `TRAIN-1`, all six trials, preview, encryption, restart recovery, and uninstall.
 4. Exercise the real GitHub fork, branch, push, and pull-request path with a test participant account.
-5. Freeze organizer/release/governance parameters and obtain the applicable research/ethics approval before recruiting external participants.
+5. Complete `PILOT_GOVERNANCE_TEMPLATE.json`, obtain the applicable research/ethics determination, and validate it against the exact release commit and organizer RSA public key before recruiting external participants.
 
 No implementation or technical test in this repository establishes the product's human-efficiency claim. The primary future outcome remains time-to-correct-context under a controlled long-task reconstruction goal, with correctness, navigation, reveal use, scripted follow-up requests, and subjective workload as secondary measures.

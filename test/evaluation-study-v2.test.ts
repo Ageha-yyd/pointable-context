@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { generateKeyPairSync } from "node:crypto";
+import { createHash, generateKeyPairSync } from "node:crypto";
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -19,6 +19,7 @@ import {
   writeStudyV2ResultFixture,
 } from "../src/evaluation/study-v2/results.js";
 import { planStudyV2GitHubSubmission } from "../src/evaluation/study-v2/submission.js";
+import { validateStudyV2PilotGovernance } from "../src/evaluation/study-v2/governance.js";
 import type {
   StudyV2Event,
   StudyV2Questionnaire,
@@ -121,6 +122,92 @@ test("study-v2 pack is separate, counterbalanced, privacy-bounded, and digest-st
   assert.equal(first.valid, true, JSON.stringify(first.issues));
   assert.match(first.packDigest ?? "", /^[a-f0-9]{64}$/u);
   assert.equal(second.packDigest, first.packDigest);
+});
+
+test("pilot governance is fail-closed and binds approval, release, dates, repository, and RSA key", async () => {
+  const template = JSON.parse(await readFile(
+    resolve("docs/evaluation/study-v2/PILOT_GOVERNANCE_TEMPLATE.json"),
+    "utf8",
+  )) as unknown;
+  const { publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const publicKeyPem = publicKey.export({ type: "spki", format: "pem" }).toString();
+  const publicKeySha256 = createHash("sha256")
+    .update(publicKey.export({ type: "spki", format: "der" }))
+    .digest("hex");
+  const releaseCommit = "a".repeat(40);
+  const pending = validateStudyV2PilotGovernance({
+    governance: template,
+    researcherPublicKeyPem: publicKeyPem,
+    expectedReleaseCommit: releaseCommit,
+  });
+  assert.equal(pending.valid, false);
+  assert.ok(pending.issues.includes("pilot_governance_identity_invalid"));
+
+  const governance = {
+    schemaVersion: 1,
+    studyId: STUDY_V2_ID,
+    status: "approved_for_pilot_data_collection",
+    releaseCommit,
+    releaseTag: "study-v2-pilot-1",
+    organizerContact: "mailto:study@example.org",
+    ethicsReview: {
+      determination: "approved",
+      reference: "IRB-2026-001",
+      decidedAt: "2026-08-01T00:00:00.000Z",
+    },
+    recruitment: {
+      opensAt: "2026-09-01T00:00:00.000Z",
+      closesAt: "2026-09-30T00:00:00.000Z",
+      targetCompletedParticipants: 24,
+    },
+    dataGovernance: {
+      deletionRequestUntil: "2026-10-15T00:00:00.000Z",
+      freezeAt: "2026-10-16T00:00:00.000Z",
+      retentionEndsAt: "2027-10-16T00:00:00.000Z",
+    },
+    submission: {
+      repository: "example/pointable-context-study-submissions",
+      baseBranch: "main",
+      publicKeySha256,
+      githubAccountIdentityVisible: true,
+    },
+    organizerSignOffAt: "2026-08-15T00:00:00.000Z",
+  };
+  const approved = validateStudyV2PilotGovernance({
+    governance,
+    researcherPublicKeyPem: publicKeyPem,
+    expectedReleaseCommit: releaseCommit,
+  });
+  assert.equal(approved.valid, true, JSON.stringify(approved.issues));
+  assert.equal(approved.publicKeySha256, publicKeySha256);
+  const wrongCommit = validateStudyV2PilotGovernance({
+    governance,
+    researcherPublicKeyPem: publicKeyPem,
+    expectedReleaseCommit: "b".repeat(40),
+  });
+  assert.equal(wrongCommit.valid, false);
+  assert.ok(wrongCommit.issues.includes("pilot_governance_commit_mismatch"));
+});
+
+test("default study release is a non-recruiting pilot candidate", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pointable-study-v2-candidate-"));
+  const destination = join(root, "release");
+  try {
+    const built = spawnSync(process.execPath, [
+      "scripts/build-study-v2-release.mjs",
+      "--destination",
+      destination,
+    ], { cwd: resolve("."), encoding: "utf8", windowsHide: true });
+    assert.equal(built.status, 0, built.stderr);
+    const manifest = JSON.parse(await readFile(join(destination, "release-manifest.json"), "utf8")) as {
+      status?: string;
+    };
+    assert.equal(manifest.status, "pilot_candidate_not_for_recruitment");
+    await assert.rejects(readFile(join(destination, "pilot-governance.json"), "utf8"));
+    await assert.rejects(readFile(join(destination, "organizer-public.pem"), "utf8"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("study-v2 pack digest is stable across Git line-ending conversion", async () => {

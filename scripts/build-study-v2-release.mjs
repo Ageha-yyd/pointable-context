@@ -6,27 +6,46 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { validateStudyV2Pack } from "../dist/src/evaluation/study-v2/pack.js";
+import { validateStudyV2PilotGovernance } from "../dist/src/evaluation/study-v2/governance.js";
 
 const execFileAsync = promisify(execFile);
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, "..");
 
 function usage() {
-  return "Usage: node scripts/build-study-v2-release.mjs --destination <absolute-new-directory> [--zip <absolute-new-zip>]";
+  return "Usage: node scripts/build-study-v2-release.mjs --destination <absolute-new-directory> [--zip <absolute-new-zip>] [--governance <absolute-json> --public-key <absolute-pem>]";
 }
 
 function parse(argv) {
   if (argv[0] === "--") argv = argv.slice(1);
-  const destinationIndex = argv.indexOf("--destination");
-  const zipIndex = argv.indexOf("--zip");
-  const destination = argv[destinationIndex + 1];
-  const zip = zipIndex < 0 ? undefined : argv[zipIndex + 1];
-  const expected = zip === undefined ? 2 : 4;
+  if (argv.length < 2 || argv.length % 2 !== 0) return undefined;
+  const allowed = new Set(["--destination", "--zip", "--governance", "--public-key"]);
+  const options = new Map();
+  for (let index = 0; index < argv.length; index += 2) {
+    const name = argv[index];
+    const value = argv[index + 1];
+    if (!allowed.has(name) || options.has(name) || value === undefined) return undefined;
+    options.set(name, value);
+  }
+  const destination = options.get("--destination");
+  const zip = options.get("--zip");
+  const governance = options.get("--governance");
+  const publicKey = options.get("--public-key");
   if (
-    destinationIndex < 0 || argv.length !== expected || !isAbsolute(destination) ||
-    (zip !== undefined && (!isAbsolute(zip) || !zip.toLowerCase().endsWith(".zip")))
+    typeof destination !== "string" || !isAbsolute(destination) ||
+    (zip !== undefined && (typeof zip !== "string" || !isAbsolute(zip) || !zip.toLowerCase().endsWith(".zip"))) ||
+    ((governance === undefined) !== (publicKey === undefined)) ||
+    (governance !== undefined && (typeof governance !== "string" || !isAbsolute(governance))) ||
+    (publicKey !== undefined && (typeof publicKey !== "string" || !isAbsolute(publicKey)))
   ) return undefined;
-  return { destination: resolve(destination), ...(zip === undefined ? {} : { zip: resolve(zip) }) };
+  return {
+    destination: resolve(destination),
+    ...(zip === undefined ? {} : { zip: resolve(zip) }),
+    ...(governance === undefined ? {} : {
+      governance: resolve(governance),
+      publicKey: resolve(publicKey),
+    }),
+  };
 }
 
 function contained(root, target) {
@@ -63,10 +82,53 @@ async function filesBelow(root, current = root) {
   return result;
 }
 
-async function build({ destination, zip }) {
+async function build({ destination, zip, governance, publicKey }) {
   const pack = await validateStudyV2Pack(repositoryRoot);
   if (!pack.valid || pack.packDigest === undefined) {
     throw new Error(`study-v2 pack is invalid: ${JSON.stringify(pack.issues)}`);
+  }
+  let approvedGovernance;
+  if (governance !== undefined && publicKey !== undefined) {
+    const releaseCommit = (await execFileAsync("git", ["rev-parse", "HEAD"], {
+      cwd: repositoryRoot,
+      windowsHide: true,
+      timeout: 10_000,
+      maxBuffer: 64 * 1024,
+    })).stdout.trim();
+    const governanceText = await readFile(governance, "utf8");
+    const governanceValue = JSON.parse(governanceText);
+    const publicKeyText = await readFile(publicKey, "utf8");
+    const validation = validateStudyV2PilotGovernance({
+      governance: governanceValue,
+      researcherPublicKeyPem: publicKeyText,
+      expectedReleaseCommit: releaseCommit,
+    });
+    if (!validation.valid) {
+      throw new Error(`study-v2 pilot governance is invalid: ${JSON.stringify(validation.issues)}`);
+    }
+    const worktreeStatus = (await execFileAsync("git", ["status", "--porcelain", "--untracked-files=normal"], {
+      cwd: repositoryRoot,
+      windowsHide: true,
+      timeout: 10_000,
+      maxBuffer: 256 * 1024,
+    })).stdout.trim();
+    if (worktreeStatus !== "") throw new Error("approved pilot release requires a clean Git worktree");
+    const releaseTag = governanceValue.releaseTag;
+    const tagObject = (await execFileAsync("git", ["cat-file", "-t", `refs/tags/${releaseTag}`], {
+      cwd: repositoryRoot,
+      windowsHide: true,
+      timeout: 10_000,
+      maxBuffer: 64 * 1024,
+    })).stdout.trim();
+    if (tagObject !== "tag") throw new Error("approved pilot release requires an annotated Git tag");
+    const taggedCommit = (await execFileAsync("git", ["rev-parse", `refs/tags/${releaseTag}^{commit}`], {
+      cwd: repositoryRoot,
+      windowsHide: true,
+      timeout: 10_000,
+      maxBuffer: 64 * 1024,
+    })).stdout.trim();
+    if (taggedCommit !== releaseCommit) throw new Error("pilot release tag does not resolve to the governed commit");
+    approvedGovernance = { governanceText, publicKeyText, validation };
   }
   await ensureNewDirectory(destination);
   const sources = [
@@ -91,6 +153,10 @@ async function build({ destination, zip }) {
     ["host/workspace-companion.mjs", "host/workspace-companion.mjs"],
   ];
   for (const [source, target] of sources) await copyFile(source, join(destination, target));
+  if (approvedGovernance !== undefined) {
+    await writeFile(join(destination, "pilot-governance.json"), approvedGovernance.governanceText, { flag: "wx" });
+    await writeFile(join(destination, "organizer-public.pem"), approvedGovernance.publicKeyText, { flag: "wx" });
+  }
   const releaseMarketplacePath = join(destination, ".agents", "plugins", "marketplace.json");
   const releaseMarketplace = JSON.parse(await readFile(releaseMarketplacePath, "utf8"));
   if (releaseMarketplace?.plugins?.[0]?.name !== "pointable-context" ||
@@ -108,8 +174,14 @@ async function build({ destination, zip }) {
   const releaseManifest = {
     schemaVersion: 1,
     studyId: "pointable-context-study-v2",
-    status: "prototype_not_for_data_collection",
+    status: approvedGovernance === undefined
+      ? "pilot_candidate_not_for_recruitment"
+      : "approved_for_pilot_data_collection",
     packDigest: pack.packDigest,
+    ...(approvedGovernance === undefined ? {} : {
+      releaseCommit: approvedGovernance.validation.releaseCommit,
+      organizerPublicKeySha256: approvedGovernance.validation.publicKeySha256,
+    }),
     generatedAt: new Date().toISOString(),
     runtime: "Node.js 24 or newer; single-file Windows executable not yet qualified",
     files: hashes,

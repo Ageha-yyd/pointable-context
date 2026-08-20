@@ -21,6 +21,7 @@ import { runStudyV2NativeSession } from "./native-session-runner.js";
 import { runStudyV2NativeQuestionnaire } from "./native-questionnaire-runner.js";
 import { runStudyV2NativeTraining } from "./native-training-runner.js";
 import { parseStudyV2Language, type StudyV2Language } from "./language.js";
+import { validateStudyV2PilotGovernance } from "./governance.js";
 
 function option(argv: readonly string[], name: string): string | undefined {
   const index = argv.indexOf(name);
@@ -54,6 +55,7 @@ function usage(): string {
     "  pointable-context-study-v2 assignment --slot <1-12> --json",
     "  pointable-context-study-v2 validate-result --result-dir <path> --json",
     "  pointable-context-study-v2 preview-result --result-dir <path> --json",
+    "  pointable-context-study-v2 validate-governance --governance <json> --public-key <pem> --release-commit <40-hex> --json",
     "  pointable-context-study-v2 pack-result --result-dir <path> --public-key <pem> --output <new-file> --json",
     "  pointable-context-study-v2 submit --github --envelope <file> --repository <owner/repo> [--base main] [--dry-run|--confirm-submit] --json",
     "  pointable-context-study-v2 run-native-training --repository-root <path> --participant-code <P000> --slot <1-12> --language <zh-CN|en-US> [--endpoint http://127.0.0.1:9223] --json",
@@ -174,6 +176,20 @@ try {
     const result = command === "validate-result"
       ? await validateStudyV2ResultDirectory(resolve(directory))
       : await previewStudyV2ResultDirectory(resolve(directory));
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+    process.exitCode = result.valid ? 0 : 2;
+  } else if (command === "validate-governance") {
+    const governancePath = option(argv, "--governance");
+    const publicKeyPath = option(argv, "--public-key");
+    const releaseCommit = option(argv, "--release-commit");
+    if (governancePath === undefined || publicKeyPath === undefined || releaseCommit === undefined) {
+      throw new Error("pilot_governance_arguments_required");
+    }
+    const result = validateStudyV2PilotGovernance({
+      governance: JSON.parse(await readFile(resolve(governancePath), "utf8")) as unknown,
+      researcherPublicKeyPem: await readFile(resolve(publicKeyPath), "utf8"),
+      expectedReleaseCommit: releaseCommit,
+    });
     process.stdout.write(`${JSON.stringify(result)}\n`);
     process.exitCode = result.valid ? 0 : 2;
   } else if (command === "pack-result") {

@@ -7,6 +7,7 @@
 3. Record the qualified Codex Desktop package, renderer digest, study pack digest, release SHA-256, and runner version.
 4. Obtain the applicable ethics, consent, privacy, and data-retention approvals.
 5. Prepare a separate submissions repository that accepts encrypted `.pcstudy` files only.
+6. Copy `PILOT_GOVERNANCE_TEMPLATE.json` outside the participant pack, replace every pending value, and validate it against the exact frozen commit and organizer RSA public key.
 
 ## Assignment / 分配
 
@@ -31,6 +32,21 @@ Provide exactly:
 - consent and withdrawal information.
 
 Never provide answer keys, scenario order explanations, a shared GitHub token, or a pre-opened measured transcript.
+
+## Governance gate / 治理门禁
+
+The normal release build is deliberately non-recruiting. Validate the completed governance record first:
+
+```powershell
+node study-dist/pointable-study.mjs validate-governance `
+  --governance <absolute-governance.json> `
+  --public-key <absolute-organizer-public.pem> `
+  --release-commit <40-hex-frozen-commit> --json
+```
+
+Only a `valid: true` result may be passed to the release builder with `--governance` and `--public-key`. The repository must also be clean, and `releaseTag` must already be an annotated tag resolving to the governed commit. The resulting `release-manifest.json` must say exactly `approved_for_pilot_data_collection`; candidate, prototype, missing, or unknown status must stop setup before a measured trial.
+
+普通构建默认只能生成不可招募的候选包。只有治理文件与实际公钥、冻结 commit 校验一致后，才允许构建正式 pilot 包。任何候选、原型、缺失或未知状态都必须在计分试次前停止。
 
 ## Session supervision / 实验期间
 

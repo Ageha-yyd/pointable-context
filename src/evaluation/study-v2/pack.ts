@@ -84,7 +84,7 @@ function validateManifest(manifest: JsonObject, issues: StudyV2PackIssue[]): str
   if (
     manifest.schemaVersion !== 2 ||
     manifest.studyId !== STUDY_V2_ID ||
-    manifest.status !== "prototype_materials_not_run" ||
+    manifest.status !== "pilot_candidate_materials_not_run" ||
     manifest.liveModelDuringTrials !== false ||
     manifest.presentationModel !== "P-C" ||
     manifest.participantSlots !== 12 ||

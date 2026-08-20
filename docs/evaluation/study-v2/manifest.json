@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "studyId": "pointable-context-study-v2",
-  "status": "prototype_materials_not_run",
+  "status": "pilot_candidate_materials_not_run",
   "frozenOn": "2026-08-20",
   "languages": ["zh-CN", "en-US"],
   "defaultLanguage": "zh-CN",
@@ -168,6 +168,7 @@
     "docs/evaluation/study-v2/TROUBLESHOOTING.md",
     "docs/evaluation/study-v2/DATA_DICTIONARY.md",
     "docs/evaluation/study-v2/CONSENT.md",
+    "docs/evaluation/study-v2/PILOT_GOVERNANCE_TEMPLATE.json",
     "docs/evaluation/study-v2/GITHUB_SUBMISSION.md",
     "docs/evaluation/study-v2/IMPLEMENTATION_STATUS.md",
     "docs/compatibility/codex-desktop-current.json",

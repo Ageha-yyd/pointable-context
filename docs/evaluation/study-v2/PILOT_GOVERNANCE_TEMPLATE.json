@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "studyId": "pointable-context-study-v2",
+  "status": "pending_approval",
+  "releaseCommit": "REPLACE_WITH_40_HEX_COMMIT",
+  "releaseTag": "REPLACE_WITH_IMMUTABLE_TAG",
+  "organizerContact": "REPLACE_WITH_MAILTO_OR_HTTPS_CONTACT",
+  "ethicsReview": {
+    "determination": "pending",
+    "reference": "REPLACE_WITH_APPROVAL_OR_NOT_REQUIRED_REFERENCE",
+    "decidedAt": "REPLACE_WITH_ISO_8601_TIME"
+  },
+  "recruitment": {
+    "opensAt": "REPLACE_WITH_ISO_8601_TIME",
+    "closesAt": "REPLACE_WITH_ISO_8601_TIME",
+    "targetCompletedParticipants": 0
+  },
+  "dataGovernance": {
+    "deletionRequestUntil": "REPLACE_WITH_ISO_8601_TIME",
+    "freezeAt": "REPLACE_WITH_ISO_8601_TIME",
+    "retentionEndsAt": "REPLACE_WITH_ISO_8601_TIME"
+  },
+  "submission": {
+    "repository": "REPLACE_WITH_OWNER/REPOSITORY",
+    "baseBranch": "main",
+    "publicKeySha256": "REPLACE_WITH_64_HEX_SPKI_SHA256",
+    "githubAccountIdentityVisible": true
+  },
+  "organizerSignOffAt": "REPLACE_WITH_ISO_8601_TIME"
+}

@@ -17,4 +17,4 @@ description: Prepare and diagnose an explicitly assigned Pointable Context contr
 8. If and only if the release declares the native scripted runner qualified, launch the unscored `TRAIN-1` as ordinary Codex turns. Do not accept a browser or full-overlay transcript imitation as the practice surface, and do not use a model to answer it.
 9. Emit only participant code, slot, language, pack digest, host qualification, native-runner qualification, and `STUDY READY`, then stop. Tell the participant to close this setup task before launching the controlled runner.
 
-Do not start measured collection from a release whose manifest says `prototype_not_for_data_collection`. Do not upload, encrypt, or submit a result through this setup skill.
+Start measured collection only when the immutable release manifest says exactly `approved_for_pilot_data_collection`. Treat prototype, candidate, missing, or unknown status as not approved. Do not upload, encrypt, or submit a result through this setup skill.

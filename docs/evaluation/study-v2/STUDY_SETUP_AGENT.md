@@ -45,7 +45,7 @@ If any is missing, stop. Do not invent, infer, randomize, or silently default it
 - Do not change language, slot, condition labels, timing, scenario order, answers, or event records.
 - Do not read raw selections, ordinary Chat, file contents, configuration values, names, email, or absolute paths into results.
 - Do not encrypt or submit without participant preview and a separate explicit confirmation.
-- Do not treat `prototype_not_for_data_collection` as permission to recruit participants.
+- Begin a measured session only from an immutable release whose `release-manifest.json` says exactly `approved_for_pilot_data_collection`. Candidate, prototype, missing, or unknown status is not permission to recruit participants.
 
 ## 中文提示词
 

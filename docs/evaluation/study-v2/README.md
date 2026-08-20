@@ -1,8 +1,8 @@
 # Pointable Context controlled study v2 / 受控实验 v2
 
-Status: experimental-branch package under qualification; not yet approved for formal participant data collection.
+Status: pilot candidate under governance qualification; recruitment and participant data collection remain disabled until an immutable release says exactly `approved_for_pilot_data_collection`.
 
-状态：实验分支研究包正在资格验证中；尚未批准用于正式参与者数据收集。
+状态：研究包已进入 pilot 候选与治理资格阶段；在不可变发布包明确标记 `approved_for_pilot_data_collection` 之前，招募和参与者数据收集仍然禁用。
 
 ## What this experiment tests / 实验要检验什么
 
@@ -59,3 +59,5 @@ After setup, run `START-STUDY-SETUP.cmd`, create a new setup-only Codex task, an
 - A successful technical run does not establish the human-efficiency claim. Formal use still requires clean-machine rehearsal, fixed release digest, applicable ethics/governance approval, and organizer sign-off.
 
 The source branch is for review and rehearsal. Formal recruitment should use an immutable commit/tag and generated ZIP with checksums, not the moving branch head.
+
+The default release builder now emits `pilot_candidate_not_for_recruitment`. It can emit `approved_for_pilot_data_collection` only when a complete governance record is bound to the exact Git commit and the supplied RSA public key. `PILOT_GOVERNANCE_TEMPLATE.json` is intentionally invalid until the organizer replaces every pending value and obtains the applicable approval.
