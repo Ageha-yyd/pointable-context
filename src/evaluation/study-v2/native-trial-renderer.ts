@@ -44,12 +44,19 @@ function installStudyV2NativeTrial(
   let lastActionKey = "";
   let openCard = false;
   let startedAt = 0;
-  const terms = new Map(
-    config.entityTerms.map((entry) => [
-      entry.term.normalize("NFKC").trim().toLocaleLowerCase("en-US"),
-      entry.objectCode,
-    ]),
-  );
+  const terms = config.entityTerms.map((entry) => ({
+    term: entry.term.normalize("NFKC").trim().toLocaleLowerCase("en-US"),
+    objectCode: entry.objectCode,
+  }));
+
+  const objectInSelection = (selectionText: string): string | undefined => {
+    const text = selectionText.normalize("NFKC").trim().toLocaleLowerCase("en-US");
+    const matches = new Set<string>();
+    for (const entry of terms) {
+      if (text.includes(entry.term)) matches.add(entry.objectCode);
+    }
+    return matches.size === 1 ? [...matches][0] : undefined;
+  };
 
   const emit = (
     eventType: string,
@@ -225,9 +232,9 @@ function installStudyV2NativeTrial(
         ? range.endContainer as Element
         : range.endContainer.parentElement;
       if (start === null || end === null || !historySurface.contains(start) || !historySurface.contains(end)) return;
-      const text = range.toString().normalize("NFKC").trim().toLocaleLowerCase("en-US");
+      const text = range.toString().normalize("NFKC").trim();
       if (text.length < 1 || text.length > 512) return;
-      currentObjectCode = terms.get(text);
+      currentObjectCode = objectInSelection(text);
       lastActionKey = "";
       emit("selection_completed", currentObjectCode === undefined ? {} : { objectCode: currentObjectCode });
     });

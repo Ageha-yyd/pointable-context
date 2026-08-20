@@ -12,6 +12,21 @@ function normalized(value: string): string {
   return value.normalize("NFKC").trim().toLocaleLowerCase("en-US");
 }
 
+function entitiesInSelection(
+  selectionText: string,
+  entities: readonly StudyV2ScenarioEntity[],
+): StudyV2ScenarioEntity[] {
+  const selection = normalized(selectionText);
+  const matches = new Map<string, StudyV2ScenarioEntity>();
+  for (const entity of entities) {
+    const terms = [entity.id, entity.label].map(normalized);
+    if (terms.some((term) => selection.includes(term))) {
+      matches.set(entity.id, entity);
+    }
+  }
+  return [...matches.values()];
+}
+
 function detailFor(
   entity: StudyV2ScenarioEntity,
   revision: string,
@@ -50,11 +65,6 @@ export function createStudyV2NativeLookup(
   material: StudyV2NativeTrialMaterial,
   options: { revision: string; observedAt: string },
 ): PointableLookupCallback {
-  const byTerm = new Map<string, StudyV2ScenarioEntity>();
-  for (const entity of material.entities) {
-    byTerm.set(normalized(entity.id), entity);
-    byTerm.set(normalized(entity.label), entity);
-  }
   return async (request: Readonly<PointableLookupCallbackRequest>) => {
     if (request.signal.aborted) throw new Error("study_v2_lookup_aborted");
     if (request.operation !== "resolve") {
@@ -65,15 +75,19 @@ export function createStudyV2NativeLookup(
         retryable: false,
       } satisfies PointableLookupPresentation;
     }
-    const entity = byTerm.get(normalized(request.selection.text));
-    if (entity === undefined) {
+    const matches = entitiesInSelection(request.selection.text, material.entities);
+    if (matches.length !== 1) {
       return {
         kind: "error",
         code: "study_object_not_found",
-        message: "所选文字不是本试次的预注册对象。",
+        message: matches.length === 0
+          ? "所选文字中没有本试次的预注册对象。"
+          : "所选文字包含多个预注册对象，请缩小选择范围。",
         retryable: false,
       } satisfies PointableLookupPresentation;
     }
+    const [entity] = matches;
+    if (entity === undefined) throw new Error("study_object_resolution_invalid");
     return detailFor(entity, options.revision, options.observedAt);
   };
 }

@@ -160,7 +160,7 @@ test("every counterbalanced assignment resolves to bounded native trial material
   }
 });
 
-test("native study lookup returns one P-C mental model only for an exact registered object", async () => {
+test("native study lookup extracts one exact registered object from a bounded selection", async () => {
   const assignment = studyV2AssignmentForSlot(1).trials[0];
   assert.ok(assignment);
   const material = await loadStudyV2NativeTrialMaterial(repositoryRoot, assignment);
@@ -192,6 +192,14 @@ test("native study lookup returns one P-C mental model only for an exact registe
     (detail as { detail: { comprehension: { kind: string } } }).detail.comprehension.kind,
     "concept",
   );
+  const passage = await lookup({
+    ...base,
+    selection: {
+      ...base.selection,
+      text: `Before deciding, verify ${material.entities[0]?.label ?? ""} in the frozen history.`,
+    },
+  });
+  assert.equal((passage as { kind: string }).kind, "detail");
   const missing = await lookup({
     ...base,
     selection: { ...base.selection, text: "results.ts" },
@@ -199,7 +207,7 @@ test("native study lookup returns one P-C mental model only for an exact registe
   assert.deepEqual(missing, {
     kind: "error",
     code: "study_object_not_found",
-    message: "所选文字不是本试次的预注册对象。",
+    message: "所选文字中没有本试次的预注册对象。",
     retryable: false,
   });
 });
@@ -227,6 +235,7 @@ test("native renderer is text-only, non-modal, trusted-action gated, and self-cl
   assert.match(expression, /data-response-annotation-target/u);
   assert.match(expression, /event\.isTrusted/u);
   assert.match(expression, /textContent/u);
+  assert.match(expression, /text\.includes\(entry\.term\)/u);
   assert.match(expression, /visibility:\s*"hidden"/u);
   assert.match(expression, /style\.visibility\s*=\s*"visible"/u);
   assert.match(expression, /right:\s*"20px"/u);
@@ -264,6 +273,7 @@ test("native answer control stays collapsed beside the Chat Lane and never rende
   assert.match(expression, /event\.isTrusted/u);
   assert.match(expression, /data-selected-text-overlay-target/u);
   assert.match(expression, /data-pointable-context-role/u);
+  assert.match(expression, /text\.includes\(entry\.term\)/u);
   assert.match(expression, /workspace_left/u);
   assert.doesNotMatch(expression, /冻结的 Agent 开发历史/u);
   assert.doesNotMatch(expression, /historyText|config\.history/u);

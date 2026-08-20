@@ -34,10 +34,21 @@ function installStudyV2NativeAnswerControl(
   let cardOpen = false;
   let leftWorkspace = false;
   let timeout: ReturnType<typeof setTimeout> | undefined;
-  const terms = new Map(config.entityTerms.map((entry) => [
-    entry.term.normalize("NFKC").trim().toLocaleLowerCase("en-US"),
-    entry.objectCode,
-  ]));
+  let recognizedSelectionSerial = 0;
+  let reportedActionSerial = -1;
+  const terms = config.entityTerms.map((entry) => ({
+    term: entry.term.normalize("NFKC").trim().toLocaleLowerCase("en-US"),
+    objectCode: entry.objectCode,
+  }));
+
+  const objectInSelection = (selectionText: string): string | undefined => {
+    const text = selectionText.normalize("NFKC").trim().toLocaleLowerCase("en-US");
+    const matches = new Set<string>();
+    for (const entry of terms) {
+      if (text.includes(entry.term)) matches.add(entry.objectCode);
+    }
+    return matches.size === 1 ? [...matches][0] : undefined;
+  };
 
   const emit = (
     eventType: string,
@@ -191,9 +202,10 @@ function installStudyV2NativeAnswerControl(
       const startSurface = start?.closest("[data-selected-text-overlay-target]");
       const endSurface = end?.closest("[data-selected-text-overlay-target]");
       if (startSurface === null || startSurface === undefined || startSurface !== endSurface || shell.contains(startSurface)) return;
-      const text = range.toString().normalize("NFKC").trim().toLocaleLowerCase("en-US");
+      const text = range.toString().normalize("NFKC").trim();
       if (text.length < 1 || text.length > 512) return;
-      currentObjectCode = terms.get(text);
+      currentObjectCode = objectInSelection(text);
+      if (currentObjectCode !== undefined) recognizedSelectionSerial += 1;
       emit("selection_completed", currentObjectCode === undefined ? {} : { objectCode: currentObjectCode });
     });
   };
@@ -207,7 +219,11 @@ function installStudyV2NativeAnswerControl(
         if (!(node instanceof Element)) continue;
         const action = node.matches('[data-pointable-context-role="action"]')
           ? node : node.querySelector('[data-pointable-context-role="action"]');
-        if (action !== null) emit("quick_action_shown", currentObjectCode === undefined ? {} : { objectCode: currentObjectCode });
+        if (action !== null && currentObjectCode !== undefined &&
+          reportedActionSerial !== recognizedSelectionSerial) {
+          reportedActionSerial = recognizedSelectionSerial;
+          emit("quick_action_shown", { objectCode: currentObjectCode });
+        }
         const card = node.matches('[data-pointable-context-role="card"]')
           ? node : node.querySelector('[data-pointable-context-role="card"]');
         if (card !== null && !cardOpen) {
