@@ -34,8 +34,8 @@ If any is missing, stop. Do not invent, infer, randomize, or silently default it
 5. Run the matching doctor command and follow only its bounded `actions`. Never edit a qualification record to clear a failure.
 6. Confirm that `.pointable-study-language` matches the participant choice.
 7. Inspect configured marketplaces with `codex plugin marketplace list`. If `pointable-context-experiment` is absent, run `codex plugin marketplace add <verified-package-root> --json`, then install with `codex plugin add pointable-context@pointable-context-experiment --json`. Do not edit marketplace JSON or Codex config by hand. After a new install, ask the participant to create one new setup-only task before using the setup Skill.
-8. Prepare only TRAIN-1 with the selected language. Do not open measured transcripts, entity files, scoring rules, or facilitator material.
-9. Run TRAIN-1 as ordinary native Codex turns. Reject any browser transcript imitation, full-screen fake Agent UI, or live-model fallback.
+8. Run only TRAIN-1 with `node study-dist/pointable-study.mjs run-native-training --repository-root . --participant-code <P000> --slot <1-12> --language <zh-CN|en-US> --json` in a source checkout, or replace `study-dist/pointable-study.mjs` with `bin/pointable-study.mjs` in a Release. Do not open measured transcripts, entity files, scoring rules, or facilitator material.
+9. TRAIN-1 must appear as ordinary native Codex turns with Quiet Context Reveal and the lightweight answer control. Reject any browser transcript imitation, full-screen fake Agent UI, or live-model fallback. The command must report `trainingCompleted: true` and delete its training task after the answer.
 10. Report participant code, slot, language, pack digest, Host qualification, TRAIN-1 completion, and `STUDY READY`; then stop.
 
 ## Prohibited / 禁止事项

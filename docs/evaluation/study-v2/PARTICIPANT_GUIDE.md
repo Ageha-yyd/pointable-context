@@ -31,7 +31,7 @@
 ### 完成试次
 
 1. 关闭 setup-only 任务，启动受控 runner。
-2. TRAIN-1 不计分，用来练习选择文本、打开卡片、收起/移动卡片和提交答案。
+2. 运行组织者提供的 TRAIN-1 命令。TRAIN-1 不计分，用来练习选择文本、打开卡片、收起/移动卡片和提交答案；命令返回 `trainingCompleted: true` 才算完成。
 3. 六个计分试次必须按 runner 给出的顺序完成。不要刷新或重排任务。
 4. 阅读原生 Chat；如果出现 Quiet Context Reveal 条件，可以选中对话中的稳定对象名称或 ID，点击入口查看卡片。选择文字本身不计为查询，点击查看入口后才读取详情。
 5. 需要时可以查看受控工作区，但不要使用另一个 Agent、搜索引擎、外部项目或未提供的资料。
@@ -68,7 +68,7 @@ Obtain a private participant code, an organizer-assigned slot from 1–12, an im
 
 ### Completing trials
 
-Close the setup task, complete TRAIN-1, then complete the six measured trials in runner order. In a Quiet Context Reveal trial, select a stable object label or ID and explicitly click the reveal action. You may use the controlled workspace, but not another Agent, a search engine, an external project, or other materials. A trial ends only when one answer is submitted.
+Close the setup task and run the organizer-provided TRAIN-1 command. Continue only after it reports `trainingCompleted: true`, then complete the six measured trials in runner order. In a Quiet Context Reveal trial, select a stable object label or ID and explicitly click the reveal action. You may use the controlled workspace, but not another Agent, a search engine, an external project, or other materials. A trial ends only when one answer is submitted.
 
 ### Questionnaire and result
 

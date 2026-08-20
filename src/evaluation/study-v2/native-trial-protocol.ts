@@ -1,7 +1,7 @@
 import type {
   StudyV2Condition,
   StudyV2EventType,
-  StudyV2ScenarioId,
+  StudyV2SurfaceScenarioId,
 } from "./contracts.js";
 import { isStudyV2Language, type StudyV2Language } from "./language.js";
 
@@ -22,7 +22,7 @@ export interface StudyV2NativeTrialSurfaceConfig {
   bindingName: string;
   trialToken: string;
   trialId: string;
-  scenarioId: StudyV2ScenarioId;
+  scenarioId: StudyV2SurfaceScenarioId;
   condition: StudyV2Condition;
   language: StudyV2Language;
   history: string;

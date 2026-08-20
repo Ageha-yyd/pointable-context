@@ -18,13 +18,15 @@
         "transcriptPath": "fixtures/evaluation-study-v2/TRAIN-1/transcript.zh-CN.md",
         "conversationPath": "fixtures/evaluation-study-v2/TRAIN-1/conversation.zh-CN.json",
         "entitiesPath": "fixtures/evaluation-study-v2/TRAIN-1/entities.zh-CN.json",
-        "workspacePath": "fixtures/evaluation-study-v2/TRAIN-1/workspace.zh-CN"
+        "workspacePath": "fixtures/evaluation-study-v2/TRAIN-1/workspace.zh-CN",
+        "taskPrompt": "选中 orientation gate，查看它的任务上下文，然后提交任意训练答案；本轮只练习交互，不计分。"
       },
       "en-US": {
         "transcriptPath": "fixtures/evaluation-study-v2/TRAIN-1/transcript.md",
         "conversationPath": "fixtures/evaluation-study-v2/TRAIN-1/conversation.json",
         "entitiesPath": "fixtures/evaluation-study-v2/TRAIN-1/entities.json",
-        "workspacePath": "fixtures/evaluation-study-v2/TRAIN-1/workspace"
+        "workspacePath": "fixtures/evaluation-study-v2/TRAIN-1/workspace",
+        "taskPrompt": "Select orientation gate, view its task context, then submit any training answer; this rehearsal is unscored."
       }
     }
   },

@@ -1,4 +1,5 @@
-import type { StudyV2TrialAssignment } from "./contracts.js";
+import type { StudyV2SurfaceAssignment } from "./contracts.js";
+import type { StudyV2Language } from "./language.js";
 import {
   materializeStudyV2ScriptedTask,
   type StudyV2ScriptedTaskResult,
@@ -11,7 +12,8 @@ import { validateStudyV2Pack } from "./pack.js";
 export interface MaterializeStudyV2ScriptedTrialConversationOptions {
   rpc: StudyV2ScriptedTaskRpc;
   repositoryRoot: string;
-  assignment: StudyV2TrialAssignment;
+  assignment: StudyV2SurfaceAssignment;
+  language?: StudyV2Language;
   model: string;
   workspaceRoot?: string;
   title?: string;
@@ -20,7 +22,7 @@ export interface MaterializeStudyV2ScriptedTrialConversationOptions {
 
 export interface StudyV2ScriptedTrialConversationResult {
   schemaVersion: 1;
-  assignment: StudyV2TrialAssignment;
+  assignment: StudyV2SurfaceAssignment;
   packDigest: string;
   task: StudyV2ScriptedTaskResult;
   taskPrompt: string;
@@ -37,7 +39,11 @@ export async function materializeStudyV2ScriptedTrialConversation(
   if (!pack.valid || pack.packDigest === undefined) {
     throw new Error(`study_v2_pack_invalid:${pack.issues.map((issue) => issue.code).join(",")}`);
   }
-  const material = await loadStudyV2NativeTrialMaterial(options.repositoryRoot, options.assignment);
+  const material = await loadStudyV2NativeTrialMaterial(
+    options.repositoryRoot,
+    options.assignment,
+    options.language,
+  );
   const task = await materializeStudyV2ScriptedTask({
     rpc: options.rpc,
     workspaceRoot: options.workspaceRoot ?? material.workspaceRoot,

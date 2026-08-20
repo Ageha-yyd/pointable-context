@@ -1,6 +1,6 @@
 import { readFile, realpath } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
-import type { StudyV2TrialAssignment } from "./contracts.js";
+import type { StudyV2SurfaceAssignment } from "./contracts.js";
 import { parseStudyV2Language, type StudyV2Language } from "./language.js";
 import {
   parseStudyV2FrozenConversation,
@@ -19,7 +19,7 @@ import type {
 export type { StudyV2ScenarioEntity } from "./scenario-material.js";
 
 export interface StudyV2NativeTrialMaterial {
-  assignment: StudyV2TrialAssignment;
+  assignment: StudyV2SurfaceAssignment;
   language: StudyV2Language;
   workspaceRoot: string;
   history: string;
@@ -47,7 +47,7 @@ function inside(root: string, candidate: string): boolean {
 
 export async function loadStudyV2NativeTrialMaterial(
   repositoryRoot: string,
-  assignment: StudyV2TrialAssignment,
+  assignment: StudyV2SurfaceAssignment,
   requestedLanguage: StudyV2Language = "en-US",
 ): Promise<StudyV2NativeTrialMaterial> {
   const language = parseStudyV2Language(requestedLanguage);
@@ -58,7 +58,9 @@ export async function loadStudyV2NativeTrialMaterial(
   if (!record(manifestRaw) || !Array.isArray(manifestRaw.scenarios)) {
     throw new Error("study_v2_manifest_invalid");
   }
-  const scenario = manifestRaw.scenarios.find((entry) => record(entry) && entry.id === assignment.scenarioId);
+  const scenario = assignment.scenarioId === "TRAIN-1"
+    ? manifestRaw.training
+    : manifestRaw.scenarios.find((entry) => record(entry) && entry.id === assignment.scenarioId);
   const expectedBase = `fixtures/evaluation-study-v2/${assignment.scenarioId}`;
   const scenarioRecord = record(scenario) ? scenario : undefined;
   const localizations = scenarioRecord !== undefined && record(scenarioRecord.localizations)
@@ -85,7 +87,9 @@ export async function loadStudyV2NativeTrialMaterial(
   const entities = parseStudyV2ScenarioEntities(
     JSON.parse(await readFile(join(scenarioRoot, `entities${suffix}.json`), "utf8")) as unknown,
   );
-  const scoring = STUDY_V2_SCORING_CONTRACT[assignment.scenarioId];
+  const scoring = assignment.scenarioId === "TRAIN-1"
+    ? { correctAnswerCode: "TRAIN-A", correctObjectCode: "CONCEPT:ORIENTATION-GATE" }
+    : STUDY_V2_SCORING_CONTRACT[assignment.scenarioId];
   validateStudyV2ScenarioConsistency({
     scenarioId: assignment.scenarioId,
     transcript,

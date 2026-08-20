@@ -142,6 +142,7 @@ export async function runStudyV2NativeTrial(
       rpc: runtime.rpc,
       repositoryRoot: options.repositoryRoot,
       assignment: options.assignment,
+      language: plan.language,
       model: "gpt-4.1",
     });
     taskThreadId = scripted.task.threadId;

@@ -27,15 +27,20 @@ export const STUDY_V2_EVENT_TYPES = Object.freeze([
 
 export type StudyV2Condition = "A" | "B";
 export type StudyV2ScenarioId = typeof STUDY_V2_SCENARIOS[number];
+export type StudyV2SurfaceScenarioId = StudyV2ScenarioId | "TRAIN-1";
 export type StudyV2EventType = typeof STUDY_V2_EVENT_TYPES[number];
 export type { StudyV2Language } from "./language.js";
 import type { StudyV2Language } from "./language.js";
 
-export interface StudyV2TrialAssignment {
+export interface StudyV2SurfaceAssignment {
   order: number;
   trialId: string;
-  scenarioId: StudyV2ScenarioId;
+  scenarioId: StudyV2SurfaceScenarioId;
   condition: StudyV2Condition;
+}
+
+export interface StudyV2TrialAssignment extends StudyV2SurfaceAssignment {
+  scenarioId: StudyV2ScenarioId;
 }
 
 export interface StudyV2Assignment {

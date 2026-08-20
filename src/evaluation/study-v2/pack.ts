@@ -117,7 +117,8 @@ function validateManifest(manifest: JsonObject, issues: StudyV2PackIssue[]): str
     const expected = localizedPaths("fixtures/evaluation-study-v2/TRAIN-1", language);
     return localized === undefined || localized.transcriptPath !== expected.transcriptPath ||
       localized.conversationPath !== expected.conversationPath ||
-      localized.entitiesPath !== expected.entitiesPath || localized.workspacePath !== expected.workspacePath;
+      localized.entitiesPath !== expected.entitiesPath || localized.workspacePath !== expected.workspacePath ||
+      typeof localized.taskPrompt !== "string" || localized.taskPrompt.length < 20;
   })) {
     issues.push({ code: "manifest_training_contract_invalid", path: MANIFEST_PATH });
   }

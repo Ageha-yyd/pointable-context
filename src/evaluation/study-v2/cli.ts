@@ -19,6 +19,7 @@ import {
 } from "./native-trial-runner.js";
 import { runStudyV2NativeSession } from "./native-session-runner.js";
 import { runStudyV2NativeQuestionnaire } from "./native-questionnaire-runner.js";
+import { runStudyV2NativeTraining } from "./native-training-runner.js";
 import { parseStudyV2Language, type StudyV2Language } from "./language.js";
 
 function option(argv: readonly string[], name: string): string | undefined {
@@ -55,11 +56,36 @@ function usage(): string {
     "  pointable-context-study-v2 preview-result --result-dir <path> --json",
     "  pointable-context-study-v2 pack-result --result-dir <path> --public-key <pem> --output <new-file> --json",
     "  pointable-context-study-v2 submit --github --envelope <file> --repository <owner/repo> [--base main] [--dry-run|--confirm-submit] --json",
+    "  pointable-context-study-v2 run-native-training --repository-root <path> --participant-code <P000> --slot <1-12> --language <zh-CN|en-US> [--endpoint http://127.0.0.1:9223] --json",
     "  pointable-context-study-v2 plan-native-trial --repository-root <path> --session-id <id> --slot <1-12> --order <1-6> --language <zh-CN|en-US> --json",
     "  pointable-context-study-v2 run-native-trial --repository-root <path> --session-id <id> --slot <1-12> --order <1-6> --language <zh-CN|en-US> [--endpoint http://127.0.0.1:9223] --json",
     "  pointable-context-study-v2 run-native-session --repository-root <path> --state-dir <path> --result-dir <new-path> --participant-code <P000> --session-id <32-hex> --slot <1-12> --language <zh-CN|en-US> [--endpoint http://127.0.0.1:9223] --json",
     "  pointable-context-study-v2 finalize-native-session --repository-root <path> --state-dir <path> --result-dir <new-path> --participant-code <P000> --session-id <32-hex> --slot <1-12> --language <zh-CN|en-US> [--endpoint http://127.0.0.1:9223] --json",
   ].join("\n");
+}
+
+function nativeTrainingArguments(argv: readonly string[]): {
+  repositoryRoot: string;
+  participantCode: string;
+  slot: number;
+  language: StudyV2Language;
+  endpoint?: string;
+} {
+  const repositoryRoot = option(argv, "--repository-root");
+  const participantCode = option(argv, "--participant-code");
+  if (repositoryRoot === undefined || participantCode === undefined) {
+    throw new Error("native_training_arguments_required");
+  }
+  const slot = Number(option(argv, "--slot"));
+  const language = parseStudyV2Language(option(argv, "--language"));
+  const endpoint = option(argv, "--endpoint");
+  return {
+    repositoryRoot: resolve(repositoryRoot),
+    participantCode,
+    slot,
+    language,
+    ...(endpoint === undefined ? {} : { endpoint }),
+  };
 }
 
 function nativeSessionArguments(argv: readonly string[]): {
@@ -179,6 +205,13 @@ try {
     } else {
       throw new Error("explicit_submission_confirmation_required");
     }
+  } else if (command === "run-native-training") {
+    const training = nativeTrainingArguments(argv);
+    const result = await runStudyV2NativeTraining(training, {
+      onTaskReady: (context) => reportTaskReady(training.language, context),
+    });
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+    if (!result.trainingCompleted) process.exitCode = 2;
   } else if (command === "plan-native-trial" || command === "run-native-trial") {
     const native = nativeTrialArguments(argv);
     const result = command === "plan-native-trial"

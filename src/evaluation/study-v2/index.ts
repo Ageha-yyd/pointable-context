@@ -9,6 +9,7 @@ export * from "./native-trial-pack.js";
 export * from "./native-trial-protocol.js";
 export * from "./native-trial-renderer.js";
 export * from "./native-trial-runner.js";
+export * from "./native-training-runner.js";
 export * from "./native-session-results.js";
 export * from "./native-session-runner.js";
 export * from "./native-questionnaire-host.js";

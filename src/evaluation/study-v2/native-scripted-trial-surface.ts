@@ -1,4 +1,4 @@
-import type { StudyV2TrialAssignment } from "./contracts.js";
+import type { StudyV2SurfaceAssignment } from "./contracts.js";
 import {
   startStudyV2ConditionCompanion,
   type StudyV2ConditionCompanionHandle,
@@ -19,7 +19,7 @@ interface StudyV2AnswerControlHost {
 }
 
 export interface StartStudyV2ScriptedTrialSurfaceOptions {
-  assignment: StudyV2TrialAssignment;
+  assignment: StudyV2SurfaceAssignment;
   material: StudyV2NativeTrialMaterial;
   taskThreadId: string;
   packDigest: string;
@@ -31,7 +31,7 @@ export interface StartStudyV2ScriptedTrialSurfaceOptions {
 
 export interface StudyV2ScriptedTrialSurfaceHandle {
   schemaVersion: 1;
-  assignment: StudyV2TrialAssignment;
+  assignment: StudyV2SurfaceAssignment;
   taskThreadId: string;
   answerControlMounted: true;
   quietContextCompanionMounted: boolean;

@@ -6,7 +6,7 @@ import {
 } from "../../host/codex-cdp/adapter.js";
 import type { CodexHostTaskContext } from "../../host/codex-cdp/host-context.js";
 import type { PointableLookupPresentation } from "../../host/codex-cdp/protocol.js";
-import type { StudyV2TrialAssignment } from "./contracts.js";
+import type { StudyV2SurfaceAssignment } from "./contracts.js";
 import { createStudyV2NativeLookup } from "./native-trial-lookup.js";
 import type { StudyV2NativeTrialMaterial } from "./native-trial-pack.js";
 
@@ -17,7 +17,7 @@ interface StudyV2ConditionAdapter {
 }
 
 export interface StartStudyV2ConditionCompanionOptions {
-  assignment: StudyV2TrialAssignment;
+  assignment: StudyV2SurfaceAssignment;
   material: StudyV2NativeTrialMaterial;
   taskThreadId: string;
   packDigest: string;
