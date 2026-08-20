@@ -115,6 +115,16 @@ async function readJson(path: string): Promise<unknown | undefined> {
   }
 }
 
+async function requireNewResultDestination(path: string): Promise<void> {
+  try {
+    await stat(resolve(path));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+    throw error;
+  }
+  throw new Error("study_v2_result_directory_exists");
+}
+
 async function writeJsonExclusive(path: string, value: unknown): Promise<void> {
   const temporary = `${path}.${randomBytes(12).toString("hex")}.tmp`;
   await writeFile(temporary, `${JSON.stringify(value)}\n`, { flag: "wx", mode: 0o600 });
@@ -266,6 +276,7 @@ export async function runStudyV2NativeSession(
       completedTrialCount: 6,
     });
   }
+  await requireNewResultDestination(options.resultDirectory);
   const questionnaire = await dependencies.collectQuestionnaire({
     sessionId: options.sessionId,
     completedTrialCount: 6,

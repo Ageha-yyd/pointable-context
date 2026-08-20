@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -266,6 +266,19 @@ test("native session orchestration resumes only completed checkpoints and publis
     assert.equal(awaiting.executedTrialCount, 4);
     assert.equal(resumedCalls, 4);
     assert.deepEqual(resumedRetention, [false, false, false, true]);
+
+    await mkdir(base.resultDirectory);
+    let preflightQuestionnaireCalls = 0;
+    await assert.rejects(runStudyV2NativeSession(base, {
+      doctor,
+      runTrial: async (options) => run(options.assignment, packDigest),
+      collectQuestionnaire: async () => {
+        preflightQuestionnaireCalls += 1;
+        throw new Error("questionnaire_must_not_mount");
+      },
+    }), /study_v2_result_directory_exists/u);
+    assert.equal(preflightQuestionnaireCalls, 0);
+    await rm(base.resultDirectory, { recursive: true, force: true });
 
     const completed = await runStudyV2NativeSession(base, {
       doctor,
