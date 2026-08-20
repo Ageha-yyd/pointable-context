@@ -51,6 +51,7 @@ export interface StudyV2NativeTrainingDependencies {
     trial: StudyV2SurfaceAssignment;
     threadId: string;
     title: string;
+    purpose: "training";
   }) => void | Promise<void>;
   sleep?: (milliseconds: number) => Promise<void>;
   monotonicNow?: () => number;
@@ -106,6 +107,7 @@ export async function runStudyV2NativeTraining(
       workspaceRoot: material.workspaceRoot,
       model: "gpt-4.1",
       responses: material.conversation.exchanges.map((exchange) => ({ outputText: exchange.assistant })),
+      taskActivationTimeoutMs: activationTimeoutMs,
       ...(options.endpoint === undefined ? {} : { endpoint: options.endpoint }),
     });
     const scripted = await materializeStudyV2ScriptedTrialConversation({
@@ -122,8 +124,12 @@ export async function runStudyV2NativeTraining(
     if (runtime.requestCount() !== material.conversation.exchanges.length) {
       throw new Error("study_v2_scripted_provider_request_mismatch");
     }
-    await dependencies.onTaskReady?.({ trial: assignment, threadId: taskThreadId, title: publishedTask.title });
-    await runtime.activateTask?.(taskThreadId);
+    await dependencies.onTaskReady?.({
+      trial: assignment,
+      threadId: taskThreadId,
+      title: publishedTask.title,
+      purpose: "training",
+    });
     const activationStartedAt = monotonicNow();
     while (surface === undefined) {
       try {

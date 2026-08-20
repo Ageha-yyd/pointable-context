@@ -1,0 +1,6 @@
+interface:
+  display_name: "Pointable Context Study Session"
+  short_description: "Open frozen formative trials as native Codex tasks"
+  default_prompt: "Use $pointable-context-study-session to begin or resume my assigned six-round formative session, navigating each emitted native task ID without inspecting or answering the trial."
+policy:
+  allow_implicit_invocation: false

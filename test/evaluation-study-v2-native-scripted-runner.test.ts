@@ -125,7 +125,7 @@ test("scripted runner creates native turns, waits for the exact task, records te
   let surfaceAttempts = 0;
   let surfaceStops = 0;
   let sleeps = 0;
-  const ready: string[] = [];
+  const ready: Array<{ threadId: string; title: string; purpose: string }> = [];
   const result = await runStudyV2NativeTrial({
     repositoryRoot,
     sessionId: "SESSION_RUNNER_01",
@@ -139,7 +139,8 @@ test("scripted runner creates native turns, waits for the exact task, records te
         rpc,
         requestCount: () => options.responses.length,
         publishTask: async (task) => ({ ...task, threadId: "thread-published-runner" }),
-        createRetainedReviewTask: async (task) => {
+        createRetainedReviewTask: async (task, onReady) => {
+          await onReady?.({ threadId: "thread-retained-runner", title: task.title });
           await rpc.request("thread/delete", { threadId: task.threadId });
           return {
             schemaVersion: 1,
@@ -155,7 +156,7 @@ test("scripted runner creates native turns, waits for the exact task, records te
       };
       return runtime;
     },
-    onTaskReady: ({ threadId, title }) => { ready.push(threadId, title); },
+    onTaskReady: ({ threadId, title, purpose }) => { ready.push({ threadId, title, purpose }); },
     monotonicNow: (() => {
       let value = 0;
       return () => value++;
@@ -180,7 +181,15 @@ test("scripted runner creates native turns, waits for the exact task, records te
       };
     },
   });
-  assert.deepEqual(ready, ["thread-published-runner", `Pointable Study ${assignment.trialId} · RESUME-1`]);
+  assert.deepEqual(ready, [{
+    threadId: "thread-published-runner",
+    title: `Pointable Study ${assignment.trialId} · RESUME-1`,
+    purpose: "trial",
+  }, {
+    threadId: "thread-retained-runner",
+    title: `Pointable Study ${assignment.trialId} · RESUME-1`,
+    purpose: "retained_review",
+  }]);
   assert.equal(surfaceAttempts, 2);
   assert.equal(sleeps, 1);
   assert.equal(result.terminal, "answer_submitted");
@@ -202,8 +211,7 @@ test("scripted runner creates native turns, waits for the exact task, records te
 test("unscored training uses native turns and Quiet Context Reveal, then deletes its task", async () => {
   let rpc: RunnerRpc | undefined;
   let runtimeStops = 0;
-  let readyThread: string | undefined;
-  let activatedThread: string | undefined;
+  let readyContext: { threadId: string; purpose: string } | undefined;
   const result = await runStudyV2NativeTraining({
     repositoryRoot,
     participantCode: "P042",
@@ -216,13 +224,12 @@ test("unscored training uses native turns and Quiet Context Reveal, then deletes
       return {
         rpc,
         requestCount: () => options.responses.length,
-        activateTask: async (threadId) => { activatedThread = threadId; },
         publishTask: async (task) => ({ ...task, threadId: "thread-published-training" }),
         createRetainedReviewTask: async () => { throw new Error("training_must_not_be_retained"); },
         stop: async () => { runtimeStops += 1; },
       };
     },
-    onTaskReady: ({ threadId }) => { readyThread = threadId; },
+    onTaskReady: ({ threadId, purpose }) => { readyContext = { threadId, purpose }; },
     startSurface: async (options) => {
       assert.equal(options.assignment.scenarioId, "TRAIN-1");
       assert.equal(options.assignment.condition, "B");
@@ -238,8 +245,10 @@ test("unscored training uses native turns and Quiet Context Reveal, then deletes
       };
     },
   });
-  assert.equal(readyThread, "thread-published-training");
-  assert.equal(activatedThread, "thread-published-training");
+  assert.deepEqual(readyContext, {
+    threadId: "thread-published-training",
+    purpose: "training",
+  });
   assert.equal(result.scenarioId, "TRAIN-1");
   assert.equal(result.trainingCompleted, true);
   assert.equal(result.liveModelInvoked, false);
@@ -334,7 +343,7 @@ test("formal trial can explicitly delete an answered task after recording its te
 
 test("six-trial session uses the scripted native runner by default and checkpoints every terminal answer", async () => {
   const root = await mkdtemp(join(tmpdir(), "pointable-native-scripted-session-"));
-  const readyTrials: string[] = [];
+  const readyTasks: Array<{ trialId: string; purpose: string }> = [];
   let runtimeStarts = 0;
   let runtimeStops = 0;
   let retainedReviewTasks = 0;
@@ -350,7 +359,7 @@ test("six-trial session uses the scripted native runner by default and checkpoin
       runnerVersion: "study-v2.1.0",
     }, {
       doctor,
-      onTrialTaskReady: ({ trial }) => { readyTrials.push(trial.trialId); },
+      onTrialTaskReady: ({ trial, purpose }) => { readyTasks.push({ trialId: trial.trialId, purpose }); },
       trialDependencies: {
         startRuntime: async (options) => {
           runtimeStarts += 1;
@@ -359,8 +368,12 @@ test("six-trial session uses the scripted native runner by default and checkpoin
             rpc,
             requestCount: () => options.responses.length,
             publishTask: async (task) => ({ ...task, threadId: `thread-published-${runtimeStarts}` }),
-            createRetainedReviewTask: async (task) => {
+            createRetainedReviewTask: async (task, onReady) => {
               retainedReviewTasks += 1;
+              await onReady?.({
+                threadId: `thread-retained-${runtimeStarts}`,
+                title: task.title,
+              });
               await rpc.request("thread/delete", { threadId: task.threadId });
               return {
                 schemaVersion: 1,
@@ -403,7 +416,10 @@ test("six-trial session uses the scripted native runner by default and checkpoin
     assert.equal(runtimeStarts, 6);
     assert.equal(runtimeStops, 6);
     assert.equal(retainedReviewTasks, 1);
-    assert.equal(readyTrials.length, 6);
+    assert.equal(readyTasks.length, 7);
+    assert.deepEqual(readyTasks.map(({ purpose }) => purpose), [
+      "trial", "trial", "trial", "trial", "trial", "trial", "retained_review",
+    ]);
     for (let order = 1; order <= 6; order += 1) {
       const checkpoint = JSON.parse(await readFile(
         join(root, "state", `run-${String(order).padStart(2, "0")}.json`),

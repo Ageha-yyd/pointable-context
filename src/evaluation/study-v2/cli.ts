@@ -32,18 +32,18 @@ function reportTaskReady(language: StudyV2Language, context: {
   trial: { trialId: string; scenarioId: string; condition: string };
   threadId: string;
   title: string;
+  purpose: "training" | "trial" | "retained_review";
 }): void {
   process.stderr.write(`${JSON.stringify({
     schemaVersion: 1,
     state: "awaiting_native_task",
-    trialId: context.trial.trialId,
-    scenarioId: context.trial.scenarioId,
-    condition: context.trial.condition,
     threadId: context.threadId,
     title: context.title,
+    purpose: context.purpose,
+    navigation: "codex_native_thread_id",
     action: language === "zh-CN"
-      ? "请在 Codex Desktop 中打开此任务；只有精确任务被激活后试次才开始计时。"
-      : "Open this task in Codex Desktop; the trial begins only after the exact task is active.",
+      ? "保持 runner 运行；由当前 Codex 协调任务使用原生任务导航打开此 threadId。不要依赖侧边栏，也不要手工创建任务。"
+      : "Keep the runner alive. The current Codex coordinator must open this threadId with native task navigation. Do not rely on the sidebar or create a task manually.",
   })}\n`);
 }
 

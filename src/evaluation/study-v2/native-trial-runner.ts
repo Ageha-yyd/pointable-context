@@ -46,6 +46,7 @@ export interface StudyV2NativeTrialDependencies {
     trial: StudyV2TrialAssignment;
     threadId: string;
     title: string;
+    purpose: "trial" | "retained_review";
   }) => void | Promise<void>;
   sleep?: (milliseconds: number) => Promise<void>;
   monotonicNow?: () => number;
@@ -136,6 +137,7 @@ export async function runStudyV2NativeTrial(
       workspaceRoot: material.workspaceRoot,
       model: "gpt-4.1",
       responses: material.conversation.exchanges.map((exchange) => ({ outputText: exchange.assistant })),
+      taskActivationTimeoutMs: activationTimeoutMs,
       ...(options.endpoint === undefined ? {} : { endpoint: options.endpoint }),
     });
     const scripted = await materializeStudyV2ScriptedTrialConversation({
@@ -155,6 +157,7 @@ export async function runStudyV2NativeTrial(
       trial: Object.freeze({ ...options.assignment }),
       threadId: taskThreadId,
       title: publishedTask.title,
+      purpose: "trial",
     });
     const activationStartedAt = monotonicNow();
     while (surface === undefined) {
@@ -205,7 +208,14 @@ export async function runStudyV2NativeTrial(
     surfaceStopped = true;
     let retainedThreadId: string | undefined;
     if (terminalType === "answer_submitted" && retainCompletedTask) {
-      const retained = await runtime.createRetainedReviewTask(publishedTask);
+      const retained = await runtime.createRetainedReviewTask(publishedTask, async ({ threadId, title }) => {
+        await dependencies.onTaskReady?.({
+          trial: Object.freeze({ ...options.assignment }),
+          threadId,
+          title,
+          purpose: "retained_review",
+        });
+      });
       taskThreadId = retained.threadId;
       retainedThreadId = retained.threadId;
     }

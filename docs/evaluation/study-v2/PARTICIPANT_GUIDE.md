@@ -31,8 +31,8 @@
 ### 完成试次
 
 1. 关闭 setup-only 任务，启动受控 runner。
-2. 运行组织者提供的 TRAIN-1 命令。TRAIN-1 不计分，用来练习选择文本、打开卡片、收起/移动卡片和提交答案；命令返回 `trainingCompleted: true` 才算完成。
-3. 六个计分试次必须按 runner 给出的顺序完成。不要刷新或重排任务。
+2. 让 setup Agent 运行组织者提供的 TRAIN-1 命令。runner 创建原生任务后，setup Agent 会用返回的任务 ID 直接打开它；不要等待侧边栏自动出现，也不要手工新建同名任务。TRAIN-1 不计分，用来练习选择文本、打开卡片、收起/移动卡片和提交答案；命令返回 `trainingCompleted: true` 才算完成。
+3. 六个计分试次必须按 runner 给出的顺序完成。使用组织者指定的 session coordinator，让它只负责打开 runner 返回的原生任务 ID；不要刷新、重排或自行创建任务。
 4. 阅读原生 Chat；如果出现 Quiet Context Reveal 条件，可以选中对话中的稳定对象名称或 ID，点击入口查看卡片。选择文字本身不计为查询，点击查看入口后才读取详情。
 5. 需要时可以查看受控工作区，但不要使用另一个 Agent、搜索引擎、外部项目或未提供的资料。
 6. 每轮只提交一个答案。打开卡片不是完成；提交答案才结束该轮。
@@ -68,7 +68,7 @@ Obtain a private participant code, an organizer-assigned slot from 1–12, an im
 
 ### Completing trials
 
-Close the setup task and run the organizer-provided TRAIN-1 command. Continue only after it reports `trainingCompleted: true`, then complete the six measured trials in runner order. In a Quiet Context Reveal trial, select a stable object label or ID and explicitly click the reveal action. You may use the controlled workspace, but not another Agent, a search engine, an external project, or other materials. A trial ends only when one answer is submitted.
+Have the setup Agent run the organizer-provided TRAIN-1 command. When the runner creates a native task, the Agent opens it directly by the returned task ID; do not wait for a sidebar row or create a replacement task. Continue only after TRAIN-1 reports `trainingCompleted: true`, then use the assigned session coordinator to open each of the six runner-created native tasks in order. The coordinator only navigates; it does not read or answer the trial. In a Quiet Context Reveal trial, select a stable object label or ID and explicitly click the reveal action. You may use the controlled workspace, but not another Agent, a search engine, an external project, or other materials. A trial ends only when one answer is submitted.
 
 ### Questionnaire and result
 

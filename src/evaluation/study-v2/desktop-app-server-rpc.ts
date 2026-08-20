@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { performance } from "node:perf_hooks";
 import {
   discoverCodexAppTargets,
   type PointableFetch,
@@ -10,6 +11,10 @@ import {
   type CdpEvent,
 } from "../../host/codex-cdp/transport.js";
 import type { StudyV2ScriptedTaskRpc } from "./native-scripted-task.js";
+import {
+  createReadCodexHostTaskContextExpression,
+  parseCodexHostTaskContext,
+} from "../../host/codex-cdp/host-context.js";
 
 const ALLOWED_METHODS = new Set([
   "thread/start",
@@ -385,6 +390,39 @@ export class StudyV2DesktopAppServerRpc implements StudyV2ScriptedTaskRpc {
     }, 4_000);
     if (runtimeValue(evaluated) !== true) {
       throw new Error("study_v2_desktop_navigation_unverified");
+    }
+  }
+
+  async waitForThreadActive(threadId: string, timeoutMs = 180_000): Promise<void> {
+    if (!/^[A-Za-z0-9_-]{1,256}$/u.test(threadId)) {
+      throw new Error("study_v2_desktop_navigation_thread_invalid");
+    }
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 10_000 || timeoutMs > 900_000) {
+      throw new Error("study_v2_desktop_activation_timeout_invalid");
+    }
+    const startedAt = performance.now();
+    while (true) {
+      if (this.#closed || this.#connection.isClosed()) {
+        throw new Error("study_v2_desktop_rpc_closed");
+      }
+      try {
+        const evaluated = await this.#connection.send("Runtime.evaluate", {
+          expression: createReadCodexHostTaskContextExpression(),
+          contextId: this.#contextId,
+          returnByValue: true,
+          awaitPromise: true,
+        }, 4_000);
+        const current = parseCodexHostTaskContext(runtimeValue(evaluated));
+        if (current !== undefined && (
+          current.threadId === threadId || current.threadId === `${current.hostId}:${threadId}`
+        )) return;
+      } catch {
+        // A navigation transition may temporarily have no single qualified task tuple.
+      }
+      if (performance.now() - startedAt >= timeoutMs) {
+        throw new Error("study_v2_desktop_task_activation_timed_out");
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, this.#pollIntervalMs));
     }
   }
 

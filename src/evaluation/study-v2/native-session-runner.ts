@@ -60,6 +60,7 @@ export interface StudyV2NativeSessionRunnerDependencies {
     trial: ReturnType<typeof studyV2AssignmentForSlot>["trials"][number];
     threadId: string;
     title: string;
+    purpose: "trial" | "retained_review";
   }) => void | Promise<void>;
   collectQuestionnaire?: (context: {
     sessionId: string;

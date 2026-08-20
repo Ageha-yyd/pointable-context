@@ -68,6 +68,19 @@ class DesktopCdp implements CdpConnection {
       if (expression.includes("window.electronBridge?.sendMessageFromView")) {
         return this.runtimeValue({ bridge: true, windowType: "main" });
       }
+      if (expression.includes("const fingerprintValue")) {
+        const routeRef = "app://-/index.html";
+        const threadId = "desktop-thread-1";
+        const hostId = "local";
+        return this.runtimeValue({
+          schemaVersion: 1,
+          host: "codex-desktop",
+          threadId,
+          hostId,
+          routeRef,
+          contextFingerprint: JSON.stringify({ href: routeRef, threadId, hostId }),
+        });
+      }
       if (expression.includes("data-app-action-sidebar-thread-id")) {
         return this.runtimeValue(true);
       }
@@ -185,6 +198,7 @@ test("Desktop RPC creates and polls turns through the current Codex renderer bri
       "thread/read",
       "thread/read",
     ]);
+    await rpc.waitForThreadActive("desktop-thread-1", 10_000);
     await rpc.navigateToThread("desktop-thread-1");
     await assert.rejects(() => rpc.navigateToThread("bad thread id"), /navigation_thread_invalid/u);
     await assert.rejects(

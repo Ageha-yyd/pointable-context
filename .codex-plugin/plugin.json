@@ -1,6 +1,6 @@
 {
   "name": "pointable-context",
-  "version": "0.1.0+codex.20260820110422",
+  "version": "0.1.0+codex.20260820154401",
   "description": "Selection-triggered, zero-turn development context reveal in the native Codex Chat Lane.",
   "author": {
     "name": "Local developer"
@@ -34,6 +34,7 @@
       "Maintain sparse Pointable Context milestone artifacts for this bounded long task.",
       "Audit declared Pointable Context coverage for this bounded long task without reading Chat history.",
       "Validate the frozen Pointable Context study pack before a pilot session.",
+      "Coordinate my assigned formative study session by opening each frozen native task without answering it.",
       "Use the optional capsule renderer only as an explicit fixture diagnostic."
     ]
   }

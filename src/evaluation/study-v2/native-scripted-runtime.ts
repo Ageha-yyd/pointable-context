@@ -11,9 +11,11 @@ import {
 export interface StudyV2ScriptedRuntimeHandle {
   rpc: StudyV2ScriptedTaskRpc;
   requestCount(): number;
-  activateTask?(threadId: string): Promise<void>;
   publishTask(task: StudyV2ScriptedTaskResult): Promise<StudyV2ScriptedTaskResult>;
-  createRetainedReviewTask(task: StudyV2ScriptedTaskResult): Promise<StudyV2RetainedReviewTask>;
+  createRetainedReviewTask(
+    task: StudyV2ScriptedTaskResult,
+    onReady?: (context: { threadId: string; title: string }) => void | Promise<void>,
+  ): Promise<StudyV2RetainedReviewTask>;
   stop(): Promise<void>;
 }
 
@@ -32,6 +34,7 @@ export interface StartStudyV2ScriptedRuntimeOptions {
   model: string;
   responses: readonly ScriptedResponseStep[];
   requestTimeoutMs?: number;
+  taskActivationTimeoutMs?: number;
   endpoint?: string;
 }
 
@@ -239,6 +242,11 @@ export async function startStudyV2ScriptedRuntime(
   options: StartStudyV2ScriptedRuntimeOptions,
 ): Promise<StudyV2ScriptedRuntimeHandle> {
   const model = boundedModel(options.model);
+  const taskActivationTimeoutMs = options.taskActivationTimeoutMs ?? 180_000;
+  if (!Number.isSafeInteger(taskActivationTimeoutMs) ||
+    taskActivationTimeoutMs < 10_000 || taskActivationTimeoutMs > 900_000) {
+    throw new Error("study_v2_scripted_activation_timeout_invalid");
+  }
   const provider = await startScriptedResponsesProvider(options.responses);
   let desktop: StudyV2DesktopAppServerRpc | undefined;
   try {
@@ -267,16 +275,19 @@ export async function startStudyV2ScriptedRuntime(
     return Object.freeze({
       rpc,
       requestCount: () => provider.requests.length,
-      activateTask: async (threadId: string): Promise<void> => await desktop!.navigateToThread(threadId),
       publishTask: async (task: StudyV2ScriptedTaskResult): Promise<StudyV2ScriptedTaskResult> =>
         await publishStudyV2ScriptedTask(rpc, task, provider.origin),
       createRetainedReviewTask: async (
         task: StudyV2ScriptedTaskResult,
+        onReady?: (context: { threadId: string; title: string }) => void | Promise<void>,
       ): Promise<StudyV2RetainedReviewTask> =>
         await createStudyV2RetainedReviewTask(
           rpc,
           task,
-          async (threadId) => await desktop!.navigateToThread(threadId),
+          async (threadId) => {
+            await onReady?.({ threadId, title: task.title });
+            await desktop!.waitForThreadActive(threadId, taskActivationTimeoutMs);
+          },
         ),
       stop: async (): Promise<void> => {
         if (stopped) return;
