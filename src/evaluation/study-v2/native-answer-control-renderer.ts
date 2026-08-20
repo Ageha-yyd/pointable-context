@@ -31,7 +31,9 @@ function installStudyV2NativeAnswerControl(
   let sequence = 0;
   let startedAt = 0;
   let currentObjectCode: string | undefined;
-  let cardOpen = false;
+  let pendingObjectCode: string | undefined;
+  let activeStudyCard: Element | undefined;
+  let activeStudyCardObjectCode: string | undefined;
   let leftWorkspace = false;
   let timeout: ReturnType<typeof setTimeout> | undefined;
   let recognizedSelectionSerial = 0;
@@ -40,6 +42,7 @@ function installStudyV2NativeAnswerControl(
     term: entry.term.normalize("NFKC").trim().toLocaleLowerCase("en-US"),
     objectCode: entry.objectCode,
   }));
+  const expectedActionLabel = zh ? "查看任务上下文" : "View task context";
 
   const objectInSelection = (selectionText: string): string | undefined => {
     const text = selectionText.normalize("NFKC").trim().toLocaleLowerCase("en-US");
@@ -48,6 +51,30 @@ function installStudyV2NativeAnswerControl(
       if (text.includes(entry.term)) matches.add(entry.objectCode);
     }
     return matches.size === 1 ? [...matches][0] : undefined;
+  };
+
+  const roleElements = (node: Element, role: "action" | "card"): Element[] => {
+    const selector = `[data-pointable-context-role="${role}"]`;
+    const found: Element[] = [];
+    if (node.matches(selector)) found.push(node);
+    found.push(...node.querySelectorAll(selector));
+    return found;
+  };
+
+  const isStudyAction = (element: Element): boolean =>
+    element.textContent?.trim() === expectedActionLabel;
+
+  const cardMatchesObject = (card: Element, objectCode: string): boolean => {
+    const text = card.textContent?.normalize("NFKC").toLocaleLowerCase("en-US") ?? "";
+    return terms.some((entry) => entry.objectCode === objectCode && text.includes(entry.term));
+  };
+
+  const reportVisibleStudyAction = (): void => {
+    if (currentObjectCode === undefined || reportedActionSerial === recognizedSelectionSerial) return;
+    const actions = document.querySelectorAll('[data-pointable-context-role="action"]');
+    if (![...actions].some(isStudyAction)) return;
+    reportedActionSerial = recognizedSelectionSerial;
+    emit("quick_action_shown", { objectCode: currentObjectCode });
   };
 
   const emit = (
@@ -205,8 +232,10 @@ function installStudyV2NativeAnswerControl(
       const text = range.toString().normalize("NFKC").trim();
       if (text.length < 1 || text.length > 512) return;
       currentObjectCode = objectInSelection(text);
+      pendingObjectCode = undefined;
       if (currentObjectCode !== undefined) recognizedSelectionSerial += 1;
       emit("selection_completed", currentObjectCode === undefined ? {} : { objectCode: currentObjectCode });
+      requestAnimationFrame(reportVisibleStudyAction);
     });
   };
   document.addEventListener("pointerup", selectionCompleted, true);
@@ -217,26 +246,28 @@ function installStudyV2NativeAnswerControl(
     for (const mutation of records) {
       for (const node of mutation.addedNodes) {
         if (!(node instanceof Element)) continue;
-        const action = node.matches('[data-pointable-context-role="action"]')
-          ? node : node.querySelector('[data-pointable-context-role="action"]');
-        if (action !== null && currentObjectCode !== undefined &&
-          reportedActionSerial !== recognizedSelectionSerial) {
-          reportedActionSerial = recognizedSelectionSerial;
-          emit("quick_action_shown", { objectCode: currentObjectCode });
-        }
-        const card = node.matches('[data-pointable-context-role="card"]')
-          ? node : node.querySelector('[data-pointable-context-role="card"]');
-        if (card !== null && !cardOpen) {
-          cardOpen = true;
-          emit("card_opened", currentObjectCode === undefined ? {} : { objectCode: currentObjectCode });
+        if (roleElements(node, "action").some(isStudyAction)) reportVisibleStudyAction();
+        const expectedObjectCode = pendingObjectCode ?? currentObjectCode;
+        if (activeStudyCard === undefined && expectedObjectCode !== undefined) {
+          const card = roleElements(node, "card")
+            .find((candidate) => cardMatchesObject(candidate, expectedObjectCode));
+          if (card !== undefined) {
+            activeStudyCard = card;
+            activeStudyCardObjectCode = expectedObjectCode;
+            emit("card_opened", { objectCode: expectedObjectCode });
+          }
         }
       }
       for (const node of mutation.removedNodes) {
         if (!(node instanceof Element)) continue;
-        if (node.matches('[data-pointable-context-role="card"]') ||
-          node.querySelector('[data-pointable-context-role="card"]') !== null) {
-          if (cardOpen) emit("card_closed", currentObjectCode === undefined ? {} : { objectCode: currentObjectCode });
-          cardOpen = false;
+        if (activeStudyCard !== undefined &&
+          (node === activeStudyCard || node.contains(activeStudyCard))) {
+          if (activeStudyCardObjectCode !== undefined) {
+            emit("card_closed", { objectCode: activeStudyCardObjectCode });
+          }
+          activeStudyCard = undefined;
+          activeStudyCardObjectCode = undefined;
+          pendingObjectCode = undefined;
         }
       }
     }
@@ -245,11 +276,17 @@ function installStudyV2NativeAnswerControl(
 
   const pointableClick = (event: Event): void => {
     if (!event.isTrusted || state !== "running" || !(event.target instanceof Element)) return;
+    const action = event.target.closest('[data-pointable-context-role="action"]');
+    if (action !== null && isStudyAction(action) && currentObjectCode !== undefined) {
+      pendingObjectCode = currentObjectCode;
+    }
+    const card = event.target.closest('[data-pointable-context-role="card"]');
+    if (card !== activeStudyCard || activeStudyCardObjectCode === undefined) return;
     if (event.target.closest('[data-pointable-context-role="evidence-toggle"]') !== null) {
-      emit("evidence_expanded", currentObjectCode === undefined ? {} : { objectCode: currentObjectCode });
+      emit("evidence_expanded", { objectCode: activeStudyCardObjectCode });
     }
     if (event.target.closest('[data-pointable-context-role="revision-refresh"]') !== null) {
-      emit("card_refreshed", currentObjectCode === undefined ? {} : { objectCode: currentObjectCode });
+      emit("card_refreshed", { objectCode: activeStudyCardObjectCode });
     }
   };
   document.addEventListener("click", pointableClick, true);

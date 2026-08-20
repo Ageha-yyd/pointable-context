@@ -274,6 +274,10 @@ test("native answer control stays collapsed beside the Chat Lane and never rende
   assert.match(expression, /data-selected-text-overlay-target/u);
   assert.match(expression, /data-pointable-context-role/u);
   assert.match(expression, /text\.includes\(entry\.term\)/u);
+  assert.match(expression, /expectedActionLabel/u);
+  assert.match(expression, /cardMatchesObject/u);
+  assert.match(expression, /activeStudyCardObjectCode/u);
+  assert.doesNotMatch(expression, /emit\("card_opened", currentObjectCode === undefined/u);
   assert.match(expression, /workspace_left/u);
   assert.doesNotMatch(expression, /冻结的 Agent 开发历史/u);
   assert.doesNotMatch(expression, /historyText|config\.history/u);
