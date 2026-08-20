@@ -12,6 +12,11 @@ import {
   createUninstallPointableRendererExpression,
   parsePointableLookupIntent,
 } from "../dist/src/host/codex-cdp/index.js";
+import {
+  createActivateStudyV2NativeAnswerControlExpression,
+  createInstallStudyV2NativeAnswerControlExpression,
+  createUninstallStudyV2NativeAnswerControlExpression,
+} from "../dist/src/evaluation/study-v2/native-answer-control-renderer.js";
 
 const edgePath = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 const profile = await mkdtemp(join(tmpdir(), "pointable-edge-"));
@@ -106,6 +111,9 @@ function waitForBindingIntent(connection, bindingName, expectedOperation, timeou
 
 let connection;
 let lifecycleId;
+let studyTrialToken;
+let unsubscribeStudy;
+const studyEvents = [];
 try {
   const port = await debuggerPort();
   const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
@@ -146,13 +154,42 @@ try {
   })()`);
   const bindingName = `__pointableContextBinding_${randomUUID().replaceAll("-", "_")}`;
   await connection.send("Runtime.addBinding", { name: bindingName });
+  const studyBindingName = `__pointableStudyBinding_${randomUUID().replaceAll("-", "_")}`;
+  studyTrialToken = "f".repeat(64);
+  await connection.send("Runtime.addBinding", { name: studyBindingName });
+  unsubscribeStudy = connection.onEvent((event) => {
+    if (event.method !== "Runtime.bindingCalled" || event.params?.name !== studyBindingName) return;
+    studyEvents.push(JSON.parse(event.params.payload));
+  });
+  const studyInstalled = await evaluate(connection, createInstallStudyV2NativeAnswerControlExpression({
+    bindingName: studyBindingName,
+    trialToken: studyTrialToken,
+    trialId: "QA-T1",
+    scenarioId: "TRAIN-1",
+    condition: "B",
+    language: "zh-CN",
+    history: "Headless acceptance history.",
+    taskPrompt: "Choose one answer.",
+    answers: [
+      { code: "TRAIN-A", label: "A" },
+      { code: "TRAIN-B", label: "B" },
+    ],
+    entityTerms: [{ term: "pilot", objectCode: "CONCEPT:PILOT" }],
+    timeoutMs: 300_000,
+  }));
+  if (studyInstalled.installed !== true) throw new Error("study metric observer did not install");
+  const studyActivated = await evaluate(
+    connection,
+    createActivateStudyV2NativeAnswerControlExpression(studyTrialToken),
+  );
+  if (studyActivated.state !== "running") throw new Error("study metric observer did not activate");
   const installed = await evaluate(
     connection,
     createInstallPointableRendererExpression({
       bindingName,
       requestTimeoutMs: 5_000,
       revisionCheckIntervalMs: 500,
-      actionLabel: "查看上下文（fixture）",
+      actionLabel: "查看任务上下文",
       presentationMode: "mental-model",
     }),
   );
@@ -585,6 +622,19 @@ try {
   ) {
     throw new Error(`close did not dismiss terminally: ${JSON.stringify(dismissed)}`);
   }
+  await sleep(100);
+  const studyCardEvents = studyEvents.filter((event) =>
+    event.eventType === "card_opened" || event.eventType === "card_closed"
+  );
+  if (
+    studyEvents.filter((event) => event.eventType === "quick_action_shown").length !== 1 ||
+    studyCardEvents.length !== 2 ||
+    studyCardEvents[0]?.eventType !== "card_opened" ||
+    studyCardEvents[1]?.eventType !== "card_closed" ||
+    studyCardEvents.some((event) => event.objectCode !== "CONCEPT:PILOT")
+  ) {
+    throw new Error(`study metric observer captured foreign or unidentified UI: ${JSON.stringify(studyEvents)}`);
+  }
   process.stdout.write(`${JSON.stringify({
     ok: true,
     browser: "Microsoft Edge headless",
@@ -600,9 +650,17 @@ try {
     refreshAddedChatTurns: 0,
     closeClearedSelection: true,
     closePreventedRemountAfterMs: 250,
+    studyMetricCardEventsScoped: true,
   }, null, 2)}\n`);
 } finally {
   if (connection !== undefined) {
+    if (typeof studyTrialToken === "string") {
+      await evaluate(
+        connection,
+        createUninstallStudyV2NativeAnswerControlExpression(studyTrialToken),
+      ).catch(() => undefined);
+    }
+    unsubscribeStudy?.();
     if (typeof lifecycleId === "string") {
       await evaluate(
         connection,
