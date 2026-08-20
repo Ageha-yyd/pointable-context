@@ -123,6 +123,7 @@ export async function runStudyV2NativeTraining(
       throw new Error("study_v2_scripted_provider_request_mismatch");
     }
     await dependencies.onTaskReady?.({ trial: assignment, threadId: taskThreadId, title: publishedTask.title });
+    await runtime.activateTask?.(taskThreadId);
     const activationStartedAt = monotonicNow();
     while (surface === undefined) {
       try {

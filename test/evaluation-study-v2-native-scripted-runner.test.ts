@@ -203,6 +203,7 @@ test("unscored training uses native turns and Quiet Context Reveal, then deletes
   let rpc: RunnerRpc | undefined;
   let runtimeStops = 0;
   let readyThread: string | undefined;
+  let activatedThread: string | undefined;
   const result = await runStudyV2NativeTraining({
     repositoryRoot,
     participantCode: "P042",
@@ -215,6 +216,7 @@ test("unscored training uses native turns and Quiet Context Reveal, then deletes
       return {
         rpc,
         requestCount: () => options.responses.length,
+        activateTask: async (threadId) => { activatedThread = threadId; },
         publishTask: async (task) => ({ ...task, threadId: "thread-published-training" }),
         createRetainedReviewTask: async () => { throw new Error("training_must_not_be_retained"); },
         stop: async () => { runtimeStops += 1; },
@@ -237,6 +239,7 @@ test("unscored training uses native turns and Quiet Context Reveal, then deletes
     },
   });
   assert.equal(readyThread, "thread-published-training");
+  assert.equal(activatedThread, "thread-published-training");
   assert.equal(result.scenarioId, "TRAIN-1");
   assert.equal(result.trainingCompleted, true);
   assert.equal(result.liveModelInvoked, false);

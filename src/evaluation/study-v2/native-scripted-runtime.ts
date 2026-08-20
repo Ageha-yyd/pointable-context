@@ -11,6 +11,7 @@ import {
 export interface StudyV2ScriptedRuntimeHandle {
   rpc: StudyV2ScriptedTaskRpc;
   requestCount(): number;
+  activateTask?(threadId: string): Promise<void>;
   publishTask(task: StudyV2ScriptedTaskResult): Promise<StudyV2ScriptedTaskResult>;
   createRetainedReviewTask(task: StudyV2ScriptedTaskResult): Promise<StudyV2RetainedReviewTask>;
   stop(): Promise<void>;
@@ -266,6 +267,7 @@ export async function startStudyV2ScriptedRuntime(
     return Object.freeze({
       rpc,
       requestCount: () => provider.requests.length,
+      activateTask: async (threadId: string): Promise<void> => await desktop!.navigateToThread(threadId),
       publishTask: async (task: StudyV2ScriptedTaskResult): Promise<StudyV2ScriptedTaskResult> =>
         await publishStudyV2ScriptedTask(rpc, task, provider.origin),
       createRetainedReviewTask: async (
