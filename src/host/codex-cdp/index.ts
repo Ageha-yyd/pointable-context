@@ -4,7 +4,14 @@ export {
   type CodexCdpHostAdapterStatus,
   type PointableLookupCallback,
   type PointableLookupCallbackRequest,
+  type PointableAnnotationProvider,
+  type PointableAnnotationProviderRequest,
 } from "./adapter.js";
+export {
+  buildWorkspaceAnnotationCatalog,
+  createWorkspaceAnnotationProvider,
+  type WorkspaceAnnotationProviderOptions,
+} from "./workspace-annotations.js";
 export {
   createFixtureLookupCallback,
   type FixtureLookupCallbackOptions,
@@ -50,6 +57,20 @@ export {
   type WorkspaceCompanionStatus,
 } from "./workspace-companion.js";
 export {
+  CompositeContextIndex,
+  RoutedWorkspaceRevisionProbe,
+  TASK_OBJECT_ENTITY_PREFIX,
+  TASK_OBJECT_PROVIDER_ID,
+  TaskObjectRegistry,
+  parseTaskObjectInput,
+  type TaskObjectInput,
+  type TaskObjectLifecycle,
+  type TaskObjectMentalModel,
+  type TaskObjectMutationResult,
+  type TaskObjectSummary,
+  type TaskObjectType,
+} from "./task-object-registry.js";
+export {
   createPointableLookupResponse,
   parsePointableLookupIntent,
   PointableProtocolError,
@@ -70,9 +91,13 @@ export {
   createInstallPointableRendererExpression,
   createPointableRendererStatusExpression,
   createUninstallPointableRendererExpression,
+  createUpdatePointableAnnotationsExpression,
   createVerifyPointableRendererFenceExpression,
   evaluatePointableRendererEligibility,
   validatePointableRendererResponse,
+  validatePointableAnnotationCatalog,
+  type PointableAnnotationCatalog,
+  type PointableObjectAnnotation,
   type PointableRendererConfig,
   type PointableRendererFence,
   type PointableRendererAck,

@@ -1,0 +1,5 @@
+dynamic_object_open=PASS 2026-08-23T23:50:00+08:00 user confirmed the current-task Dynamic Object Lifecycle mark opened a native in-lane card without another Chat turn.
+dynamic_object_refresh=PASS 2026-08-23T23:52:00+08:00 user confirmed a task-object revision produced the update notice and trusted refresh preserved the card while showing the new current stage.
+historical_resolution=PASS 2026-08-24T00:05:00+08:00 user confirmed the superseded Dynamic Object Lifecycle remained deterministically queryable from historical Chat after the terminal-index repair.
+terminal_state_visibility=PASS 2026-08-24T00:07:14+08:00 user confirmed the superseded card visibly identified TASK-OBJECT-GRADUATION as its replacement after the first-layer terminal-state repair.
+card_text_selection=PASS 2026-08-24T00:22:44+08:00 user confirmed selecting text inside the native detail card preserved both the text selection and the open card after the card-local selection repair.

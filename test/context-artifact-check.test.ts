@@ -152,6 +152,7 @@ test("repository milestone artifacts pass without being modified", async () => {
   const paths = [
     "docs/concepts/long-task-dogfood.md",
     "docs/concepts/pilot.md",
+    "docs/concepts/task-object-graduation.md",
     "docs/changes/presentation-default.md",
     "docs/decisions/native-chat-lane.md",
     "docs/decisions/native-trial-fail-closed.md",
@@ -159,8 +160,8 @@ test("repository milestone artifacts pass without being modified", async () => {
   const before = await Promise.all(paths.map((path) => readFile(path, "utf8")));
   const result = await checkContextMilestoneArtifacts(resolve("."));
   assert.equal(result.valid, true, JSON.stringify(result.issues));
-  assert.equal(result.candidateCount, 5);
-  assert.equal(result.artifacts.length, 5);
+  assert.equal(result.candidateCount, 6);
+  assert.equal(result.artifacts.length, 6);
   assert.deepEqual(await Promise.all(paths.map((path) => readFile(path, "utf8"))), before);
 });
 

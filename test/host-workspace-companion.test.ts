@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { createWorkspaceCompanion } from "../src/host/codex-cdp/workspace-companion.js";
 import { CodexTaskWorkspaceBindingRegistry } from "../src/host/codex-cdp/task-workspace-binding.js";
+import { TaskObjectRegistry } from "../src/host/codex-cdp/task-object-registry.js";
 import type { CdpConnection, CdpEvent } from "../src/host/codex-cdp/transport.js";
 
 class CompanionConnection implements CdpConnection {
@@ -92,10 +93,32 @@ function targetResponse(): Response {
   }]), { status: 200 });
 }
 
+function taskObjectInput() {
+  return {
+    schemaVersion: 1,
+    objectKey: "COMPANION-LIFECYCLE",
+    entityType: "task",
+    canonicalName: "Companion Lifecycle",
+    aliases: ["Companion 生命周期"],
+    summary: "验证 Companion 对当前任务动态对象的管理。",
+    mentalModel: {
+      kind: "task",
+      goal: "让动态对象通过当前 Companion 进入原生查询链路。",
+      status: "实现中",
+      completed: "任务内 Registry 已接入。",
+      next: "验证更新、替代和退役。",
+      blocker: "无。",
+      evidence: "当前测试通过 Host 可见任务调用 Companion 控制面。",
+    },
+  };
+}
+
 test("workspace companion binds exactly one active Codex task to a live workspace", async () => {
   const root = await mkdtemp(join(tmpdir(), "pointable-workspace-companion-"));
   const workspace = join(root, "workspace");
   await mkdir(workspace);
+  await mkdir(join(workspace, "docs", "tasks"), { recursive: true });
+  await writeFile(join(workspace, "docs", "tasks", "pilot.md"), "# Pilot\n", "utf8");
   const registry = new CodexTaskWorkspaceBindingRegistry(join(root, "bindings.json"));
   const connection = new CompanionConnection();
   const companion = createWorkspaceCompanion({
@@ -132,6 +155,7 @@ test("workspace companion binds exactly one active Codex task to a live workspac
     assert.equal(entry.workspaceRoot, workspace);
     assert.deepEqual(await registry.find({ hostId: "host-1", threadId: "thread-1" }), entry);
     assert.deepEqual(companion.status().activeBinding, entry);
+    assert.ok((companion.status().adapter.targets[0]?.annotationCount ?? 0) > 0);
     const reboundResult = await companion.bindCurrentTask(workspace);
     assert.equal(reboundResult.replaced, true);
     const rebound = reboundResult.binding;
@@ -141,6 +165,69 @@ test("workspace companion binds exactly one active Codex task to a live workspac
     assert.equal(companion.status().activeBinding, undefined);
     assert.equal(await registry.find({ hostId: "host-1", threadId: "thread-1" }), undefined);
     assert.equal(await companion.unbindCurrentTask(), undefined);
+  } finally {
+    await companion.stop();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("workspace companion manages task objects only for the current bound task", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pointable-workspace-companion-objects-"));
+  const workspace = join(root, "workspace");
+  await mkdir(workspace);
+  const registry = new CodexTaskWorkspaceBindingRegistry(join(root, "bindings.json"));
+  const taskObjectRegistry = new TaskObjectRegistry(join(root, "task-objects.json"));
+  const companion = createWorkspaceCompanion({
+    registry,
+    taskObjectRegistry,
+    refreshIntervalMs: 60_000,
+    fetch: async () => targetResponse(),
+    connect: async () => new CompanionConnection(),
+  });
+  try {
+    await companion.start();
+    await assert.rejects(
+      () => companion.upsertCurrentTaskObject(taskObjectInput()),
+      /context_binding_missing/u,
+    );
+    await companion.bindCurrentTask(workspace);
+    const created = await companion.upsertCurrentTaskObject(taskObjectInput());
+    assert.equal(created.kind, "created");
+    assert.equal(created.object.lifecycle, "active");
+    assert.deepEqual(
+      (await companion.listCurrentTaskObjects()).map((item) => item.objectKey),
+      ["COMPANION-LIFECYCLE"],
+    );
+
+    const updated = await companion.upsertCurrentTaskObject({
+      ...taskObjectInput(),
+      summary: "动态对象内容已更新。",
+    });
+    assert.equal(updated.kind, "updated");
+
+    const superseded = await companion.supersedeCurrentTaskObject(
+      "COMPANION-LIFECYCLE",
+      {
+        ...taskObjectInput(),
+        objectKey: "COMPANION-LIFECYCLE-V2",
+        canonicalName: "Companion Lifecycle v2",
+        summary: "替代后的动态对象。",
+      },
+    );
+    assert.equal(superseded.kind, "superseded");
+    assert.deepEqual(
+      (await companion.listCurrentTaskObjects())
+        .filter((item) => item.lifecycle === "active")
+        .map((item) => item.objectKey),
+      ["COMPANION-LIFECYCLE-V2"],
+    );
+
+    const retired = await companion.retireCurrentTaskObject("COMPANION-LIFECYCLE-V2");
+    assert.equal(retired.kind, "retired");
+    assert.equal(
+      (await companion.listCurrentTaskObjects()).filter((item) => item.lifecycle === "active").length,
+      0,
+    );
   } finally {
     await companion.stop();
     await rm(root, { recursive: true, force: true });

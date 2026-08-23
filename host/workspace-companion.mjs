@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 // src/host/codex-cdp/workspace-companion-cli.ts
-import { randomBytes as randomBytes4, randomUUID as randomUUID4, timingSafeEqual as timingSafeEqual2 } from "node:crypto";
+import { randomBytes as randomBytes4, randomUUID as randomUUID5, timingSafeEqual as timingSafeEqual2 } from "node:crypto";
 import { closeSync, existsSync, openSync } from "node:fs";
-import { mkdir as mkdir2, open as open2, readFile as readFile2, rename as rename2, rm, writeFile as writeFile2 } from "node:fs/promises";
+import { mkdir as mkdir3, open as open2, readFile as readFile3, rename as rename3, rm, stat as stat4, writeFile as writeFile3 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname as dirname3, isAbsolute as isAbsolute3, join, resolve as resolve5 } from "node:path";
+import { dirname as dirname4, isAbsolute as isAbsolute4, join, resolve as resolve6 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer, request as httpRequest } from "node:http";
 import { spawn } from "node:child_process";
@@ -304,7 +304,7 @@ function parseFacts(raw, path) {
   if (entries.length > MAX_FACT_FIELDS) {
     throw new ContractError(`${path} has too many fields`);
   }
-  const facts = /* @__PURE__ */ Object.create(null);
+  const facts2 = /* @__PURE__ */ Object.create(null);
   let textBudget = 0;
   for (const [key, item] of entries) {
     const normalizedKey = key.trim().toLowerCase();
@@ -323,9 +323,9 @@ function parseFacts(raw, path) {
     if (textBudget > MAX_FACT_TEXT_BUDGET_BYTES) {
       throw new ContractError(`${path} exceeds the aggregate text bound`);
     }
-    facts[key] = parsed;
+    facts2[key] = parsed;
   }
-  return facts;
+  return facts2;
 }
 function validateIdentityRecordForRuntime(raw) {
   const value = objectValue(raw, "identity");
@@ -376,8 +376,8 @@ function addContextIndexBudget(state, record8, selection, normalizedSelection) {
     return;
   }
   for (const term of searchableIdentityTerms(record8)) {
-    const normalizedTerm = normalizeText(term);
-    state.resolutionWorkUnits += selection.length + term.length + 1 + normalizedSelection.length + normalizedTerm.length + 1;
+    const normalizedTerm2 = normalizeText(term);
+    state.resolutionWorkUnits += selection.length + term.length + 1 + normalizedSelection.length + normalizedTerm2.length + 1;
     if (state.resolutionWorkUnits > CONTEXT_INDEX_LIMITS.resolutionWorkUnits) {
       throw new ContractError(
         "context index exceeds the resolution work bound"
@@ -984,6 +984,7 @@ function validateDetail(value) {
     "sources",
     "humanSummary",
     "comprehension",
+    "terminalState",
     "detailRef",
     "changes"
   ])) {
@@ -998,13 +999,13 @@ function validateDetail(value) {
       "detail freshness is invalid"
     );
   }
-  if (!boundedString(value.observedAt, 20, 64) || !Number.isFinite(Date.parse(value.observedAt)) || !Array.isArray(value.facts) || value.facts.length > 5 || !Array.isArray(value.sources) || value.sources.length > 5 || value.humanSummary !== void 0 && !boundedString(value.humanSummary, 1, 1024) || value.detailRef !== void 0 && !boundedString(value.detailRef, 8, 256) || value.changes !== void 0 && (!Array.isArray(value.changes) || value.changes.length > 3)) {
+  if (!boundedString(value.observedAt, 20, 64) || !Number.isFinite(Date.parse(value.observedAt)) || !Array.isArray(value.facts) || value.facts.length > 5 || !Array.isArray(value.sources) || value.sources.length > 5 || value.humanSummary !== void 0 && !boundedString(value.humanSummary, 1, 1024) || value.terminalState !== void 0 && !record2(value.terminalState) || value.detailRef !== void 0 && !boundedString(value.detailRef, 8, 256) || value.changes !== void 0 && (!Array.isArray(value.changes) || value.changes.length > 3)) {
     throw new PointableProtocolError(
       "invalid_lookup_result",
       "detail metadata exceeds its contract"
     );
   }
-  const facts = value.facts.map((fact) => {
+  const facts2 = value.facts.map((fact) => {
     if (!record2(fact) || !exactKeys2(fact, ["label", "value"])) {
       throw new PointableProtocolError(
         "invalid_lookup_result",
@@ -1134,6 +1135,20 @@ function validateDetail(value) {
       );
     }
   }
+  let terminalState;
+  if (value.terminalState !== void 0) {
+    const state = value.terminalState;
+    if (!record2(state)) {
+      throw new PointableProtocolError("invalid_lookup_result", "detail terminal state is invalid");
+    }
+    if (state.kind === "superseded" && exactKeys2(state, ["kind", "replacementKey"]) && boundedString(state.replacementKey, 1, 128)) {
+      terminalState = { kind: "superseded", replacementKey: state.replacementKey };
+    } else if (state.kind === "retired" && exactKeys2(state, ["kind"])) {
+      terminalState = { kind: "retired" };
+    } else {
+      throw new PointableProtocolError("invalid_lookup_result", "detail terminal state is invalid");
+    }
+  }
   const changes = value.changes === void 0 ? void 0 : value.changes.map((change) => {
     if (!record2(change) || !exactKeys2(change, ["label", "before", "after"])) {
       throw new PointableProtocolError(
@@ -1155,10 +1170,11 @@ function validateDetail(value) {
     revision: requiredString(value.revision, "detail revision", 512),
     observedAt: value.observedAt,
     freshness: value.freshness,
-    facts,
+    facts: facts2,
     sources,
     ...typeof value.humanSummary === "string" ? { humanSummary: value.humanSummary } : {},
     ...comprehension === void 0 ? {} : { comprehension },
+    ...terminalState === void 0 ? {} : { terminalState },
     ...typeof value.detailRef === "string" ? { detailRef: value.detailRef } : {},
     ...changes === void 0 ? {} : { changes }
   };
@@ -1273,6 +1289,7 @@ function validatePointableRendererResponse(value) {
   const factView = (candidate) => isRecord(candidate) && exact(candidate, ["label", "value"]) && bounded(candidate.label, 1, 128) && bounded(candidate.value, 1, 1024);
   const sourceView = (candidate) => isRecord(candidate) && exact(candidate, ["label"]) && bounded(candidate.label, 1, 512);
   const changeView = (candidate) => isRecord(candidate) && exact(candidate, ["label", "before", "after"]) && bounded(candidate.label, 1, 128) && bounded(candidate.before, 1, 1024) && bounded(candidate.after, 1, 1024);
+  const terminalStateView = (candidate) => isRecord(candidate) && (candidate.kind === "superseded" && exact(candidate, ["kind", "replacementKey"]) && bounded(candidate.replacementKey, 1, 128) || candidate.kind === "retired" && exact(candidate, ["kind"]));
   const evidenceView = (candidate) => isRecord(candidate) && exact(candidate, ["excerpt", "source"]) && bounded(candidate.excerpt, 1, 1024) && bounded(candidate.source, 1, 512);
   const comprehensionView = (candidate) => {
     if (!isRecord(candidate) || !Array.isArray(candidate.evidence) || candidate.evidence.length < 1 || candidate.evidence.length > 3 || !candidate.evidence.every(evidenceView)) {
@@ -1339,9 +1356,10 @@ function validatePointableRendererResponse(value) {
       "sources",
       "humanSummary",
       "comprehension",
+      "terminalState",
       "detailRef",
       "changes"
-    ]) || !bounded(detail.entityId, 1, 256) || !bounded(detail.entityType, 1, 128) || !bounded(detail.label, 1, 256) || !bounded(detail.summary, 1, 1024) || !bounded(detail.revision, 1, 512) || !bounded(detail.observedAt, 20, 64) || !Number.isFinite(Date.parse(detail.observedAt)) || detail.freshness !== "current" && detail.freshness !== "stale" && detail.freshness !== "partial" && detail.freshness !== "unknown" || !Array.isArray(detail.facts) || detail.facts.length > 5 || !detail.facts.every(factView) || !Array.isArray(detail.sources) || detail.sources.length > 5 || !detail.sources.every(sourceView) || detail.humanSummary !== void 0 && !bounded(detail.humanSummary, 1, 1024) || detail.comprehension !== void 0 && !comprehensionView(detail.comprehension) || detail.detailRef !== void 0 && !bounded(detail.detailRef, 8, 256) || detail.changes !== void 0 && (!Array.isArray(detail.changes) || detail.changes.length > 3 || !detail.changes.every(changeView))) {
+    ]) || !bounded(detail.entityId, 1, 256) || !bounded(detail.entityType, 1, 128) || !bounded(detail.label, 1, 256) || !bounded(detail.summary, 1, 1024) || !bounded(detail.revision, 1, 512) || !bounded(detail.observedAt, 20, 64) || !Number.isFinite(Date.parse(detail.observedAt)) || detail.freshness !== "current" && detail.freshness !== "stale" && detail.freshness !== "partial" && detail.freshness !== "unknown" || !Array.isArray(detail.facts) || detail.facts.length > 5 || !detail.facts.every(factView) || !Array.isArray(detail.sources) || detail.sources.length > 5 || !detail.sources.every(sourceView) || detail.humanSummary !== void 0 && !bounded(detail.humanSummary, 1, 1024) || detail.comprehension !== void 0 && !comprehensionView(detail.comprehension) || detail.terminalState !== void 0 && !terminalStateView(detail.terminalState) || detail.detailRef !== void 0 && !bounded(detail.detailRef, 8, 256) || detail.changes !== void 0 && (!Array.isArray(detail.changes) || detail.changes.length > 3 || !detail.changes.every(changeView))) {
       return void 0;
     }
   } else if (presentation.kind === "revision") {
@@ -1358,7 +1376,35 @@ function validatePointableRendererResponse(value) {
   }
   return value;
 }
-function installPointableContextRenderer(config, evaluateEligibility2, validateResponse) {
+function validatePointableAnnotationCatalog(value) {
+  const isRecord = (candidate) => typeof candidate === "object" && candidate !== null && !Array.isArray(candidate);
+  const bounded = (candidate, minimum, maximum) => typeof candidate === "string" && candidate.length >= minimum && candidate.length <= maximum && !/[\p{Cc}\p{Cf}]/u.test(candidate);
+  if (!isRecord(value) || Object.keys(value).sort().join("|") !== "contextFingerprint|entries|revision" || !bounded(value.revision, 1, 128) || !bounded(value.contextFingerprint, 1, 2048) || !Array.isArray(value.entries) || value.entries.length > 256) {
+    return void 0;
+  }
+  const entries = [];
+  const pairs = /* @__PURE__ */ new Set();
+  for (const raw of value.entries) {
+    if (!isRecord(raw) || Object.keys(raw).sort().join("|") !== "entityType|objectKey|priority|term" || !bounded(raw.objectKey, 16, 128) || !bounded(raw.term, 3, 256) || raw.term !== raw.term.trim() || !bounded(raw.entityType, 1, 128) || !Number.isSafeInteger(raw.priority) || Number(raw.priority) < 0 || Number(raw.priority) > 100) {
+      return void 0;
+    }
+    const pair = `${raw.objectKey}\0${raw.term.normalize("NFKC").toLocaleLowerCase("en-US")}`;
+    if (pairs.has(pair)) return void 0;
+    pairs.add(pair);
+    entries.push({
+      objectKey: raw.objectKey,
+      term: raw.term,
+      entityType: raw.entityType,
+      priority: Number(raw.priority)
+    });
+  }
+  return Object.freeze({
+    revision: value.revision,
+    contextFingerprint: value.contextFingerprint,
+    entries: Object.freeze(entries.map((entry) => Object.freeze(entry)))
+  });
+}
+function installPointableContextRenderer(config, evaluateEligibility2, validateResponse, validateAnnotations) {
   const namespace = "__pointableContextRenderer";
   const bindingNamePattern = /^__pointableContextBinding_[A-Za-z0-9_]{8,128}$/u;
   if (!bindingNamePattern.test(config.bindingName)) {
@@ -1419,15 +1465,30 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   let holdCardPlacementUntil = 0;
   let manualCardPlacement;
   let dragState;
+  let annotationCatalog = {
+    revision: "unbound",
+    contextFingerprint: "unbound",
+    entries: []
+  };
+  let annotationHits = [];
+  let annotationFrame;
+  let annotationStyle;
   let uninstalled = false;
   const activeObserver = new MutationObserver(() => {
     if (candidate !== void 0) scheduleReconcile();
+    if (annotationCatalog.entries.length > 0) scheduleAnnotationReconcile();
   });
   const resizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(() => reposition()) : void 0;
   const pointerUpHandler = (event) => {
     const ownedInteraction = event.composedPath().some((item) => item instanceof Element && item.getAttribute("data-pointable-context-owned") === lifecycleId);
     if (event.button === 0 && !ownedInteraction) {
-      window.setTimeout(evaluateSelection, 0);
+      const selection = window.getSelection();
+      const hit = event.isTrusted && selection?.isCollapsed !== false ? annotationAtPoint(event.clientX, event.clientY) : void 0;
+      if (hit !== void 0) {
+        activateAnnotation(hit);
+      } else {
+        window.setTimeout(evaluateSelection, 0);
+      }
     }
   };
   const dragMoveHandler = (event) => {
@@ -1483,6 +1544,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   const viewportHandler = () => reposition();
   const routeHandler = () => {
     reconcile();
+    scheduleAnnotationReconcile();
   };
   const selectionHandler = () => {
     window.setTimeout(evaluateSelection, 0);
@@ -1586,6 +1648,208 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     const rect = root.getBoundingClientRect();
     return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
   }
+  const annotationHighlightName = `pointable-context-object-${lifecycleId}`;
+  const annotationInteractiveSelector = 'a, button, input, textarea, select, [role="button"], [contenteditable="true"]';
+  function refreshObserver() {
+    activeObserver.disconnect();
+    if (candidate === void 0 && annotationCatalog.entries.length === 0) return;
+    activeObserver.observe(document.body, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: [
+        "hidden",
+        "inert",
+        "data-app-action-sidebar-thread-active",
+        "data-app-action-sidebar-thread-id",
+        "data-app-action-sidebar-thread-host-id"
+      ]
+    });
+  }
+  function annotationRegistry() {
+    if (typeof CSS === "undefined") return void 0;
+    return CSS.highlights;
+  }
+  function clearAnnotationHighlights() {
+    annotationRegistry()?.delete(annotationHighlightName);
+    annotationHits = [];
+    annotationStyle?.remove();
+    annotationStyle = void 0;
+  }
+  function annotationSurface(root) {
+    if (!stableRoot.contains(root) || rejectedSurface(root)) return void 0;
+    if (root.closest('[data-user-message-bubble="true"]') !== null) {
+      return "user_message";
+    }
+    return root.closest(
+      "[data-response-annotation-target], [data-local-conversation-final-assistant]"
+    ) !== null ? "assistant_message" : void 0;
+  }
+  function termBoundary(text, start, length) {
+    const isWord = (value) => value !== void 0 && /[\p{L}\p{N}_]/u.test(value);
+    const first = text[start];
+    const last = text[start + length - 1];
+    return !(isWord(first) && isWord(text[start - 1]) || isWord(last) && isWord(text[start + length]));
+  }
+  function firstTermIndex(text, term) {
+    const foldedText = text.toLocaleLowerCase("en-US");
+    const foldedTerm = term.toLocaleLowerCase("en-US");
+    if (foldedTerm.length !== term.length) return -1;
+    let from = 0;
+    while (from <= foldedText.length - foldedTerm.length) {
+      const found = foldedText.indexOf(foldedTerm, from);
+      if (found < 0) return -1;
+      if (found + term.length <= text.length && termBoundary(text, found, term.length)) {
+        return found;
+      }
+      from = found + Math.max(1, foldedTerm.length);
+    }
+    return -1;
+  }
+  function structuralBoundaryBetween(previous, current) {
+    const between = document.createRange();
+    try {
+      between.setStart(previous, previous.data.length);
+      between.setEnd(current, 0);
+      const fragment = between.cloneContents();
+      return fragment.querySelector(
+        "br, p, div, li, ul, ol, pre, blockquote, section, article, header, footer, table, thead, tbody, tfoot, tr, td, th, hr"
+      ) !== null;
+    } catch {
+      return true;
+    } finally {
+      between.detach();
+    }
+  }
+  function scheduleAnnotationReconcile() {
+    if (annotationFrame !== void 0 || uninstalled) return;
+    annotationFrame = window.requestAnimationFrame(() => {
+      annotationFrame = void 0;
+      reconcileAnnotations();
+    });
+  }
+  function reconcileAnnotations() {
+    clearAnnotationHighlights();
+    if (annotationCatalog.entries.length === 0 || annotationCatalog.contextFingerprint !== readContextFingerprint()) {
+      refreshObserver();
+      return;
+    }
+    const registry = annotationRegistry();
+    const HighlightConstructor = globalThis.Highlight;
+    if (registry === void 0 || HighlightConstructor === void 0) {
+      refreshObserver();
+      return;
+    }
+    const roots = [...stableRoot.querySelectorAll(
+      "[data-selected-text-overlay-target]"
+    )].filter((root) => rootVisible(root)).slice(0, 64);
+    const contextFingerprint = readContextFingerprint();
+    let totalText = 0;
+    const nextHits = [];
+    for (const root of roots) {
+      if (totalText >= 262144) break;
+      const surface = annotationSurface(root);
+      if (surface === void 0) continue;
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      const segments = [];
+      let text = "";
+      let previousText;
+      for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        if (!(node instanceof Text) || node.data.length === 0) continue;
+        const parent = node.parentElement;
+        if (parent === null || rejectedSurface(parent) || parent.closest(annotationInteractiveSelector) !== null) {
+          continue;
+        }
+        const separator = previousText !== void 0 && structuralBoundaryBetween(previousText, node) ? "\n" : "";
+        if (segments.length >= 2048 || text.length + separator.length + node.data.length > 65536) break;
+        text += separator;
+        const start = text.length;
+        text += node.data;
+        segments.push({ node, start, end: text.length });
+        previousText = node;
+      }
+      totalText += text.length;
+      if (text.length === 0) continue;
+      const candidates2 = [];
+      for (const annotation of annotationCatalog.entries) {
+        const start = firstTermIndex(text, annotation.term);
+        if (start >= 0) {
+          candidates2.push({
+            annotation,
+            start,
+            end: start + annotation.term.length
+          });
+        }
+      }
+      candidates2.sort((left, right) => right.annotation.priority - left.annotation.priority || left.start - right.start || right.annotation.term.length - left.annotation.term.length);
+      const chosen = [];
+      const objectKeys = /* @__PURE__ */ new Set();
+      for (const item of candidates2) {
+        if (objectKeys.has(item.annotation.objectKey) || chosen.some((other) => item.start < other.end && other.start < item.end)) {
+          continue;
+        }
+        chosen.push(item);
+        objectKeys.add(item.annotation.objectKey);
+        if (chosen.length >= 3) break;
+      }
+      for (const item of chosen) {
+        const startSegment = segments.find((segment) => item.start >= segment.start && item.start < segment.end);
+        const endSegment = segments.find((segment) => item.end > segment.start && item.end <= segment.end);
+        if (startSegment === void 0 || endSegment === void 0) continue;
+        const range = document.createRange();
+        range.setStart(startSegment.node, item.start - startSegment.start);
+        range.setEnd(endSegment.node, item.end - endSegment.start);
+        if (range.toString().length !== item.annotation.term.length) continue;
+        nextHits.push({
+          ...item.annotation,
+          range,
+          sourceRoot: root,
+          surface,
+          contextFingerprint
+        });
+      }
+    }
+    if (nextHits.length > 0) {
+      const style = document.createElement("style");
+      style.setAttribute("data-pointable-context-owned", lifecycleId);
+      style.setAttribute("data-pointable-context-role", "annotation-style");
+      style.textContent = `::highlight(${annotationHighlightName}) { background-color: rgba(77, 112, 255, .08); text-decoration-line: underline; text-decoration-style: dotted; text-decoration-thickness: 1.5px; text-decoration-color: rgba(77, 112, 255, .88); text-underline-offset: 3px; }`;
+      document.head.append(style);
+      annotationStyle = style;
+      annotationHits = nextHits;
+      registry.set(annotationHighlightName, new HighlightConstructor(...nextHits.map(({ range }) => range)));
+    }
+    refreshObserver();
+  }
+  function annotationAnchorIsCurrent(hit) {
+    return hit.sourceRoot.isConnected && hit.range.commonAncestorContainer.isConnected && hit.range.toString().toLocaleLowerCase("en-US") === hit.term.toLocaleLowerCase("en-US") && hit.contextFingerprint === readContextFingerprint() && rootVisible(hit.sourceRoot) && annotationSurface(hit.sourceRoot) === hit.surface;
+  }
+  function annotationAtPoint(clientX, clientY) {
+    return annotationHits.find((hit) => annotationAnchorIsCurrent(hit) && [...hit.range.getClientRects()].some((rect) => clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom));
+  }
+  function activateAnnotation(hit) {
+    if (!annotationAnchorIsCurrent(hit)) return;
+    cleanup(true, false);
+    candidate = {
+      generation: ++generation,
+      text: hit.range.toString(),
+      surface: hit.surface,
+      range: hit.range.cloneRange(),
+      sourceRoot: hit.sourceRoot,
+      contextFingerprint: hit.contextFingerprint
+    };
+    refreshObserver();
+    void submitLookup("resolve", candidate.generation);
+  }
+  function updateAnnotations(value) {
+    const catalog = validateAnnotations(value);
+    if (catalog === void 0) return status();
+    annotationCatalog = catalog;
+    refreshObserver();
+    scheduleAnnotationReconcile();
+    return status();
+  }
   function evaluateSelection() {
     if (uninstalled) return;
     const selection = window.getSelection();
@@ -1599,6 +1863,10 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     const end = nodeElement(range.endContainer);
     if (start === null || end === null) {
       cleanup(true, false);
+      return;
+    }
+    const openCard = connectedOwnedElement("card");
+    if (openCard !== null && openCard.contains(start) && openCard.contains(end)) {
       return;
     }
     const admitted = selectionSurface(start, end, range);
@@ -1633,18 +1901,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       sourceRoot: admitted.root,
       contextFingerprint
     };
-    activeObserver.observe(document.body, {
-      subtree: true,
-      childList: true,
-      attributes: true,
-      attributeFilter: [
-        "hidden",
-        "inert",
-        "data-app-action-sidebar-thread-active",
-        "data-app-action-sidebar-thread-id",
-        "data-app-action-sidebar-thread-host-id"
-      ]
-    });
+    refreshObserver();
     mountAction();
   }
   function mountAction() {
@@ -1971,10 +2228,10 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       const type = document.createElement("span");
       type.textContent = item.entityType;
       Object.assign(type.style, { color: "#52627a", fontSize: "12px" });
-      const summary = document.createElement("span");
-      summary.textContent = item.summary;
-      Object.assign(summary.style, { color: "#52627a", fontSize: "12px" });
-      button.append(label, type, summary);
+      const summary2 = document.createElement("span");
+      summary2.textContent = item.summary;
+      Object.assign(summary2.style, { color: "#52627a", fontSize: "12px" });
+      button.append(label, type, summary2);
       button.addEventListener("click", (event) => {
         if (!event.isTrusted) return;
         void submitLookup("choose", currentGeneration, item.candidateRef);
@@ -2257,6 +2514,22 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     changeSummary.append(heading, list);
     body.append(changeSummary);
   }
+  function mountTerminalState(body, terminalState) {
+    if (terminalState === void 0) return;
+    const notice = document.createElement("div");
+    notice.setAttribute("data-pointable-context-role", "terminal-state");
+    Object.assign(notice.style, {
+      marginBottom: "8px",
+      padding: "8px 10px",
+      borderRadius: "8px",
+      background: "#fff7e8",
+      color: "#8a4b08",
+      fontSize: "12px",
+      lineHeight: "1.45"
+    });
+    notice.textContent = terminalState.kind === "superseded" ? `\u6B64\u5BF9\u8C61\u5DF2\u7531 ${terminalState.replacementKey} \u66FF\u4EE3\uFF1B\u4EE5\u4E0B\u4FDD\u7559\u7684\u662F\u5386\u53F2\u53EA\u8BFB\u4E0A\u4E0B\u6587\u3002` : "\u6B64\u5BF9\u8C61\u5DF2\u9000\u5F79\uFF1B\u4EE5\u4E0B\u4FDD\u7559\u7684\u662F\u5386\u53F2\u53EA\u8BFB\u4E0A\u4E0B\u6587\u3002";
+    body.append(notice);
+  }
   function mountDetail(detail, preserveUiState = false) {
     clearRevisionTimer();
     const previousCard = preserveUiState ? connectedOwnedElement("card") : null;
@@ -2265,11 +2538,12 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     state = "detail";
     const { body } = createShell(detail.label, preserveUiState);
     mountRevisionChanges(body, detail.changes);
+    mountTerminalState(body, detail.terminalState);
     if (presentationMode === "mental-model" && detail.comprehension !== void 0) {
       mountComprehension(body, detail.comprehension, evidenceExpanded);
     } else {
-      const summary = presentationMode === "record" ? detail.summary : detail.humanSummary ?? detail.summary;
-      body.append(paragraph(summary));
+      const summary2 = presentationMode === "record" ? detail.summary : detail.humanSummary ?? detail.summary;
+      body.append(paragraph(summary2));
     }
     const compactState = document.createElement("div");
     compactState.textContent = `${detail.entityType} \xB7 ${detail.freshness}`;
@@ -2324,9 +2598,9 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       const heading = document.createElement("h3");
       heading.textContent = "\u5173\u952E\u4E8B\u5B9E";
       Object.assign(heading.style, { margin: "12px 0 4px", fontSize: "13px" });
-      const facts = document.createElement("div");
-      for (const fact of detail.facts) facts.append(metadataRow(fact.label, fact.value));
-      detailBody.append(heading, facts);
+      const facts2 = document.createElement("div");
+      for (const fact of detail.facts) facts2.append(metadataRow(fact.label, fact.value));
+      detailBody.append(heading, facts2);
     }
     if (detail.sources.length > 0) {
       const heading = document.createElement("h3");
@@ -2575,8 +2849,8 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     }
     if (clearCandidate) {
       candidate = void 0;
-      activeObserver.disconnect();
       state = "idle";
+      refreshObserver();
     }
     if (restore && restoreFocus?.isConnected) {
       restoreFocus.focus({ preventScroll: true });
@@ -2592,13 +2866,18 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       selectionGeneration: generation,
       pendingRequestCount: pending === void 0 ? 0 : 1,
       actionCount: connectedOwnedElement("action") === null ? 0 : 1,
-      cardCount: connectedOwnedElement("card") === null ? 0 : 1
+      cardCount: connectedOwnedElement("card") === null ? 0 : 1,
+      annotationCount: annotationHits.length
     };
   }
   function uninstall() {
     if (uninstalled) return status();
     cleanup(true, false);
     uninstalled = true;
+    annotationCatalog = { revision: "unbound", contextFingerprint: "unbound", entries: [] };
+    if (annotationFrame !== void 0) window.cancelAnimationFrame(annotationFrame);
+    annotationFrame = void 0;
+    clearAnnotationHighlights();
     activeObserver.disconnect();
     resizeObserver?.disconnect();
     document.removeEventListener("selectionchange", selectionHandler);
@@ -2621,6 +2900,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     status,
     verifyFence,
     receiveResult,
+    updateAnnotations,
     reconcile,
     uninstall
   };
@@ -2631,8 +2911,9 @@ function createInstallPointableRendererExpression(config) {
   return `(() => {
     const evaluateEligibility = (${evaluatePointableRendererEligibility.toString()});
     const validateResponse = (${validatePointableRendererResponse.toString()});
+    const validateAnnotations = (${validatePointableAnnotationCatalog.toString()});
     const install = (${installPointableContextRenderer.toString()});
-    return install(${JSON.stringify(config)}, evaluateEligibility, validateResponse);
+    return install(${JSON.stringify(config)}, evaluateEligibility, validateResponse, validateAnnotations);
   })()`;
 }
 function createVerifyPointableRendererFenceExpression(fence, lifecycleId) {
@@ -2647,6 +2928,14 @@ function createDeliverPointableResultExpression(response, lifecycleId) {
     const renderer = window.__pointableContextRenderer;
     return renderer?.status?.().lifecycleId === ${JSON.stringify(lifecycleId)}
       ? renderer.receiveResult?.(${JSON.stringify(response)}) ?? null
+      : null;
+  })()`;
+}
+function createUpdatePointableAnnotationsExpression(catalog, lifecycleId) {
+  return `(() => {
+    const renderer = window.__pointableContextRenderer;
+    return renderer?.status?.().lifecycleId === ${JSON.stringify(lifecycleId)}
+      ? renderer.updateAnnotations?.(${JSON.stringify(catalog)}) ?? null
       : null;
   })()`;
 }
@@ -2742,7 +3031,7 @@ async function readBoundedResponseText(response, maximumBytes, signal) {
 }
 function awaitWithAbort(promise, signal) {
   if (signal.aborted) return Promise.reject(signal.reason);
-  return new Promise((resolve6, reject) => {
+  return new Promise((resolve7, reject) => {
     const aborted = () => {
       cleanup();
       reject(signal.reason);
@@ -2752,7 +3041,7 @@ function awaitWithAbort(promise, signal) {
     promise.then(
       (value) => {
         cleanup();
-        resolve6(value);
+        resolve7(value);
       },
       (error) => {
         cleanup();
@@ -2905,7 +3194,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
   } catch {
     throw new CdpTransportError("cdp_connect_failed", "CDP websocket failed");
   }
-  await new Promise((resolve6, reject) => {
+  await new Promise((resolve7, reject) => {
     const timer = setTimeout(() => {
       cleanup();
       socket.close();
@@ -2919,7 +3208,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
     };
     const opened = () => {
       cleanup();
-      resolve6();
+      resolve7();
     };
     const failed = () => {
       cleanup();
@@ -3042,7 +3331,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
         closeForProtocolError(error, 1009);
         return Promise.reject(error);
       }
-      return new Promise((resolve6, reject) => {
+      return new Promise((resolve7, reject) => {
         const timer = setTimeout(() => {
           pending.delete(id);
           reject(
@@ -3052,7 +3341,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
             )
           );
         }, timeoutMs);
-        pending.set(id, { resolve: resolve6, reject, timer });
+        pending.set(id, { resolve: resolve7, reject, timer });
         try {
           socket.send(serialized);
         } catch (error) {
@@ -3166,6 +3455,9 @@ function parseCodexHostTaskContext(value, expectedFingerprint) {
 function record6(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+function sameHostTask(left, right) {
+  return left.host === right.host && left.hostId === right.hostId && left.threadId === right.threadId && left.routeRef === right.routeRef && left.contextFingerprint === right.contextFingerprint;
+}
 function runtimeValue(value) {
   if (!record6(value) || !record6(value.result) || value.exceptionDetails !== void 0) {
     return void 0;
@@ -3202,7 +3494,7 @@ function lookupError(code, message, retryable) {
   return { kind: "error", code, message, retryable };
 }
 function boundedLookup(callback, timeoutMs, controller) {
-  return new Promise((resolve6, reject) => {
+  return new Promise((resolve7, reject) => {
     let settled = false;
     const timer = setTimeout(() => {
       if (settled) return;
@@ -3215,7 +3507,7 @@ function boundedLookup(callback, timeoutMs, controller) {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        resolve6(value);
+        resolve7(value);
       },
       (error) => {
         if (settled) return;
@@ -3230,7 +3522,7 @@ function waitForMainContext(attachment, signal, timeoutMs = 2e3) {
   if (attachment.mainExecutionContextId !== void 0) {
     return Promise.resolve(attachment.mainExecutionContextId);
   }
-  return new Promise((resolve6, reject) => {
+  return new Promise((resolve7, reject) => {
     let settled = false;
     let timer;
     const cleanup = () => {
@@ -3242,7 +3534,7 @@ function waitForMainContext(attachment, signal, timeoutMs = 2e3) {
       if (settled) return;
       settled = true;
       cleanup();
-      resolve6(contextId);
+      resolve7(contextId);
     };
     const aborted = () => {
       if (settled) return;
@@ -3266,7 +3558,7 @@ function connectWithAbort(connectionPromise, signal) {
     connectionPromise.then((connection) => connection.close(), () => void 0);
     return Promise.reject(signal.reason);
   }
-  return new Promise((resolve6, reject) => {
+  return new Promise((resolve7, reject) => {
     let settled = false;
     const aborted = () => {
       if (settled) return;
@@ -3283,7 +3575,7 @@ function connectWithAbort(connectionPromise, signal) {
         }
         settled = true;
         signal.removeEventListener("abort", aborted);
-        resolve6(connection);
+        resolve7(connection);
       },
       (error) => {
         if (settled) return;
@@ -3304,6 +3596,8 @@ var CodexCdpHostAdapter = class {
   #maxConcurrentLookupsPerTarget;
   #actionLabel;
   #presentationMode;
+  #annotationProvider;
+  #annotationRefreshIntervalMs;
   #attachments = /* @__PURE__ */ new Map();
   #attaching = /* @__PURE__ */ new Set();
   #recoveries = /* @__PURE__ */ new Set();
@@ -3322,6 +3616,8 @@ var CodexCdpHostAdapter = class {
     this.#maxConcurrentLookupsPerTarget = options.maxConcurrentLookupsPerTarget ?? 8;
     this.#actionLabel = options.actionLabel;
     this.#presentationMode = options.presentationMode;
+    this.#annotationProvider = options.annotationProvider;
+    this.#annotationRefreshIntervalMs = options.annotationRefreshIntervalMs ?? 15e3;
     if (this.#presentationMode !== void 0 && this.#presentationMode !== "record" && this.#presentationMode !== "narrative" && this.#presentationMode !== "mental-model") {
       throw new RangeError("presentationMode is invalid");
     }
@@ -3331,6 +3627,11 @@ var CodexCdpHostAdapter = class {
     if (!Number.isSafeInteger(this.#maxConcurrentLookupsPerTarget) || this.#maxConcurrentLookupsPerTarget < 1 || this.#maxConcurrentLookupsPerTarget > 32) {
       throw new RangeError(
         "maxConcurrentLookupsPerTarget must be an integer from 1 to 32"
+      );
+    }
+    if (!Number.isSafeInteger(this.#annotationRefreshIntervalMs) || this.#annotationRefreshIntervalMs < 1e3 || this.#annotationRefreshIntervalMs > 3e5) {
+      throw new RangeError(
+        "annotationRefreshIntervalMs must be an integer from 1000 to 300000"
       );
     }
   }
@@ -3383,6 +3684,7 @@ var CodexCdpHostAdapter = class {
       }
       await this.#attach(target, signal);
     }
+    await this.#refreshAnnotations(signal, false);
     if (!this.#isStopped() && !signal.aborted) this.#state = "running";
     return this.status();
   }
@@ -3397,7 +3699,9 @@ var CodexCdpHostAdapter = class {
         bindingName: attachment.bindingName,
         pendingLookups: attachment.inFlight.size,
         executionContextId: attachment.mainExecutionContextId,
-        rendererLifecycleId: attachment.rendererLifecycleId
+        rendererLifecycleId: attachment.rendererLifecycleId,
+        annotationCount: attachment.annotationCount,
+        ...attachment.annotationRevision === void 0 ? {} : { annotationRevision: attachment.annotationRevision }
       }]).sort((left, right) => left.targetId.localeCompare(right.targetId))
     };
   }
@@ -3406,6 +3710,78 @@ var CodexCdpHostAdapter = class {
    * used only for an explicit local bind action; zero or multiple results must
    * be treated as unavailable/ambiguous by the caller.
    */
+  async refreshAnnotations(signal, force = true) {
+    if (this.#isStopped() || signal?.aborted) return this.status();
+    const combined = signal === void 0 ? this.#stopController.signal : AbortSignal.any([signal, this.#stopController.signal]);
+    await this.#refreshAnnotations(combined, force);
+    return this.status();
+  }
+  async #refreshAnnotations(signal, force) {
+    if (this.#annotationProvider === void 0 || signal.aborted) return;
+    await Promise.all([...this.#attachments.values()].map(async (attachment) => {
+      if (signal.aborted || attachment.invalidated || attachment.connection.isClosed() || attachment.mainExecutionContextId === void 0 || attachment.rendererLifecycleId === void 0 || !force && Date.now() - attachment.annotationCheckedAt < this.#annotationRefreshIntervalMs) {
+        return;
+      }
+      attachment.annotationCheckedAt = Date.now();
+      const task = await this.#readCurrentHostTaskContext(attachment);
+      const empty = (contextFingerprint, revision2) => ({
+        revision: revision2,
+        contextFingerprint,
+        entries: []
+      });
+      let catalog;
+      if (task === void 0) {
+        catalog = empty("unbound", "unbound");
+      } else {
+        const controller = new AbortController();
+        try {
+          const raw = await boundedLookup(
+            (timeoutSignal) => this.#annotationProvider?.({
+              host: {
+                targetId: attachment.target.id,
+                targetUrl: attachment.target.url,
+                bindingGeneration: attachment.bindingGeneration,
+                task,
+                revalidateTask: async (revalidateSignal) => {
+                  if (revalidateSignal?.aborted) return void 0;
+                  const current2 = await this.#readCurrentHostTaskContext(attachment);
+                  return current2 !== void 0 && sameHostTask(current2, task) ? current2 : void 0;
+                }
+              },
+              signal: AbortSignal.any([
+                timeoutSignal,
+                signal,
+                attachment.lifecycleController.signal
+              ])
+            }) ?? Promise.resolve(empty(task.contextFingerprint, "unavailable")),
+            this.#lookupTimeoutMs,
+            controller
+          );
+          catalog = validatePointableAnnotationCatalog(raw) ?? empty(task.contextFingerprint, "invalid");
+        } catch {
+          catalog = empty(task.contextFingerprint, "unavailable");
+        }
+        const current = await this.#readCurrentHostTaskContext(attachment);
+        if (current === void 0 || !sameHostTask(current, task)) {
+          catalog = empty("context-changed", "context-changed");
+        }
+      }
+      if (signal.aborted || attachment.invalidated || attachment.connection.isClosed() || this.#attachments.get(attachment.target.id) !== attachment) {
+        return;
+      }
+      await attachment.connection.send("Runtime.evaluate", {
+        expression: createUpdatePointableAnnotationsExpression(
+          catalog,
+          attachment.rendererLifecycleId
+        ),
+        contextId: attachment.mainExecutionContextId,
+        returnByValue: true,
+        awaitPromise: true
+      });
+      attachment.annotationRevision = catalog.revision;
+      attachment.annotationCount = catalog.entries.length;
+    }));
+  }
   async activeTasks(signal) {
     if (this.#isStopped() || signal?.aborted) return [];
     const byTask = /* @__PURE__ */ new Map();
@@ -3473,7 +3849,9 @@ var CodexCdpHostAdapter = class {
       contextWaiters: /* @__PURE__ */ new Set(),
       lifecycleController: new AbortController(),
       invalidated: false,
-      detached: false
+      detached: false,
+      annotationCheckedAt: 0,
+      annotationCount: 0
     };
     this.#attaching.add(attachment);
     attachment.unsubscribeEvent = connection.onEvent((event) => this.#onEvent(attachment, event));
@@ -3660,9 +4038,15 @@ var CodexCdpHostAdapter = class {
     }
   }
   async #readHostTaskContext(attachment, intent) {
+    return await this.#readCurrentHostTaskContext(
+      attachment,
+      intent.contextFingerprint
+    ) ?? false;
+  }
+  async #readCurrentHostTaskContext(attachment, expectedFingerprint) {
     const contextId = attachment.mainExecutionContextId;
     if (contextId === void 0 || this.#attachments.get(attachment.target.id) !== attachment || attachment.connection.isClosed() || attachment.invalidated) {
-      return false;
+      return void 0;
     }
     try {
       const evaluated = await attachment.connection.send("Runtime.evaluate", {
@@ -3673,10 +4057,10 @@ var CodexCdpHostAdapter = class {
       });
       return parseCodexHostTaskContext(
         runtimeValue(evaluated),
-        intent.contextFingerprint
+        expectedFingerprint
       );
     } catch {
-      return false;
+      return void 0;
     }
   }
   async #rendererFenceCurrent(attachment, intent) {
@@ -3785,9 +4169,6 @@ var CodexCdpHostAdapter = class {
     }
   }
 };
-
-// src/host/codex-cdp/workspace-lookup.ts
-import { createHash as createHash7, randomBytes as randomBytes3 } from "node:crypto";
 
 // src/adapters/local-workspace.ts
 import { execFile as execFile3 } from "node:child_process";
@@ -4625,8 +5006,8 @@ function extractStaticTestDefinitionContext(content) {
     if (titles.length >= 20) break;
   }
   const visible = titles.slice(0, 3);
-  const summary = visible.length === 0 ? "\u672A\u63D0\u53D6\u5230\u9759\u6001 test/it \u6807\u9898\uFF1B\u8BE5\u5361\u7247\u4E0D\u6267\u884C\u6D4B\u8BD5" : `\u68C0\u6D4B\u5230 ${titles.length} \u4E2A\u9759\u6001 test/it \u6807\u9898\uFF1A${visible.join("\uFF1B")}${titles.length > 3 ? `\uFF1B\u53E6 ${titles.length - 3} \u9879` : ""}`;
-  return { summary, titles: visible, titleCount: titles.length };
+  const summary2 = visible.length === 0 ? "\u672A\u63D0\u53D6\u5230\u9759\u6001 test/it \u6807\u9898\uFF1B\u8BE5\u5361\u7247\u4E0D\u6267\u884C\u6D4B\u8BD5" : `\u68C0\u6D4B\u5230 ${titles.length} \u4E2A\u9759\u6001 test/it \u6807\u9898\uFF1A${visible.join("\uFF1B")}${titles.length > 3 ? `\uFF1B\u53E6 ${titles.length - 3} \u9879` : ""}`;
+  return { summary: summary2, titles: visible, titleCount: titles.length };
 }
 function configurationPurpose(relativePath) {
   const path = portable(relativePath);
@@ -4723,7 +5104,10 @@ var DEFAULT_IGNORED_DIRECTORIES = /* @__PURE__ */ new Set([
   ".turbo",
   "coverage",
   "dist",
-  "node_modules"
+  "fixtures",
+  "node_modules",
+  "study-dist",
+  "study-release"
 ]);
 function boundedInteger(value, fallback, minimum, maximum, name) {
   const candidate = value ?? fallback;
@@ -5398,6 +5782,9 @@ var LocalWorkspaceAuthoritativeProvider = class {
   }
 };
 
+// src/host/codex-cdp/workspace-lookup.ts
+import { createHash as createHash7, randomBytes as randomBytes3 } from "node:crypto";
+
 // src/lookup-service.ts
 import {
   createHmac,
@@ -5722,7 +6109,7 @@ function interruptionOutcome(error) {
   return void 0;
 }
 function runBounded(operationName, operation, callerSignal, timeoutMs) {
-  return new Promise((resolve6, reject) => {
+  return new Promise((resolve7, reject) => {
     const controller = new AbortController();
     const deadlineAt = performance2.now() + timeoutMs;
     let settled = false;
@@ -5739,7 +6126,7 @@ function runBounded(operationName, operation, callerSignal, timeoutMs) {
       }
       settled = true;
       cleanup();
-      resolve6(value);
+      resolve7(value);
     };
     const settleFailure = (error) => {
       if (settled) return;
@@ -6222,13 +6609,13 @@ function factText2(value) {
     1024
   );
 }
-function scalarFact(facts, key) {
-  const value = facts[key];
+function scalarFact(facts2, key) {
+  const value = facts2[key];
   return typeof value === "string" ? truncate(value, 1024) : void 0;
 }
 function mentalModelComprehension(outcome) {
   const evidenceExcerpt = scalarFact(outcome.detail.facts, "\u8BC1\u636E");
-  const source = outcome.detail.sourceRefs.find((item) => item.sourceType === "project_evidence");
+  const source = outcome.detail.sourceRefs.find((item) => item.sourceType === "project_evidence" || item.sourceType === "agent-task-context");
   if (evidenceExcerpt === void 0 || source === void 0) {
     return void 0;
   }
@@ -6294,31 +6681,40 @@ function candidateView(candidate, candidateRef) {
   };
 }
 function detailView(outcome, options = {}) {
+  const lifecycle = scalarFact(outcome.detail.facts, "\u751F\u547D\u5468\u671F");
+  const replacementKey = scalarFact(outcome.detail.facts, "\u66FF\u4EE3\u5BF9\u8C61");
+  const terminalState = lifecycle === "superseded" && replacementKey !== void 0 ? { kind: "superseded", replacementKey: truncate(replacementKey, 128) } : lifecycle === "retired" ? { kind: "retired" } : void 0;
   const purpose = outcome.detail.facts["\u7528\u9014"] ?? outcome.detail.facts["\u804C\u8D23"];
   const scenarioSummary = outcome.detail.entityType === "verification" ? outcome.detail.facts["\u7ED3\u679C"] ?? outcome.detail.facts["\u9A8C\u8BC1\u8303\u56F4"] : outcome.detail.entityType === "configuration" ? outcome.detail.facts["\u914D\u7F6E\u7528\u9014"] : outcome.detail.entityType === "decision" ? outcome.detail.facts["\u9009\u62E9\u4E86\u4EC0\u4E48"] ?? outcome.detail.facts["\u51B3\u7B56"] : outcome.detail.entityType === "concept" ? outcome.detail.facts["\u5B83\u662F\u4EC0\u4E48\u610F\u601D"] : outcome.detail.entityType === "change" ? outcome.detail.facts["\u73B0\u5728\u600E\u6837"] : outcome.detail.entityType === "task" ? outcome.detail.facts["\u5F53\u524D\u72B6\u6001"] : void 0;
   const change = outcome.detail.facts["\u672C\u6B21\u53D8\u5316"];
   const activeChange = typeof change === "string" && /^(?:涉及：|modified\b|staged\b|untracked\b|conflicted\b)/u.test(change);
   const summaryValue = scenarioSummary ?? (activeChange ? change : purpose);
-  const summary = typeof summaryValue === "string" ? truncate(summaryValue, 1024) : truncate(outcome.candidate.summary, 1024);
+  const summary2 = typeof summaryValue === "string" ? truncate(summaryValue, 1024) : truncate(outcome.candidate.summary, 1024);
   const comprehension = mentalModelComprehension(outcome);
   const humanSummary = comprehension === void 0 ? void 0 : truncate(
     comprehension.kind === "concept" ? `${comprehension.meaning} ${comprehension.context}` : comprehension.kind === "change" ? `${comprehension.after} ${comprehension.impact}` : comprehension.kind === "decision" ? `${comprehension.choice} ${comprehension.consequence}` : comprehension.kind === "task" ? `${comprehension.status} \u4E0B\u4E00\u6B65\uFF1A${comprehension.next}` : `${comprehension.result} \u5C1A\u672A\u8BC1\u660E\uFF1A${comprehension.gap}`,
     1024
   );
+  const allFacts = Object.entries(outcome.detail.facts);
+  const projectedFacts = terminalState === void 0 ? allFacts : [
+    ...allFacts.filter(([label]) => label === "\u751F\u547D\u5468\u671F" || label === "\u66FF\u4EE3\u5BF9\u8C61"),
+    ...allFacts.filter(([label]) => label !== "\u751F\u547D\u5468\u671F" && label !== "\u66FF\u4EE3\u5BF9\u8C61")
+  ];
   return {
     entityId: truncate(outcome.detail.entityId, 256),
     entityType: truncate(outcome.detail.entityType, 128),
     label: truncate(outcome.candidate.label, 256),
-    summary,
+    summary: summary2,
     revision: outcome.detail.entityRevision,
     observedAt: outcome.detail.observedAt,
     freshness: outcome.detail.freshness,
-    facts: Object.entries(outcome.detail.facts).slice(0, 5).map(([label, value]) => ({ label, value: factText2(value) })),
+    facts: projectedFacts.slice(0, 5).map(([label, value]) => ({ label, value: factText2(value) })),
     sources: outcome.detail.sourceRefs.slice(0, 5).map((source) => ({
       label: truncate(`${source.sourceType} / ${source.sourceId}`, 512)
     })),
     ...humanSummary === void 0 ? {} : { humanSummary },
     ...comprehension === void 0 ? {} : { comprehension },
+    ...terminalState === void 0 ? {} : { terminalState },
     ...options.detailRef === void 0 ? {} : { detailRef: options.detailRef },
     ...options.changes === void 0 ? {} : { changes: options.changes }
   };
@@ -6440,7 +6836,16 @@ function createWorkspaceLookupCallback(options) {
     throw new RangeError("maxDetailRefs must be an integer from 1 to 4096");
   }
   const index = options.index ?? new LocalWorkspaceContextIndex();
-  const provider = options.provider ?? new LocalWorkspaceAuthoritativeProvider();
+  if (options.provider !== void 0 && options.providers !== void 0) {
+    throw new TypeError("provider and providers cannot be combined");
+  }
+  const providers = options.providers === void 0 ? [options.provider ?? new LocalWorkspaceAuthoritativeProvider()] : [...options.providers];
+  if (providers.length < 1 || providers.length > 8) {
+    throw new RangeError("providers must contain 1 to 8 providers");
+  }
+  if (new Set(providers.map((item) => item.providerId)).size !== providers.length) {
+    throw new TypeError("providers must have unique providerId values");
+  }
   const revisionProbe = options.revisionProbe === false ? void 0 : options.revisionProbe ?? new LocalWorkspaceRevisionProbe();
   const clock = options.clock ?? Date.now;
   const candidateGrants = /* @__PURE__ */ new Map();
@@ -6520,7 +6925,7 @@ function createWorkspaceLookupCallback(options) {
       routeRef: request.host.task.routeRef,
       workspaceRoot: activeEntry.workspaceRoot
     };
-    const service = new LookupService(binding, index, [provider], {
+    const service = new LookupService(binding, index, providers, {
       ...options.operationTimeoutMs === void 0 ? {} : { operationTimeoutMs: options.operationTimeoutMs }
     });
     return { binding, selection, hostContext, service };
@@ -6712,6 +7117,759 @@ function createWorkspaceLookupCallback(options) {
   };
 }
 
+// src/host/codex-cdp/workspace-annotations.ts
+import { createHash as createHash8 } from "node:crypto";
+var DEFAULT_MAX_ANNOTATIONS = 256;
+var TYPE_PRIORITY = Object.freeze({
+  task: 95,
+  decision: 92,
+  change: 89,
+  verification: 86,
+  concept: 83,
+  module: 72,
+  document: 62,
+  configuration: 54,
+  file: 24
+});
+function normalizedTerm(value) {
+  return value.normalize("NFKC").toLocaleLowerCase("en-US");
+}
+function usableTerm(value) {
+  return value === value.trim() && value.length >= 3 && value.length <= 256 && !/[\p{Cc}\p{Cf}]/u.test(value);
+}
+function objectKey(record8) {
+  return createHash8("sha256").update(record8.scope.kind, "utf8").update("\0", "utf8").update(record8.scope.namespace, "utf8").update("\0", "utf8").update(record8.scope.id, "utf8").update("\0", "utf8").update(record8.entityId, "utf8").digest("hex");
+}
+function recordTerms(record8) {
+  const values = [
+    { term: record8.canonicalName, bonus: 4 },
+    ...record8.canonicalKey === void 0 ? [] : [{ term: record8.canonicalKey, bonus: 2 }],
+    ...record8.aliases.map((term) => ({ term, bonus: 0 }))
+  ];
+  const seen = /* @__PURE__ */ new Set();
+  return values.filter(({ term }) => {
+    if (!usableTerm(term)) return false;
+    const normalized = normalizedTerm(term);
+    if (seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  }).slice(0, 4);
+}
+function buildWorkspaceAnnotationCatalog(records, bindingRevision, contextFingerprint, maxAnnotations = DEFAULT_MAX_ANNOTATIONS) {
+  if (!Number.isSafeInteger(maxAnnotations) || maxAnnotations < 1 || maxAnnotations > DEFAULT_MAX_ANNOTATIONS) {
+    throw new RangeError("maxAnnotations must be an integer from 1 to 256");
+  }
+  const byTerm = /* @__PURE__ */ new Map();
+  for (const record8 of records) {
+    if (record8.deleted) continue;
+    for (const term of recordTerms(record8)) {
+      const normalized = normalizedTerm(term.term);
+      const bucket = byTerm.get(normalized) ?? [];
+      bucket.push({ record: record8, term: term.term, bonus: term.bonus });
+      byTerm.set(normalized, bucket);
+    }
+  }
+  const entries = [];
+  for (const bucket of byTerm.values()) {
+    const objectIds = new Set(bucket.map(({ record: record8 }) => record8.entityId));
+    if (objectIds.size !== 1) continue;
+    const candidate = bucket[0];
+    if (candidate === void 0) continue;
+    const base = TYPE_PRIORITY[candidate.record.entityType] ?? 10;
+    entries.push({
+      objectKey: objectKey(candidate.record),
+      term: candidate.term,
+      entityType: candidate.record.entityType,
+      priority: Math.min(100, base + candidate.bonus)
+    });
+  }
+  entries.sort((left, right) => right.priority - left.priority || right.term.length - left.term.length || left.term.localeCompare(right.term, "en"));
+  const bounded = entries.slice(0, maxAnnotations);
+  const revision2 = createHash8("sha256").update(bindingRevision, "utf8").update("\0", "utf8").update(JSON.stringify(bounded), "utf8").digest("hex");
+  return Object.freeze({
+    revision: revision2,
+    contextFingerprint,
+    entries: Object.freeze(bounded.map((entry) => Object.freeze({ ...entry })))
+  });
+}
+function createWorkspaceAnnotationProvider(options) {
+  const index = options.index ?? new LocalWorkspaceContextIndex();
+  const maxAnnotations = options.maxAnnotations ?? DEFAULT_MAX_ANNOTATIONS;
+  return async (request) => {
+    if (request.signal.aborted) throw request.signal.reason;
+    const entry = await options.registry.find(request.host.task);
+    if (entry === void 0) {
+      return {
+        revision: "unbound",
+        contextFingerprint: request.host.task.contextFingerprint,
+        entries: []
+      };
+    }
+    const binding = new CodexTaskWorkspaceBindingPort(
+      options.registry,
+      request.host.task,
+      { current: request.host.revalidateTask }
+    );
+    const hostContext = {
+      selectionGeneration: 1,
+      explicitScope: { ...entry.scope },
+      threadRef: codexTaskThreadRef(request.host.task),
+      routeRef: request.host.task.routeRef,
+      workspaceRoot: entry.workspaceRoot
+    };
+    const resolved = await binding.resolve(hostContext, request.signal);
+    if (resolved.kind !== "trusted") {
+      return {
+        revision: "unavailable",
+        contextFingerprint: request.host.task.contextFingerprint,
+        entries: []
+      };
+    }
+    const rawRecords = await index.list(resolved, request.signal);
+    const records = validateContextIndexForRuntime(rawRecords, resolved.scope);
+    const revalidated = await binding.revalidate(resolved, request.signal);
+    if (revalidated.kind !== "trusted" || !sameContextScope(revalidated.scope, resolved.scope) || revalidated.bindingRevision !== resolved.bindingRevision) {
+      return {
+        revision: "context-changed",
+        contextFingerprint: request.host.task.contextFingerprint,
+        entries: []
+      };
+    }
+    return buildWorkspaceAnnotationCatalog(
+      records,
+      resolved.bindingRevision,
+      request.host.task.contextFingerprint,
+      maxAnnotations
+    );
+  };
+}
+
+// src/host/codex-cdp/task-object-registry.ts
+import { createHash as createHash9, randomUUID as randomUUID4 } from "node:crypto";
+import { mkdir as mkdir2, readFile as readFile2, rename as rename2, stat as stat3, writeFile as writeFile2 } from "node:fs/promises";
+import { dirname as dirname3, isAbsolute as isAbsolute3, resolve as resolve5 } from "node:path";
+var TASK_OBJECT_PROVIDER_ID = "agent-task-context";
+var TASK_OBJECT_ENTITY_PREFIX = "task-object:";
+var REGISTRY_SCHEMA_VERSION2 = 1;
+var MAX_REGISTRY_BYTES2 = 1024 * 1024;
+var MAX_RECORDS = 1024;
+var MAX_ACTIVE_PER_BINDING = 256;
+var MAX_ALIASES = 8;
+function objectRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function exactKeys3(value, expected) {
+  return Reflect.ownKeys(value).every((key) => typeof key === "string") && Object.keys(value).sort().join("\0") === [...expected].sort().join("\0");
+}
+function boundedText5(value, name, minimum = 1, maximum = 1024) {
+  if (typeof value !== "string" || value.length < minimum || value.length > maximum || value !== value.trim() || /[\p{Cc}\p{Cf}]/u.test(value)) {
+    throw new ContractError(`${name} is invalid`);
+  }
+  return value;
+}
+function timestamp(value, name) {
+  const parsed = boundedText5(value, name, 20, 64);
+  if (!Number.isFinite(Date.parse(parsed))) throw new ContractError(`${name} is invalid`);
+  return parsed;
+}
+function objectKey2(value) {
+  const parsed = boundedText5(value, "objectKey", 2, 128);
+  if (!/^[A-Za-z0-9][A-Za-z0-9:._/-]*$/u.test(parsed)) {
+    throw new ContractError("objectKey is invalid");
+  }
+  return parsed;
+}
+function taskObjectType(value) {
+  if (value !== "concept" && value !== "change" && value !== "decision" && value !== "task" && value !== "verification") {
+    throw new ContractError("entityType is invalid");
+  }
+  return value;
+}
+function aliases(value) {
+  if (!Array.isArray(value) || value.length > MAX_ALIASES) {
+    throw new ContractError("aliases are invalid");
+  }
+  const seen = /* @__PURE__ */ new Set();
+  const output = [];
+  for (const [index, item] of value.entries()) {
+    const alias = boundedText5(item, `aliases[${index}]`, 2, 256);
+    const normalized = alias.normalize("NFKC").toLocaleLowerCase("en-US");
+    if (seen.has(normalized)) throw new ContractError("aliases must be unique");
+    seen.add(normalized);
+    output.push(alias);
+  }
+  return output;
+}
+function mentalModel(value, entityType) {
+  if (!objectRecord(value) || value.kind !== entityType) {
+    throw new ContractError("mentalModel kind does not match entityType");
+  }
+  const text = (key) => boundedText5(value[key], `mentalModel.${key}`);
+  if (entityType === "concept") {
+    if (!exactKeys3(value, ["kind", "meaning", "context", "boundary", "sequence", "evidence"])) {
+      throw new ContractError("concept mentalModel fields are invalid");
+    }
+    if (!Array.isArray(value.sequence) || value.sequence.length < 2 || value.sequence.length > 4) {
+      throw new ContractError("mentalModel.sequence must contain 2 to 4 steps");
+    }
+    const sequence = value.sequence.map((item, index) => boundedText5(item, `mentalModel.sequence[${index}]`, 1, 256));
+    if (sequence.filter((item) => /^当前[：:]\s*/u.test(item)).length !== 1) {
+      throw new ContractError("mentalModel.sequence must mark exactly one \u5F53\u524D step");
+    }
+    return {
+      kind: "concept",
+      meaning: text("meaning"),
+      context: text("context"),
+      boundary: text("boundary"),
+      sequence,
+      evidence: text("evidence")
+    };
+  }
+  if (entityType === "change") {
+    if (!exactKeys3(value, ["kind", "before", "after", "impact", "evidence"])) {
+      throw new ContractError("change mentalModel fields are invalid");
+    }
+    return {
+      kind: "change",
+      before: text("before"),
+      after: text("after"),
+      impact: text("impact"),
+      evidence: text("evidence")
+    };
+  }
+  if (entityType === "decision") {
+    if (!exactKeys3(value, ["kind", "problem", "choice", "consequence", "evidence"])) {
+      throw new ContractError("decision mentalModel fields are invalid");
+    }
+    return {
+      kind: "decision",
+      problem: text("problem"),
+      choice: text("choice"),
+      consequence: text("consequence"),
+      evidence: text("evidence")
+    };
+  }
+  if (entityType === "task") {
+    if (!exactKeys3(value, ["kind", "goal", "status", "completed", "next", "blocker", "evidence"])) {
+      throw new ContractError("task mentalModel fields are invalid");
+    }
+    return {
+      kind: "task",
+      goal: text("goal"),
+      status: text("status"),
+      completed: text("completed"),
+      next: text("next"),
+      blocker: text("blocker"),
+      evidence: text("evidence")
+    };
+  }
+  if (!exactKeys3(value, ["kind", "claim", "result", "gap", "evidence"])) {
+    throw new ContractError("verification mentalModel fields are invalid");
+  }
+  return {
+    kind: "verification",
+    claim: text("claim"),
+    result: text("result"),
+    gap: text("gap"),
+    evidence: text("evidence")
+  };
+}
+function parseTaskObjectInput(value) {
+  if (!objectRecord(value) || !exactKeys3(value, [
+    "schemaVersion",
+    "objectKey",
+    "entityType",
+    "canonicalName",
+    "aliases",
+    "summary",
+    "mentalModel"
+  ]) || value.schemaVersion !== 1) {
+    throw new ContractError("task object input is invalid");
+  }
+  const entityType = taskObjectType(value.entityType);
+  const key = objectKey2(value.objectKey);
+  const name = boundedText5(value.canonicalName, "canonicalName", 2, 256);
+  const parsedAliases = aliases(value.aliases);
+  const reserved = new Set(
+    [key, name].map((item) => item.normalize("NFKC").toLocaleLowerCase("en-US"))
+  );
+  if (parsedAliases.some((item) => reserved.has(item.normalize("NFKC").toLocaleLowerCase("en-US")))) {
+    throw new ContractError("aliases must not repeat objectKey or canonicalName");
+  }
+  return Object.freeze({
+    schemaVersion: 1,
+    objectKey: key,
+    entityType,
+    canonicalName: name,
+    aliases: Object.freeze(parsedAliases),
+    summary: boundedText5(value.summary, "summary", 1, 1024),
+    mentalModel: Object.freeze(mentalModel(value.mentalModel, entityType))
+  });
+}
+function scopeKey2(scope) {
+  return `${scope.kind}\0${scope.namespace}\0${scope.id}`;
+}
+function entityIdFor(binding, task, key) {
+  const digest = createHash9("sha256").update(scopeKey2(binding.scope), "utf8").update("\0", "utf8").update(codexTaskThreadRef(task), "utf8").update("\0", "utf8").update(key, "utf8").digest("hex");
+  return `${TASK_OBJECT_ENTITY_PREFIX}${digest}`;
+}
+function revisionFor(input, lifecycle, replacement) {
+  return `task-object:${createHash9("sha256").update(JSON.stringify({ input, lifecycle, replacement: replacement ?? null }), "utf8").digest("hex")}`;
+}
+function sameObjectIdentity(left, right) {
+  return left.objectKey === right.objectKey && left.entityType === right.entityType && left.canonicalName === right.canonicalName && left.aliases.length === right.aliases.length && left.aliases.every((alias, index) => alias === right.aliases[index]);
+}
+function copyInput(input) {
+  return {
+    ...input,
+    aliases: [...input.aliases],
+    mentalModel: {
+      ...input.mentalModel,
+      ...input.mentalModel.kind === "concept" ? { sequence: [...input.mentalModel.sequence] } : {}
+    }
+  };
+}
+function copyStored(record8) {
+  return {
+    ...copyInput(record8),
+    scope: { ...record8.scope },
+    threadRef: record8.threadRef,
+    routeRef: record8.routeRef,
+    workspaceRoot: record8.workspaceRoot,
+    bindingRevision: record8.bindingRevision,
+    entityId: record8.entityId,
+    lifecycle: record8.lifecycle,
+    ...record8.replacedByObjectKey === void 0 ? {} : { replacedByObjectKey: record8.replacedByObjectKey },
+    createdAt: record8.createdAt,
+    updatedAt: record8.updatedAt,
+    entityRevision: record8.entityRevision
+  };
+}
+function summary(record8) {
+  return Object.freeze({
+    objectKey: record8.objectKey,
+    entityId: record8.entityId,
+    entityType: record8.entityType,
+    canonicalName: record8.canonicalName,
+    summary: record8.summary,
+    lifecycle: record8.lifecycle,
+    ...record8.replacedByObjectKey === void 0 ? {} : { replacedByObjectKey: record8.replacedByObjectKey },
+    updatedAt: record8.updatedAt,
+    entityRevision: record8.entityRevision
+  });
+}
+function parseStored(value, index) {
+  if (!objectRecord(value)) throw new ContractError(`task object record ${index} is invalid`);
+  const optionalReplacement = value.replacedByObjectKey === void 0 ? [] : ["replacedByObjectKey"];
+  if (!exactKeys3(value, [
+    "schemaVersion",
+    "objectKey",
+    "entityType",
+    "canonicalName",
+    "aliases",
+    "summary",
+    "mentalModel",
+    "scope",
+    "threadRef",
+    "routeRef",
+    "workspaceRoot",
+    "bindingRevision",
+    "entityId",
+    "lifecycle",
+    "createdAt",
+    "updatedAt",
+    "entityRevision",
+    ...optionalReplacement
+  ])) {
+    throw new ContractError(`task object record ${index} fields are invalid`);
+  }
+  const input = parseTaskObjectInput({
+    schemaVersion: value.schemaVersion,
+    objectKey: value.objectKey,
+    entityType: value.entityType,
+    canonicalName: value.canonicalName,
+    aliases: value.aliases,
+    summary: value.summary,
+    mentalModel: value.mentalModel
+  });
+  if (!objectRecord(value.scope) || !exactKeys3(value.scope, ["kind", "namespace", "id"]) || value.scope.kind !== "workspace" || typeof value.scope.namespace !== "string" || typeof value.scope.id !== "string" || typeof value.workspaceRoot !== "string" || !isAbsolute3(value.workspaceRoot) || typeof value.bindingRevision !== "string" || !/^[a-f0-9]{64}$/u.test(value.bindingRevision) || typeof value.entityId !== "string" || !new RegExp(`^${TASK_OBJECT_ENTITY_PREFIX}[a-f0-9]{64}$`, "u").test(value.entityId) || value.lifecycle !== "active" && value.lifecycle !== "superseded" && value.lifecycle !== "retired" || typeof value.entityRevision !== "string" || !/^task-object:[a-f0-9]{64}$/u.test(value.entityRevision)) {
+    throw new ContractError(`task object record ${index} authority fields are invalid`);
+  }
+  const replacedByObjectKey = value.replacedByObjectKey === void 0 ? void 0 : objectKey2(value.replacedByObjectKey);
+  if (value.lifecycle === "superseded" !== (replacedByObjectKey !== void 0)) {
+    throw new ContractError(`task object record ${index} replacement is invalid`);
+  }
+  return {
+    ...copyInput(input),
+    scope: {
+      kind: "workspace",
+      namespace: boundedText5(value.scope.namespace, `records[${index}].scope.namespace`, 1, 128),
+      id: boundedText5(value.scope.id, `records[${index}].scope.id`, 1, 256)
+    },
+    threadRef: boundedText5(value.threadRef, `records[${index}].threadRef`, 1, 768),
+    routeRef: boundedText5(value.routeRef, `records[${index}].routeRef`, 1, 2048),
+    workspaceRoot: resolve5(value.workspaceRoot),
+    bindingRevision: value.bindingRevision,
+    entityId: value.entityId,
+    lifecycle: value.lifecycle,
+    ...replacedByObjectKey === void 0 ? {} : { replacedByObjectKey },
+    createdAt: timestamp(value.createdAt, `records[${index}].createdAt`),
+    updatedAt: timestamp(value.updatedAt, `records[${index}].updatedAt`),
+    entityRevision: value.entityRevision
+  };
+}
+function parseDocument2(value) {
+  if (!objectRecord(value) || !exactKeys3(value, ["schemaVersion", "records"]) || value.schemaVersion !== REGISTRY_SCHEMA_VERSION2 || !Array.isArray(value.records) || value.records.length > MAX_RECORDS) {
+    throw new ContractError("task object registry is invalid");
+  }
+  const records = value.records.map(parseStored);
+  const identities = /* @__PURE__ */ new Set();
+  for (const record8 of records) {
+    const identity2 = `${record8.threadRef}\0${record8.bindingRevision}\0${record8.objectKey}`;
+    if (identities.has(identity2)) throw new ContractError("task object registry has duplicate identities");
+    identities.add(identity2);
+  }
+  return { schemaVersion: 1, records };
+}
+function matchesBinding(record8, binding) {
+  return sameContextScope(record8.scope, binding.scope) && record8.bindingRevision === binding.bindingRevision && record8.threadRef === binding.threadRef && record8.routeRef === binding.routeRef && record8.workspaceRoot === binding.workspaceRoot;
+}
+function matchesEntry(record8, task, entry) {
+  return sameContextScope(record8.scope, entry.scope) && record8.bindingRevision === entry.bindingRevision && record8.threadRef === codexTaskThreadRef(task) && record8.routeRef === task.routeRef && record8.workspaceRoot === entry.workspaceRoot;
+}
+function facts(record8) {
+  const common = {
+    "\u751F\u547D\u5468\u671F": record8.lifecycle,
+    ...record8.replacedByObjectKey === void 0 ? {} : { "\u66FF\u4EE3\u5BF9\u8C61": record8.replacedByObjectKey },
+    "\u4FE1\u606F\u8FB9\u754C": "\u5F53\u524D Codex \u4EFB\u52A1\u5185\u7531 Agent \u663E\u5F0F\u767B\u8BB0\u7684\u4E34\u65F6\u4E0A\u4E0B\u6587\uFF1B\u5C1A\u672A\u56FA\u5316\u4E3A\u4ED3\u5E93\u8BC1\u636E",
+    "\u66F4\u65B0\u65F6\u95F4": record8.updatedAt,
+    "\u8BC1\u636E": record8.mentalModel.evidence
+  };
+  switch (record8.mentalModel.kind) {
+    case "concept":
+      return {
+        "\u5B83\u662F\u4EC0\u4E48\u610F\u601D": record8.mentalModel.meaning,
+        "\u4E3A\u4EC0\u4E48\u73B0\u5728\u51FA\u73B0": record8.mentalModel.context,
+        "\u5B83\u4E0D\u662F\u4EC0\u4E48": record8.mentalModel.boundary,
+        "\u6240\u5904\u6D41\u7A0B": [...record8.mentalModel.sequence],
+        ...common
+      };
+    case "change":
+      return {
+        "\u539F\u6765\u600E\u6837": record8.mentalModel.before,
+        "\u73B0\u5728\u600E\u6837": record8.mentalModel.after,
+        "\u5F71\u54CD\u4EC0\u4E48": record8.mentalModel.impact,
+        ...common
+      };
+    case "decision":
+      return {
+        "\u4E3A\u4EC0\u4E48\u9700\u8981\u51B3\u5B9A": record8.mentalModel.problem,
+        "\u9009\u62E9\u4E86\u4EC0\u4E48": record8.mentalModel.choice,
+        "\u540E\u679C\u662F\u4EC0\u4E48": record8.mentalModel.consequence,
+        ...common
+      };
+    case "task":
+      return {
+        "\u76EE\u6807": record8.mentalModel.goal,
+        "\u5F53\u524D\u72B6\u6001": record8.mentalModel.status,
+        "\u5DF2\u5B8C\u6210": record8.mentalModel.completed,
+        "\u4E0B\u4E00\u6B65": record8.mentalModel.next,
+        "\u963B\u585E": record8.mentalModel.blocker,
+        ...common
+      };
+    case "verification":
+      return {
+        "\u8981\u8BC1\u660E\u4EC0\u4E48": record8.mentalModel.claim,
+        "\u7ED3\u679C": record8.mentalModel.result,
+        "\u5C1A\u672A\u8BC1\u660E": record8.mentalModel.gap,
+        "\u6267\u884C\u65F6\u95F4": record8.updatedAt,
+        ...common
+      };
+  }
+}
+var TaskObjectRegistry = class {
+  providerId = TASK_OBJECT_PROVIDER_ID;
+  path;
+  #mutation = Promise.resolve();
+  constructor(path) {
+    if (!isAbsolute3(path)) throw new TypeError("task object registry path must be absolute");
+    this.path = resolve5(path);
+  }
+  ownsEntityId(entityId) {
+    return new RegExp(`^${TASK_OBJECT_ENTITY_PREFIX}[a-f0-9]{64}$`, "u").test(entityId);
+  }
+  async #read() {
+    try {
+      const info = await stat3(this.path);
+      if (!info.isFile() || info.size > MAX_REGISTRY_BYTES2) {
+        throw new ContractError("task object registry file is invalid");
+      }
+      const content = await readFile2(this.path, "utf8");
+      return parseDocument2(JSON.parse(content));
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        return { schemaVersion: 1, records: [] };
+      }
+      if (error instanceof ContractError) throw error;
+      throw new ContractError("task object registry JSON is malformed");
+    }
+  }
+  async #write(document2) {
+    const body = `${JSON.stringify(document2, null, 2)}
+`;
+    if (Buffer.byteLength(body, "utf8") > MAX_REGISTRY_BYTES2) {
+      throw new ContractError("task object registry exceeds its byte budget");
+    }
+    await mkdir2(dirname3(this.path), { recursive: true, mode: 448 });
+    const temporary = `${this.path}.${process.pid}.${randomUUID4()}.tmp`;
+    await writeFile2(temporary, body, { encoding: "utf8", mode: 384, flag: "wx" });
+    await rename2(temporary, this.path);
+  }
+  async #mutate(operation) {
+    const previous = this.#mutation;
+    let release;
+    this.#mutation = new Promise((resolveMutation) => {
+      release = resolveMutation;
+    });
+    await previous;
+    try {
+      return await operation(await this.#read());
+    } finally {
+      release();
+    }
+  }
+  async upsert(task, binding, rawInput) {
+    const input = parseTaskObjectInput(rawInput);
+    return await this.#mutate(async (document2) => {
+      const index = document2.records.findIndex((record9) => matchesEntry(record9, task, binding) && record9.objectKey === input.objectKey);
+      const existing = index < 0 ? void 0 : document2.records[index];
+      if (existing !== void 0 && existing.lifecycle !== "active") {
+        throw new ContractError("retired or superseded objectKey cannot be reactivated");
+      }
+      if (existing !== void 0 && !sameObjectIdentity(existing, input)) {
+        throw new ContractError("task object identity changes require supersede");
+      }
+      const nextRevision = revisionFor(input, "active");
+      if (existing !== void 0 && existing.lifecycle === "active" && existing.entityRevision === nextRevision) {
+        return { kind: "unchanged", object: summary(existing) };
+      }
+      const activeCount = document2.records.filter((record9) => matchesEntry(record9, task, binding) && record9.lifecycle === "active" && record9.objectKey !== input.objectKey).length;
+      if (activeCount >= MAX_ACTIVE_PER_BINDING) {
+        throw new ContractError("active task object capacity is full");
+      }
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      const record8 = {
+        ...copyInput(input),
+        scope: { ...binding.scope },
+        threadRef: codexTaskThreadRef(task),
+        routeRef: task.routeRef,
+        workspaceRoot: binding.workspaceRoot,
+        bindingRevision: binding.bindingRevision,
+        entityId: existing?.entityId ?? entityIdFor(binding, task, input.objectKey),
+        lifecycle: "active",
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+        entityRevision: nextRevision
+      };
+      if (index < 0) {
+        if (document2.records.length >= MAX_RECORDS) {
+          throw new ContractError("task object registry is full");
+        }
+        document2.records.push(record8);
+      } else {
+        document2.records[index] = record8;
+      }
+      await this.#write(document2);
+      return { kind: existing === void 0 ? "created" : "updated", object: summary(record8) };
+    });
+  }
+  async supersede(task, binding, replacedObjectKey, rawReplacement) {
+    const replacedKey = objectKey2(replacedObjectKey);
+    const replacement = parseTaskObjectInput(rawReplacement);
+    if (replacement.objectKey === replacedKey) {
+      throw new ContractError("replacement objectKey must differ from the superseded object");
+    }
+    return await this.#mutate(async (document2) => {
+      const oldIndex = document2.records.findIndex((record8) => matchesEntry(record8, task, binding) && record8.objectKey === replacedKey && record8.lifecycle === "active");
+      const old = oldIndex < 0 ? void 0 : document2.records[oldIndex];
+      if (old === void 0) throw new ContractError("active task object to supersede was not found");
+      const replacementIndex = document2.records.findIndex((record8) => matchesEntry(record8, task, binding) && record8.objectKey === replacement.objectKey);
+      const existingReplacement = replacementIndex < 0 ? void 0 : document2.records[replacementIndex];
+      if (existingReplacement !== void 0) {
+        throw new ContractError("replacement objectKey has already been used");
+      }
+      if (replacementIndex < 0 && document2.records.length >= MAX_RECORDS) {
+        throw new ContractError("task object registry is full");
+      }
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      const retiredOld = {
+        ...copyStored(old),
+        lifecycle: "superseded",
+        replacedByObjectKey: replacement.objectKey,
+        updatedAt: now,
+        entityRevision: revisionFor(old, "superseded", replacement.objectKey)
+      };
+      const next = {
+        ...copyInput(replacement),
+        scope: { ...binding.scope },
+        threadRef: codexTaskThreadRef(task),
+        routeRef: task.routeRef,
+        workspaceRoot: binding.workspaceRoot,
+        bindingRevision: binding.bindingRevision,
+        entityId: entityIdFor(binding, task, replacement.objectKey),
+        lifecycle: "active",
+        createdAt: now,
+        updatedAt: now,
+        entityRevision: revisionFor(replacement, "active")
+      };
+      document2.records[oldIndex] = retiredOld;
+      document2.records.push(next);
+      await this.#write(document2);
+      return { kind: "superseded", object: summary(retiredOld), replacement: summary(next) };
+    });
+  }
+  async retire(task, binding, rawObjectKey) {
+    const key = objectKey2(rawObjectKey);
+    return await this.#mutate(async (document2) => {
+      const index = document2.records.findIndex((record8) => matchesEntry(record8, task, binding) && record8.objectKey === key && record8.lifecycle === "active");
+      const current = index < 0 ? void 0 : document2.records[index];
+      if (current === void 0) throw new ContractError("active task object to retire was not found");
+      const retired = {
+        ...copyStored(current),
+        lifecycle: "retired",
+        updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        entityRevision: revisionFor(current, "retired")
+      };
+      document2.records[index] = retired;
+      await this.#write(document2);
+      return { kind: "retired", object: summary(retired) };
+    });
+  }
+  async listForTask(task, binding) {
+    return (await this.#read()).records.filter((record8) => matchesEntry(record8, task, binding)).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)).map(summary);
+  }
+  async listActive(binding, signal) {
+    if (signal?.aborted) throw signal.reason;
+    const records = (await this.#read()).records.filter((record8) => record8.lifecycle === "active" && matchesBinding(record8, binding));
+    return this.#identityRecords(records, signal);
+  }
+  async listForLookup(binding, stableRecords, signal) {
+    if (signal?.aborted) throw signal.reason;
+    const records = (await this.#read()).records.filter((record8) => matchesBinding(record8, binding)).filter((record8) => {
+      if (record8.lifecycle === "active") return true;
+      const name = record8.canonicalName.normalize("NFKC").toLocaleLowerCase("en-US");
+      return !stableRecords.some((stable) => !stable.deleted && stable.entityType === record8.entityType && stable.canonicalName.normalize("NFKC").toLocaleLowerCase("en-US") === name);
+    });
+    return this.#identityRecords(records, signal);
+  }
+  async list(binding, signal) {
+    if (signal?.aborted) throw signal.reason;
+    const records = (await this.#read()).records.filter((record8) => matchesBinding(record8, binding));
+    return this.#identityRecords(records, signal);
+  }
+  #identityRecords(records, signal) {
+    if (signal?.aborted) throw signal.reason;
+    const revision2 = `task-objects:${createHash9("sha256").update(records.map((record8) => `${record8.entityId}:${record8.entityRevision}`).sort().join("\n"), "utf8").digest("hex")}`;
+    const indexedAt = (/* @__PURE__ */ new Date()).toISOString();
+    return records.map((record8) => ({
+      schemaVersion: "1.0",
+      scope: { ...record8.scope },
+      entityId: record8.entityId,
+      entityType: record8.entityType,
+      canonicalKey: record8.objectKey,
+      canonicalName: record8.canonicalName,
+      aliases: [...record8.aliases],
+      summary: record8.summary,
+      authorityRef: { provider: TASK_OBJECT_PROVIDER_ID, locator: record8.entityId },
+      indexRevision: revision2,
+      indexedAt,
+      deleted: false
+    }));
+  }
+  async getDetail(request) {
+    if (request.signal?.aborted) return { kind: "unavailable", retryable: true };
+    if (!this.ownsEntityId(request.entityId) || request.authorityLocator !== request.entityId) {
+      return { kind: "not_found" };
+    }
+    const record8 = (await this.#read()).records.find((candidate) => candidate.entityId === request.entityId && candidate.entityType === request.entityType && matchesBinding(candidate, request.binding));
+    if (record8 === void 0) return { kind: "not_found" };
+    const snapshot = {
+      scope: { ...record8.scope },
+      entityId: record8.entityId,
+      entityType: record8.entityType,
+      entityRevision: record8.entityRevision,
+      observedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      freshness: "partial",
+      facts: facts(record8),
+      relations: [],
+      sourceRefs: [{ sourceType: TASK_OBJECT_PROVIDER_ID, sourceId: record8.objectKey }]
+    };
+    return {
+      kind: "snapshot",
+      snapshot,
+      verification: { verifiedAt: snapshot.observedAt, method: "live_read" }
+    };
+  }
+  async probe(request) {
+    const observedAt = (/* @__PURE__ */ new Date()).toISOString();
+    if (request.signal?.aborted) return { kind: "unavailable", observedAt, retryable: true };
+    if (!this.ownsEntityId(request.entityId)) return { kind: "not_found", observedAt };
+    const record8 = (await this.#read()).records.find((candidate) => candidate.entityId === request.entityId && candidate.entityType === request.entityType && matchesBinding(candidate, request.binding));
+    return record8 === void 0 ? { kind: "not_found", observedAt } : { kind: "current", revision: record8.entityRevision, observedAt };
+  }
+};
+var ActiveTaskObjectAnnotationIndex = class {
+  constructor(registry) {
+    this.registry = registry;
+  }
+  registry;
+  async list(binding, signal) {
+    return await this.registry.listActive(binding, signal);
+  }
+};
+var TaskObjectWorkspaceContextIndex = class {
+  constructor(stableIndex, registry) {
+    this.stableIndex = stableIndex;
+    this.registry = registry;
+  }
+  stableIndex;
+  registry;
+  async list(binding, signal) {
+    const stable = await this.stableIndex.list(binding, signal);
+    if (signal?.aborted) throw signal.reason;
+    const taskObjects = await this.registry.listForLookup(binding, stable, signal);
+    return [...stable, ...taskObjects];
+  }
+};
+var CompositeContextIndex = class {
+  constructor(indexes) {
+    this.indexes = indexes;
+    if (indexes.length < 1 || indexes.length > 8) {
+      throw new RangeError("CompositeContextIndex requires 1 to 8 indexes");
+    }
+  }
+  indexes;
+  async list(binding, signal) {
+    const records = [];
+    for (const index of this.indexes) {
+      if (signal?.aborted) throw signal.reason;
+      records.push(...await index.list(binding, signal));
+    }
+    return records;
+  }
+};
+var RoutedWorkspaceRevisionProbe = class {
+  constructor(taskObjects, fallback) {
+    this.taskObjects = taskObjects;
+    this.fallback = fallback;
+  }
+  taskObjects;
+  fallback;
+  async probe(request) {
+    return this.taskObjects.ownsEntityId(request.entityId) ? await this.taskObjects.probe(request) : await this.fallback.probe(request);
+  }
+};
+
 // src/host/codex-cdp/workspace-companion.ts
 var DEFAULT_REFRESH_INTERVAL_MS = 2e3;
 function refreshInterval(value) {
@@ -6820,9 +7978,29 @@ function immutableStatus(status) {
 function createWorkspaceCompanion(options) {
   const intervalMs = refreshInterval(options.refreshIntervalMs);
   const presentationMode = options.presentationMode ?? "record";
+  const localIndex = new LocalWorkspaceContextIndex();
+  const localProvider = new LocalWorkspaceAuthoritativeProvider();
+  const localRevisionProbe = new LocalWorkspaceRevisionProbe();
+  const workspaceIndex = options.taskObjectRegistry === void 0 ? localIndex : new TaskObjectWorkspaceContextIndex(localIndex, options.taskObjectRegistry);
+  const annotationIndex = options.taskObjectRegistry === void 0 ? localIndex : new CompositeContextIndex([
+    localIndex,
+    new ActiveTaskObjectAnnotationIndex(options.taskObjectRegistry)
+  ]);
   const lookup = createWorkspaceLookupCallback({
     registry: options.registry,
+    index: workspaceIndex,
+    ...options.taskObjectRegistry === void 0 ? { provider: localProvider, revisionProbe: localRevisionProbe } : {
+      providers: [localProvider, options.taskObjectRegistry],
+      revisionProbe: new RoutedWorkspaceRevisionProbe(
+        options.taskObjectRegistry,
+        localRevisionProbe
+      )
+    },
     ...options.operationTimeoutMs === void 0 ? {} : { operationTimeoutMs: options.operationTimeoutMs }
+  });
+  const annotationProvider = createWorkspaceAnnotationProvider({
+    registry: options.registry,
+    index: annotationIndex
   });
   const adapterOptions = {
     lookup,
@@ -6833,7 +8011,9 @@ function createWorkspaceCompanion(options) {
     ...options.lookupTimeoutMs === void 0 ? {} : { lookupTimeoutMs: options.lookupTimeoutMs },
     ...options.maxConcurrentLookupsPerTarget === void 0 ? {} : { maxConcurrentLookupsPerTarget: options.maxConcurrentLookupsPerTarget },
     actionLabel: options.actionLabel ?? "\u67E5\u770B\u4E0A\u4E0B\u6587",
-    presentationMode
+    presentationMode,
+    annotationProvider,
+    ...options.annotationRefreshIntervalMs === void 0 ? {} : { annotationRefreshIntervalMs: options.annotationRefreshIntervalMs }
   };
   const adapter = new CodexCdpHostAdapter(adapterOptions);
   let state = "idle";
@@ -6926,6 +8106,7 @@ function createWorkspaceCompanion(options) {
     const replaced = await options.registry.find(tasks[0]) !== void 0;
     const entry = await options.registry.bind(tasks[0], workspaceRoot);
     activeBinding = entry;
+    await adapter.refreshAnnotations(void 0, true);
     return Object.freeze({ binding: entry, replaced });
   };
   const unbindCurrentTask = async () => {
@@ -6936,7 +8117,52 @@ function createWorkspaceCompanion(options) {
     if (tasks.length !== 1) throw new Error("active_codex_task_ambiguous");
     const removed = await options.registry.unbind(tasks[0]);
     activeBinding = void 0;
+    await adapter.refreshAnnotations(void 0, true);
     return removed;
+  };
+  const currentTaskBinding = async () => {
+    if (state !== "running") throw new Error("workspace_companion_not_running");
+    if (options.taskObjectRegistry === void 0) {
+      throw new Error("task_object_registry_unavailable");
+    }
+    const tasks = await adapter.activeTasks();
+    activeTaskCount = tasks.length;
+    if (tasks.length === 0) throw new Error("active_codex_task_unavailable");
+    if (tasks.length !== 1) throw new Error("active_codex_task_ambiguous");
+    const binding = await options.registry.find(tasks[0]);
+    if (binding === void 0) throw new Error("context_binding_missing");
+    activeBinding = binding;
+    return { task: tasks[0], binding, registry: options.taskObjectRegistry };
+  };
+  const refreshObjectAnnotations = async () => {
+    await adapter.refreshAnnotations(void 0, true);
+  };
+  const upsertCurrentTaskObject = async (input) => {
+    const current = await currentTaskBinding();
+    const result = await current.registry.upsert(current.task, current.binding, input);
+    await refreshObjectAnnotations();
+    return result;
+  };
+  const supersedeCurrentTaskObject = async (replacedObjectKey, replacement) => {
+    const current = await currentTaskBinding();
+    const result = await current.registry.supersede(
+      current.task,
+      current.binding,
+      replacedObjectKey,
+      replacement
+    );
+    await refreshObjectAnnotations();
+    return result;
+  };
+  const retireCurrentTaskObject = async (objectKey3) => {
+    const current = await currentTaskBinding();
+    const result = await current.registry.retire(current.task, current.binding, objectKey3);
+    await refreshObjectAnnotations();
+    return result;
+  };
+  const listCurrentTaskObjects = async () => {
+    const current = await currentTaskBinding();
+    return await current.registry.listForTask(current.task, current.binding);
   };
   const stop = () => {
     if (stopPromise !== void 0) return stopPromise;
@@ -6964,6 +8190,10 @@ function createWorkspaceCompanion(options) {
     refresh,
     bindCurrentTask,
     unbindCurrentTask,
+    upsertCurrentTaskObject,
+    supersedeCurrentTaskObject,
+    retireCurrentTaskObject,
+    listCurrentTaskObjects,
     stop,
     status
   });
@@ -6982,14 +8212,14 @@ function record7(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function packageRoot(start) {
-  let current = resolve5(start);
+  let current = resolve6(start);
   for (let depth = 0; depth < 10; depth += 1) {
     const developmentLayout = existsSync(join(current, "src"));
     const packagedLayout = existsSync(join(current, "host", "workspace-companion.mjs"));
     if (existsSync(join(current, "package.json")) && (developmentLayout || packagedLayout)) {
       return current;
     }
-    const parent = dirname3(current);
+    const parent = dirname4(current);
     if (parent === current) break;
     current = parent;
   }
@@ -6997,7 +8227,7 @@ function packageRoot(start) {
 }
 function localStateRoot() {
   const local = process.env.LOCALAPPDATA;
-  return resolve5(local && isAbsolute3(local) ? local : homedir(), "PointableContext");
+  return resolve6(local && isAbsolute4(local) ? local : homedir(), "PointableContext");
 }
 function boundedInteger2(value, name) {
   if (!/^\d+$/u.test(value)) fail(`${name} must be an integer`);
@@ -7009,9 +8239,9 @@ function boundedInteger2(value, name) {
 }
 function parseArguments(argv) {
   const command = argv[0];
-  if (command !== "start" && command !== "status" && command !== "bind" && command !== "unbind" && command !== "stop" && command !== "run") {
+  if (command !== "start" && command !== "status" && command !== "bind" && command !== "unbind" && command !== "stop" && command !== "run" && command !== "object-upsert" && command !== "object-supersede" && command !== "object-retire" && command !== "object-list") {
     return fail(
-      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop> [options]"
+      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-list> [options]"
     );
   }
   const stateRoot = localStateRoot();
@@ -7021,6 +8251,9 @@ function parseArguments(argv) {
   let refreshIntervalMs = 2e3;
   let presentationMode = "mental-model";
   let workspaceRoot;
+  let objectFile;
+  let objectKey3;
+  let replaces;
   let json = false;
   for (let index = 1; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -7032,11 +8265,11 @@ function parseArguments(argv) {
     if (value === void 0) fail(`${argument} requires a value`);
     index += 1;
     if (argument === "--state-dir") {
-      if (!isAbsolute3(value)) fail("--state-dir must be absolute");
-      stateDir = resolve5(value);
+      if (!isAbsolute4(value)) fail("--state-dir must be absolute");
+      stateDir = resolve6(value);
     } else if (argument === "--registry") {
-      if (!isAbsolute3(value)) fail("--registry must be absolute");
-      registryPath = resolve5(value);
+      if (!isAbsolute4(value)) fail("--registry must be absolute");
+      registryPath = resolve6(value);
     } else if (argument === "--endpoint") {
       endpoint = value;
     } else if (argument === "--refresh-ms") {
@@ -7047,14 +8280,30 @@ function parseArguments(argv) {
       }
       presentationMode = value;
     } else if (argument === "--workspace-root") {
-      if (!isAbsolute3(value)) fail("--workspace-root must be absolute");
-      workspaceRoot = resolve5(value);
+      if (!isAbsolute4(value)) fail("--workspace-root must be absolute");
+      workspaceRoot = resolve6(value);
+    } else if (argument === "--object-file") {
+      if (!isAbsolute4(value)) fail("--object-file must be absolute");
+      objectFile = resolve6(value);
+    } else if (argument === "--object-key") {
+      objectKey3 = value;
+    } else if (argument === "--replaces") {
+      replaces = value;
     } else {
       fail(`unknown option: ${argument}`);
     }
   }
   if (command === "bind" && workspaceRoot === void 0) {
     fail("bind requires --workspace-root <absolute-path>");
+  }
+  if ((command === "object-upsert" || command === "object-supersede") && objectFile === void 0) {
+    fail(`${command} requires --object-file <absolute-path>`);
+  }
+  if (command === "object-supersede" && replaces === void 0) {
+    fail("object-supersede requires --replaces <object-key>");
+  }
+  if (command === "object-retire" && objectKey3 === void 0) {
+    fail("object-retire requires --object-key <object-key>");
   }
   return {
     command,
@@ -7064,6 +8313,9 @@ function parseArguments(argv) {
     refreshIntervalMs,
     presentationMode,
     ...workspaceRoot === void 0 ? {} : { workspaceRoot },
+    ...objectFile === void 0 ? {} : { objectFile },
+    ...objectKey3 === void 0 ? {} : { objectKey: objectKey3 },
+    ...replaces === void 0 ? {} : { replaces },
     json
   };
 }
@@ -7085,7 +8337,7 @@ function parseState(value) {
 }
 async function readState(directory) {
   try {
-    const text = await readFile2(statePath(directory), "utf8");
+    const text = await readFile3(statePath(directory), "utf8");
     if (Buffer.byteLength(text, "utf8") > 16 * 1024) return void 0;
     return parseState(JSON.parse(text));
   } catch {
@@ -7102,7 +8354,7 @@ function processIsAlive(pid) {
 }
 async function readLockPid(directory) {
   try {
-    const value = (await readFile2(lockPath(directory), "utf8")).trim();
+    const value = (await readFile3(lockPath(directory), "utf8")).trim();
     if (!/^\d+$/u.test(value)) return void 0;
     const pid = Number(value);
     return Number.isSafeInteger(pid) && pid > 0 ? pid : void 0;
@@ -7111,17 +8363,17 @@ async function readLockPid(directory) {
   }
 }
 async function writeJsonAtomic(path, value) {
-  const temporary = `${path}.${process.pid}.${randomUUID4()}.tmp`;
-  await writeFile2(temporary, `${JSON.stringify(value)}
+  const temporary = `${path}.${process.pid}.${randomUUID5()}.tmp`;
+  await writeFile3(temporary, `${JSON.stringify(value)}
 `, {
     encoding: "utf8",
     mode: 384,
     flag: "wx"
   });
-  await rename2(temporary, path);
+  await rename3(temporary, path);
 }
 async function claimLock(directory) {
-  await mkdir2(directory, { recursive: true, mode: 448 });
+  await mkdir3(directory, { recursive: true, mode: 448 });
   try {
     const handle = await open2(lockPath(directory), "wx", 384);
     try {
@@ -7172,6 +8424,15 @@ async function readRequestJson(request) {
   }
   const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
   if (!record7(parsed)) throw new Error("control request JSON is invalid");
+  return parsed;
+}
+async function readTaskObjectFile(path) {
+  const info = await stat4(path);
+  if (!info.isFile() || info.size > MAX_REQUEST_BYTES) {
+    throw new Error("task object input file is invalid or too large");
+  }
+  const parsed = JSON.parse(await readFile3(path, "utf8"));
+  if (!record7(parsed)) throw new Error("task object input JSON is invalid");
   return parsed;
 }
 async function controlRequest(state, method, path, body) {
@@ -7246,8 +8507,12 @@ async function runServer(arguments_) {
   const token = randomBytes4(32).toString("hex");
   const startedAt = (/* @__PURE__ */ new Date()).toISOString();
   const registry = new CodexTaskWorkspaceBindingRegistry(arguments_.registryPath);
+  const taskObjectRegistry = new TaskObjectRegistry(
+    join(arguments_.stateDir, "task-objects.json")
+  );
   const companion = createWorkspaceCompanion({
     registry,
+    taskObjectRegistry,
     endpoint: arguments_.endpoint,
     refreshIntervalMs: arguments_.refreshIntervalMs,
     presentationMode: arguments_.presentationMode
@@ -7285,10 +8550,10 @@ async function runServer(arguments_) {
     }
     if (request.method === "POST" && request.url === "/bind") {
       void readRequestJson(request).then(async (body) => {
-        if (typeof body.workspaceRoot !== "string" || !isAbsolute3(body.workspaceRoot)) {
+        if (typeof body.workspaceRoot !== "string" || !isAbsolute4(body.workspaceRoot)) {
           throw new Error("workspace_root_invalid");
         }
-        return await companion.bindCurrentTask(resolve5(body.workspaceRoot));
+        return await companion.bindCurrentTask(resolve6(body.workspaceRoot));
       }).then(
         (result) => sendJson(response, 200, { ok: true, ...result }),
         (error) => sendJson(response, 409, {
@@ -7308,6 +8573,52 @@ async function runServer(arguments_) {
         (error) => sendJson(response, 409, {
           ok: false,
           error: error instanceof Error ? error.message : "unbind_failed"
+        })
+      );
+      return;
+    }
+    if (request.method === "GET" && request.url === "/objects") {
+      void companion.listCurrentTaskObjects().then(
+        (objects) => sendJson(response, 200, { ok: true, objects }),
+        (error) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "object_list_failed"
+        })
+      );
+      return;
+    }
+    if (request.method === "POST" && request.url === "/objects/upsert") {
+      void readRequestJson(request).then(async (body) => await companion.upsertCurrentTaskObject(body.object)).then(
+        (result) => sendJson(response, 200, { ok: true, result }),
+        (error) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "object_upsert_failed"
+        })
+      );
+      return;
+    }
+    if (request.method === "POST" && request.url === "/objects/supersede") {
+      void readRequestJson(request).then(async (body) => {
+        if (typeof body.replaces !== "string") throw new Error("replaces_invalid");
+        return await companion.supersedeCurrentTaskObject(body.replaces, body.object);
+      }).then(
+        (result) => sendJson(response, 200, { ok: true, result }),
+        (error) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "object_supersede_failed"
+        })
+      );
+      return;
+    }
+    if (request.method === "POST" && request.url === "/objects/retire") {
+      void readRequestJson(request).then(async (body) => {
+        if (typeof body.objectKey !== "string") throw new Error("object_key_invalid");
+        return await companion.retireCurrentTaskObject(body.objectKey);
+      }).then(
+        (result) => sendJson(response, 200, { ok: true, result }),
+        (error) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "object_retire_failed"
         })
       );
       return;
@@ -7349,7 +8660,7 @@ async function startDetached(arguments_) {
     return { ...await waitForStatus(arguments_.stateDir), alreadyRunning: true };
   }
   await removeOwnedState(arguments_.stateDir);
-  await mkdir2(arguments_.stateDir, { recursive: true, mode: 448 });
+  await mkdir3(arguments_.stateDir, { recursive: true, mode: 448 });
   const logDescriptor = openSync(logPath(arguments_.stateDir), "a", 384);
   const entrypoint = fileURLToPath(import.meta.url);
   const child = spawn(process.execPath, [
@@ -7367,7 +8678,7 @@ async function startDetached(arguments_) {
     arguments_.presentationMode,
     "--json"
   ], {
-    cwd: packageRoot(dirname3(entrypoint)),
+    cwd: packageRoot(dirname4(entrypoint)),
     detached: true,
     windowsHide: true,
     stdio: ["ignore", logDescriptor, logDescriptor]
@@ -7425,6 +8736,27 @@ function print(value, json) {
     process.stdout.write("Active Codex task was not bound\n");
     return;
   }
+  const result = record7(value.result) ? value.result : void 0;
+  const object = result && record7(result.object) ? result.object : void 0;
+  if (result !== void 0 && object !== void 0) {
+    process.stdout.write(
+      `Task object ${String(object.objectKey)}: ${String(result.kind)} (${String(object.lifecycle)})
+`
+    );
+    return;
+  }
+  if (Array.isArray(value.objects)) {
+    process.stdout.write(`Current task objects: ${value.objects.length}
+`);
+    for (const item of value.objects) {
+      if (!record7(item)) continue;
+      process.stdout.write(
+        `- ${String(item.objectKey)} [${String(item.entityType)}] ${String(item.lifecycle)}
+`
+      );
+    }
+    return;
+  }
   const companion = record7(value.companion) ? value.companion : void 0;
   const adapter = companion && record7(companion.adapter) ? companion.adapter : void 0;
   const state = typeof companion?.state === "string" ? companion.state : value.stopped === true ? "stopped" : "inactive";
@@ -7468,6 +8800,32 @@ async function main() {
       fail("workspace companion is not running");
     }
     print(await controlRequest(state, "POST", "/unbind"), arguments_.json);
+    return;
+  }
+  if (arguments_.command === "object-upsert" || arguments_.command === "object-supersede" || arguments_.command === "object-retire" || arguments_.command === "object-list") {
+    const state = await readState(arguments_.stateDir);
+    if (state === void 0 || !processIsAlive(state.pid)) {
+      fail("workspace companion is not running");
+    }
+    if (arguments_.command === "object-list") {
+      print(await controlRequest(state, "GET", "/objects"), arguments_.json);
+      return;
+    }
+    if (arguments_.command === "object-retire") {
+      print(await controlRequest(state, "POST", "/objects/retire", {
+        objectKey: arguments_.objectKey
+      }), arguments_.json);
+      return;
+    }
+    const object = await readTaskObjectFile(arguments_.objectFile);
+    if (arguments_.command === "object-supersede") {
+      print(await controlRequest(state, "POST", "/objects/supersede", {
+        replaces: arguments_.replaces,
+        object
+      }), arguments_.json);
+      return;
+    }
+    print(await controlRequest(state, "POST", "/objects/upsert", { object }), arguments_.json);
     return;
   }
   print(await liveStatus(arguments_.stateDir) ?? { ok: true, stopped: true }, arguments_.json);

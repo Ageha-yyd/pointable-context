@@ -1,28 +1,29 @@
 {
   "name": "pointable-context",
-  "version": "0.1.0+codex.20260820154401",
-  "description": "Selection-triggered, zero-turn development context reveal in the native Codex Chat Lane.",
+  "version": "0.1.0+codex.20260823163741",
+  "description": "Zero-turn development context reveal from quiet object marks or text selection in the native Codex Chat Lane.",
   "author": {
     "name": "Local developer"
   },
   "keywords": [
     "project-context",
     "entity-lookup",
-    "selection-quick-look"
+    "selection-quick-look",
+    "object-annotation"
   ],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Pointable Context",
-    "shortDescription": "Select a reference and reveal verified context in place.",
-    "longDescription": "Keep the Codex Chat Lane quiet until the user selects a stable file, module, decision, test, configuration, or explicitly authored context reference. A trusted explicit action reveals bounded, type-specific detail beside the selection without opening a browser, calling a model, or creating another chat turn. The title bar can move an open card within the viewport so obscured Chat remains readable while body selection, disclosures, refresh, and close keep their normal behavior. Explicit concept, change, decision, task, and verification artifacts project compact mental models with evidence kept behind a local disclosure. Opt-in Agent milestone context maintenance runs only at stable milestones and is gated by read-only Artifact/Record Checks for structure, identity, time, non-circular exact evidence, and duplicate names. An optional explicit long-task declaration measures Module/Decision/Task/Verification coverage, omissions, projection failures, and record redundancy without mining Chat or exposing file content. Open workspace cards pin their snapshot, signal detected file revision drift, and refresh in place only after another trusted action; explicit refresh puts at most three deduplicated, type-prioritized changes before the full mental model while ordinary cards remain quiet. A per-build qualification record keeps automatic host gates separate from evidence-bound manual interaction checks and binds them to the exact Codex package plus renderer digest. Test source never implies PASS/FAIL, task completion and verification results are never inferred, ordinary prose is never semantically mined, configuration values stay hidden, and browser clients plus DCPM/CWA are not product dependencies.",
+    "shortDescription": "Click a quiet object mark or select text to reveal verified context in place.",
+    "longDescription": "Keep the Codex Chat Lane free of persistent capsules while making a bounded set of registered development objects discoverable. After explicit task/workspace binding, each visible message may mark at most three unique high-value identities with a subtle dotted underline; the identity-only catalog contains no facts, sources, authority locator, file content, or configuration values. A trusted click reuses the existing fenced lookup and reveals bounded, type-specific detail beside the text. Registered objects omitted by that mark budget remain reachable through arbitrary text selection plus the quiet View Context action, without semantic-model recognition. Neither path opens a browser, calls a model, or creates another chat turn. The title bar can move an open card within the viewport so obscured Chat remains readable while body selection, disclosures, refresh, and close keep their normal behavior. Explicit concept, change, decision, task, and verification artifacts project compact mental models with evidence kept behind a local disclosure. For a bounded long task, a private Host-fenced registry can also hold sparse Agent-declared objects that are not stable enough to commit: active identities update in place, identity changes use explicit supersession, and obsolete objects retire. Terminal objects leave automatic marking but remain read-only resolvable from historical Chat with explicit lifecycle and replacement context, so old references do not become dead links. Every task-local detail remains partial rather than repository authority. Opt-in Agent milestone context maintenance runs only at stable milestones and is gated by read-only Artifact/Record Checks for structure, identity, time, non-circular exact evidence, and duplicate names. Open workspace cards pin their snapshot, signal detected revision drift, and refresh in place only after another trusted action. Per-build qualification binds the exact Codex package and renderer digest. Test source never implies PASS/FAIL, task completion and verification results are never inferred, ordinary prose is never semantically mined, configuration values stay hidden, and browser clients plus DCPM/CWA are not product dependencies.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
       "Read"
     ],
     "defaultPrompt": [
-      "Enable Pointable Context Quiet Mode for this Codex task.",
+      "Enable Pointable Context Quiet Mode with bounded object marks and the selection fallback for this Codex task.",
       "Bind Pointable Context Quiet Mode to my current local workspace.",
       "Start the fixture Quiet Mode so I can select ARCH-7 in this task.",
       "Check whether the Pointable Context selection companion is running.",
@@ -32,6 +33,7 @@
       "Record this observed verification result for Pointable Context, including its remaining gap.",
       "Record this stable concept, change, or decision for Pointable Context with exact workspace evidence.",
       "Maintain sparse Pointable Context milestone artifacts for this bounded long task.",
+      "Maintain sparse task-local Pointable Context objects for this bounded long task without mining ordinary Chat.",
       "Audit declared Pointable Context coverage for this bounded long task without reading Chat history.",
       "Validate the frozen Pointable Context study pack before a pilot session.",
       "Coordinate my assigned formative study session by opening each frozen native task without answering it.",

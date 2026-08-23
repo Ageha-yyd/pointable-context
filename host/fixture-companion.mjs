@@ -1054,6 +1054,7 @@ function validateDetail(value) {
     "sources",
     "humanSummary",
     "comprehension",
+    "terminalState",
     "detailRef",
     "changes"
   ])) {
@@ -1068,7 +1069,7 @@ function validateDetail(value) {
       "detail freshness is invalid"
     );
   }
-  if (!boundedString(value.observedAt, 20, 64) || !Number.isFinite(Date.parse(value.observedAt)) || !Array.isArray(value.facts) || value.facts.length > 5 || !Array.isArray(value.sources) || value.sources.length > 5 || value.humanSummary !== void 0 && !boundedString(value.humanSummary, 1, 1024) || value.detailRef !== void 0 && !boundedString(value.detailRef, 8, 256) || value.changes !== void 0 && (!Array.isArray(value.changes) || value.changes.length > 3)) {
+  if (!boundedString(value.observedAt, 20, 64) || !Number.isFinite(Date.parse(value.observedAt)) || !Array.isArray(value.facts) || value.facts.length > 5 || !Array.isArray(value.sources) || value.sources.length > 5 || value.humanSummary !== void 0 && !boundedString(value.humanSummary, 1, 1024) || value.terminalState !== void 0 && !record(value.terminalState) || value.detailRef !== void 0 && !boundedString(value.detailRef, 8, 256) || value.changes !== void 0 && (!Array.isArray(value.changes) || value.changes.length > 3)) {
     throw new PointableProtocolError(
       "invalid_lookup_result",
       "detail metadata exceeds its contract"
@@ -1204,6 +1205,20 @@ function validateDetail(value) {
       );
     }
   }
+  let terminalState;
+  if (value.terminalState !== void 0) {
+    const state = value.terminalState;
+    if (!record(state)) {
+      throw new PointableProtocolError("invalid_lookup_result", "detail terminal state is invalid");
+    }
+    if (state.kind === "superseded" && exactKeys(state, ["kind", "replacementKey"]) && boundedString(state.replacementKey, 1, 128)) {
+      terminalState = { kind: "superseded", replacementKey: state.replacementKey };
+    } else if (state.kind === "retired" && exactKeys(state, ["kind"])) {
+      terminalState = { kind: "retired" };
+    } else {
+      throw new PointableProtocolError("invalid_lookup_result", "detail terminal state is invalid");
+    }
+  }
   const changes = value.changes === void 0 ? void 0 : value.changes.map((change) => {
     if (!record(change) || !exactKeys(change, ["label", "before", "after"])) {
       throw new PointableProtocolError(
@@ -1229,6 +1244,7 @@ function validateDetail(value) {
     sources,
     ...typeof value.humanSummary === "string" ? { humanSummary: value.humanSummary } : {},
     ...comprehension === void 0 ? {} : { comprehension },
+    ...terminalState === void 0 ? {} : { terminalState },
     ...typeof value.detailRef === "string" ? { detailRef: value.detailRef } : {},
     ...changes === void 0 ? {} : { changes }
   };
@@ -1343,6 +1359,7 @@ function validatePointableRendererResponse(value) {
   const factView = (candidate) => isRecord(candidate) && exact(candidate, ["label", "value"]) && bounded(candidate.label, 1, 128) && bounded(candidate.value, 1, 1024);
   const sourceView = (candidate) => isRecord(candidate) && exact(candidate, ["label"]) && bounded(candidate.label, 1, 512);
   const changeView = (candidate) => isRecord(candidate) && exact(candidate, ["label", "before", "after"]) && bounded(candidate.label, 1, 128) && bounded(candidate.before, 1, 1024) && bounded(candidate.after, 1, 1024);
+  const terminalStateView = (candidate) => isRecord(candidate) && (candidate.kind === "superseded" && exact(candidate, ["kind", "replacementKey"]) && bounded(candidate.replacementKey, 1, 128) || candidate.kind === "retired" && exact(candidate, ["kind"]));
   const evidenceView = (candidate) => isRecord(candidate) && exact(candidate, ["excerpt", "source"]) && bounded(candidate.excerpt, 1, 1024) && bounded(candidate.source, 1, 512);
   const comprehensionView = (candidate) => {
     if (!isRecord(candidate) || !Array.isArray(candidate.evidence) || candidate.evidence.length < 1 || candidate.evidence.length > 3 || !candidate.evidence.every(evidenceView)) {
@@ -1409,9 +1426,10 @@ function validatePointableRendererResponse(value) {
       "sources",
       "humanSummary",
       "comprehension",
+      "terminalState",
       "detailRef",
       "changes"
-    ]) || !bounded(detail.entityId, 1, 256) || !bounded(detail.entityType, 1, 128) || !bounded(detail.label, 1, 256) || !bounded(detail.summary, 1, 1024) || !bounded(detail.revision, 1, 512) || !bounded(detail.observedAt, 20, 64) || !Number.isFinite(Date.parse(detail.observedAt)) || detail.freshness !== "current" && detail.freshness !== "stale" && detail.freshness !== "partial" && detail.freshness !== "unknown" || !Array.isArray(detail.facts) || detail.facts.length > 5 || !detail.facts.every(factView) || !Array.isArray(detail.sources) || detail.sources.length > 5 || !detail.sources.every(sourceView) || detail.humanSummary !== void 0 && !bounded(detail.humanSummary, 1, 1024) || detail.comprehension !== void 0 && !comprehensionView(detail.comprehension) || detail.detailRef !== void 0 && !bounded(detail.detailRef, 8, 256) || detail.changes !== void 0 && (!Array.isArray(detail.changes) || detail.changes.length > 3 || !detail.changes.every(changeView))) {
+    ]) || !bounded(detail.entityId, 1, 256) || !bounded(detail.entityType, 1, 128) || !bounded(detail.label, 1, 256) || !bounded(detail.summary, 1, 1024) || !bounded(detail.revision, 1, 512) || !bounded(detail.observedAt, 20, 64) || !Number.isFinite(Date.parse(detail.observedAt)) || detail.freshness !== "current" && detail.freshness !== "stale" && detail.freshness !== "partial" && detail.freshness !== "unknown" || !Array.isArray(detail.facts) || detail.facts.length > 5 || !detail.facts.every(factView) || !Array.isArray(detail.sources) || detail.sources.length > 5 || !detail.sources.every(sourceView) || detail.humanSummary !== void 0 && !bounded(detail.humanSummary, 1, 1024) || detail.comprehension !== void 0 && !comprehensionView(detail.comprehension) || detail.terminalState !== void 0 && !terminalStateView(detail.terminalState) || detail.detailRef !== void 0 && !bounded(detail.detailRef, 8, 256) || detail.changes !== void 0 && (!Array.isArray(detail.changes) || detail.changes.length > 3 || !detail.changes.every(changeView))) {
       return void 0;
     }
   } else if (presentation.kind === "revision") {
@@ -1428,7 +1446,35 @@ function validatePointableRendererResponse(value) {
   }
   return value;
 }
-function installPointableContextRenderer(config, evaluateEligibility2, validateResponse) {
+function validatePointableAnnotationCatalog(value) {
+  const isRecord = (candidate) => typeof candidate === "object" && candidate !== null && !Array.isArray(candidate);
+  const bounded = (candidate, minimum, maximum) => typeof candidate === "string" && candidate.length >= minimum && candidate.length <= maximum && !/[\p{Cc}\p{Cf}]/u.test(candidate);
+  if (!isRecord(value) || Object.keys(value).sort().join("|") !== "contextFingerprint|entries|revision" || !bounded(value.revision, 1, 128) || !bounded(value.contextFingerprint, 1, 2048) || !Array.isArray(value.entries) || value.entries.length > 256) {
+    return void 0;
+  }
+  const entries = [];
+  const pairs = /* @__PURE__ */ new Set();
+  for (const raw of value.entries) {
+    if (!isRecord(raw) || Object.keys(raw).sort().join("|") !== "entityType|objectKey|priority|term" || !bounded(raw.objectKey, 16, 128) || !bounded(raw.term, 3, 256) || raw.term !== raw.term.trim() || !bounded(raw.entityType, 1, 128) || !Number.isSafeInteger(raw.priority) || Number(raw.priority) < 0 || Number(raw.priority) > 100) {
+      return void 0;
+    }
+    const pair = `${raw.objectKey}\0${raw.term.normalize("NFKC").toLocaleLowerCase("en-US")}`;
+    if (pairs.has(pair)) return void 0;
+    pairs.add(pair);
+    entries.push({
+      objectKey: raw.objectKey,
+      term: raw.term,
+      entityType: raw.entityType,
+      priority: Number(raw.priority)
+    });
+  }
+  return Object.freeze({
+    revision: value.revision,
+    contextFingerprint: value.contextFingerprint,
+    entries: Object.freeze(entries.map((entry) => Object.freeze(entry)))
+  });
+}
+function installPointableContextRenderer(config, evaluateEligibility2, validateResponse, validateAnnotations) {
   const namespace = "__pointableContextRenderer";
   const bindingNamePattern = /^__pointableContextBinding_[A-Za-z0-9_]{8,128}$/u;
   if (!bindingNamePattern.test(config.bindingName)) {
@@ -1489,15 +1535,30 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   let holdCardPlacementUntil = 0;
   let manualCardPlacement;
   let dragState;
+  let annotationCatalog = {
+    revision: "unbound",
+    contextFingerprint: "unbound",
+    entries: []
+  };
+  let annotationHits = [];
+  let annotationFrame;
+  let annotationStyle;
   let uninstalled = false;
   const activeObserver = new MutationObserver(() => {
     if (candidate !== void 0) scheduleReconcile();
+    if (annotationCatalog.entries.length > 0) scheduleAnnotationReconcile();
   });
   const resizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(() => reposition()) : void 0;
   const pointerUpHandler = (event) => {
     const ownedInteraction = event.composedPath().some((item) => item instanceof Element && item.getAttribute("data-pointable-context-owned") === lifecycleId);
     if (event.button === 0 && !ownedInteraction) {
-      window.setTimeout(evaluateSelection, 0);
+      const selection = window.getSelection();
+      const hit = event.isTrusted && selection?.isCollapsed !== false ? annotationAtPoint(event.clientX, event.clientY) : void 0;
+      if (hit !== void 0) {
+        activateAnnotation(hit);
+      } else {
+        window.setTimeout(evaluateSelection, 0);
+      }
     }
   };
   const dragMoveHandler = (event) => {
@@ -1553,6 +1614,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   const viewportHandler = () => reposition();
   const routeHandler = () => {
     reconcile();
+    scheduleAnnotationReconcile();
   };
   const selectionHandler = () => {
     window.setTimeout(evaluateSelection, 0);
@@ -1656,6 +1718,208 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     const rect = root.getBoundingClientRect();
     return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
   }
+  const annotationHighlightName = `pointable-context-object-${lifecycleId}`;
+  const annotationInteractiveSelector = 'a, button, input, textarea, select, [role="button"], [contenteditable="true"]';
+  function refreshObserver() {
+    activeObserver.disconnect();
+    if (candidate === void 0 && annotationCatalog.entries.length === 0) return;
+    activeObserver.observe(document.body, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: [
+        "hidden",
+        "inert",
+        "data-app-action-sidebar-thread-active",
+        "data-app-action-sidebar-thread-id",
+        "data-app-action-sidebar-thread-host-id"
+      ]
+    });
+  }
+  function annotationRegistry() {
+    if (typeof CSS === "undefined") return void 0;
+    return CSS.highlights;
+  }
+  function clearAnnotationHighlights() {
+    annotationRegistry()?.delete(annotationHighlightName);
+    annotationHits = [];
+    annotationStyle?.remove();
+    annotationStyle = void 0;
+  }
+  function annotationSurface(root) {
+    if (!stableRoot.contains(root) || rejectedSurface(root)) return void 0;
+    if (root.closest('[data-user-message-bubble="true"]') !== null) {
+      return "user_message";
+    }
+    return root.closest(
+      "[data-response-annotation-target], [data-local-conversation-final-assistant]"
+    ) !== null ? "assistant_message" : void 0;
+  }
+  function termBoundary(text, start, length) {
+    const isWord = (value) => value !== void 0 && /[\p{L}\p{N}_]/u.test(value);
+    const first = text[start];
+    const last = text[start + length - 1];
+    return !(isWord(first) && isWord(text[start - 1]) || isWord(last) && isWord(text[start + length]));
+  }
+  function firstTermIndex(text, term) {
+    const foldedText = text.toLocaleLowerCase("en-US");
+    const foldedTerm = term.toLocaleLowerCase("en-US");
+    if (foldedTerm.length !== term.length) return -1;
+    let from = 0;
+    while (from <= foldedText.length - foldedTerm.length) {
+      const found = foldedText.indexOf(foldedTerm, from);
+      if (found < 0) return -1;
+      if (found + term.length <= text.length && termBoundary(text, found, term.length)) {
+        return found;
+      }
+      from = found + Math.max(1, foldedTerm.length);
+    }
+    return -1;
+  }
+  function structuralBoundaryBetween(previous, current) {
+    const between = document.createRange();
+    try {
+      between.setStart(previous, previous.data.length);
+      between.setEnd(current, 0);
+      const fragment = between.cloneContents();
+      return fragment.querySelector(
+        "br, p, div, li, ul, ol, pre, blockquote, section, article, header, footer, table, thead, tbody, tfoot, tr, td, th, hr"
+      ) !== null;
+    } catch {
+      return true;
+    } finally {
+      between.detach();
+    }
+  }
+  function scheduleAnnotationReconcile() {
+    if (annotationFrame !== void 0 || uninstalled) return;
+    annotationFrame = window.requestAnimationFrame(() => {
+      annotationFrame = void 0;
+      reconcileAnnotations();
+    });
+  }
+  function reconcileAnnotations() {
+    clearAnnotationHighlights();
+    if (annotationCatalog.entries.length === 0 || annotationCatalog.contextFingerprint !== readContextFingerprint()) {
+      refreshObserver();
+      return;
+    }
+    const registry = annotationRegistry();
+    const HighlightConstructor = globalThis.Highlight;
+    if (registry === void 0 || HighlightConstructor === void 0) {
+      refreshObserver();
+      return;
+    }
+    const roots = [...stableRoot.querySelectorAll(
+      "[data-selected-text-overlay-target]"
+    )].filter((root) => rootVisible(root)).slice(0, 64);
+    const contextFingerprint = readContextFingerprint();
+    let totalText = 0;
+    const nextHits = [];
+    for (const root of roots) {
+      if (totalText >= 262144) break;
+      const surface = annotationSurface(root);
+      if (surface === void 0) continue;
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      const segments = [];
+      let text = "";
+      let previousText;
+      for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        if (!(node instanceof Text) || node.data.length === 0) continue;
+        const parent = node.parentElement;
+        if (parent === null || rejectedSurface(parent) || parent.closest(annotationInteractiveSelector) !== null) {
+          continue;
+        }
+        const separator = previousText !== void 0 && structuralBoundaryBetween(previousText, node) ? "\n" : "";
+        if (segments.length >= 2048 || text.length + separator.length + node.data.length > 65536) break;
+        text += separator;
+        const start = text.length;
+        text += node.data;
+        segments.push({ node, start, end: text.length });
+        previousText = node;
+      }
+      totalText += text.length;
+      if (text.length === 0) continue;
+      const candidates2 = [];
+      for (const annotation of annotationCatalog.entries) {
+        const start = firstTermIndex(text, annotation.term);
+        if (start >= 0) {
+          candidates2.push({
+            annotation,
+            start,
+            end: start + annotation.term.length
+          });
+        }
+      }
+      candidates2.sort((left, right) => right.annotation.priority - left.annotation.priority || left.start - right.start || right.annotation.term.length - left.annotation.term.length);
+      const chosen = [];
+      const objectKeys = /* @__PURE__ */ new Set();
+      for (const item of candidates2) {
+        if (objectKeys.has(item.annotation.objectKey) || chosen.some((other) => item.start < other.end && other.start < item.end)) {
+          continue;
+        }
+        chosen.push(item);
+        objectKeys.add(item.annotation.objectKey);
+        if (chosen.length >= 3) break;
+      }
+      for (const item of chosen) {
+        const startSegment = segments.find((segment) => item.start >= segment.start && item.start < segment.end);
+        const endSegment = segments.find((segment) => item.end > segment.start && item.end <= segment.end);
+        if (startSegment === void 0 || endSegment === void 0) continue;
+        const range = document.createRange();
+        range.setStart(startSegment.node, item.start - startSegment.start);
+        range.setEnd(endSegment.node, item.end - endSegment.start);
+        if (range.toString().length !== item.annotation.term.length) continue;
+        nextHits.push({
+          ...item.annotation,
+          range,
+          sourceRoot: root,
+          surface,
+          contextFingerprint
+        });
+      }
+    }
+    if (nextHits.length > 0) {
+      const style = document.createElement("style");
+      style.setAttribute("data-pointable-context-owned", lifecycleId);
+      style.setAttribute("data-pointable-context-role", "annotation-style");
+      style.textContent = `::highlight(${annotationHighlightName}) { background-color: rgba(77, 112, 255, .08); text-decoration-line: underline; text-decoration-style: dotted; text-decoration-thickness: 1.5px; text-decoration-color: rgba(77, 112, 255, .88); text-underline-offset: 3px; }`;
+      document.head.append(style);
+      annotationStyle = style;
+      annotationHits = nextHits;
+      registry.set(annotationHighlightName, new HighlightConstructor(...nextHits.map(({ range }) => range)));
+    }
+    refreshObserver();
+  }
+  function annotationAnchorIsCurrent(hit) {
+    return hit.sourceRoot.isConnected && hit.range.commonAncestorContainer.isConnected && hit.range.toString().toLocaleLowerCase("en-US") === hit.term.toLocaleLowerCase("en-US") && hit.contextFingerprint === readContextFingerprint() && rootVisible(hit.sourceRoot) && annotationSurface(hit.sourceRoot) === hit.surface;
+  }
+  function annotationAtPoint(clientX, clientY) {
+    return annotationHits.find((hit) => annotationAnchorIsCurrent(hit) && [...hit.range.getClientRects()].some((rect) => clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom));
+  }
+  function activateAnnotation(hit) {
+    if (!annotationAnchorIsCurrent(hit)) return;
+    cleanup(true, false);
+    candidate = {
+      generation: ++generation,
+      text: hit.range.toString(),
+      surface: hit.surface,
+      range: hit.range.cloneRange(),
+      sourceRoot: hit.sourceRoot,
+      contextFingerprint: hit.contextFingerprint
+    };
+    refreshObserver();
+    void submitLookup("resolve", candidate.generation);
+  }
+  function updateAnnotations(value) {
+    const catalog = validateAnnotations(value);
+    if (catalog === void 0) return status();
+    annotationCatalog = catalog;
+    refreshObserver();
+    scheduleAnnotationReconcile();
+    return status();
+  }
   function evaluateSelection() {
     if (uninstalled) return;
     const selection = window.getSelection();
@@ -1669,6 +1933,10 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     const end = nodeElement(range.endContainer);
     if (start === null || end === null) {
       cleanup(true, false);
+      return;
+    }
+    const openCard = connectedOwnedElement("card");
+    if (openCard !== null && openCard.contains(start) && openCard.contains(end)) {
       return;
     }
     const admitted = selectionSurface(start, end, range);
@@ -1703,18 +1971,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       sourceRoot: admitted.root,
       contextFingerprint
     };
-    activeObserver.observe(document.body, {
-      subtree: true,
-      childList: true,
-      attributes: true,
-      attributeFilter: [
-        "hidden",
-        "inert",
-        "data-app-action-sidebar-thread-active",
-        "data-app-action-sidebar-thread-id",
-        "data-app-action-sidebar-thread-host-id"
-      ]
-    });
+    refreshObserver();
     mountAction();
   }
   function mountAction() {
@@ -2327,6 +2584,22 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     changeSummary.append(heading, list);
     body.append(changeSummary);
   }
+  function mountTerminalState(body, terminalState) {
+    if (terminalState === void 0) return;
+    const notice = document.createElement("div");
+    notice.setAttribute("data-pointable-context-role", "terminal-state");
+    Object.assign(notice.style, {
+      marginBottom: "8px",
+      padding: "8px 10px",
+      borderRadius: "8px",
+      background: "#fff7e8",
+      color: "#8a4b08",
+      fontSize: "12px",
+      lineHeight: "1.45"
+    });
+    notice.textContent = terminalState.kind === "superseded" ? `\u6B64\u5BF9\u8C61\u5DF2\u7531 ${terminalState.replacementKey} \u66FF\u4EE3\uFF1B\u4EE5\u4E0B\u4FDD\u7559\u7684\u662F\u5386\u53F2\u53EA\u8BFB\u4E0A\u4E0B\u6587\u3002` : "\u6B64\u5BF9\u8C61\u5DF2\u9000\u5F79\uFF1B\u4EE5\u4E0B\u4FDD\u7559\u7684\u662F\u5386\u53F2\u53EA\u8BFB\u4E0A\u4E0B\u6587\u3002";
+    body.append(notice);
+  }
   function mountDetail(detail, preserveUiState = false) {
     clearRevisionTimer();
     const previousCard = preserveUiState ? connectedOwnedElement("card") : null;
@@ -2335,6 +2608,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     state = "detail";
     const { body } = createShell(detail.label, preserveUiState);
     mountRevisionChanges(body, detail.changes);
+    mountTerminalState(body, detail.terminalState);
     if (presentationMode === "mental-model" && detail.comprehension !== void 0) {
       mountComprehension(body, detail.comprehension, evidenceExpanded);
     } else {
@@ -2645,8 +2919,8 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     }
     if (clearCandidate) {
       candidate = void 0;
-      activeObserver.disconnect();
       state = "idle";
+      refreshObserver();
     }
     if (restore && restoreFocus?.isConnected) {
       restoreFocus.focus({ preventScroll: true });
@@ -2662,13 +2936,18 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       selectionGeneration: generation,
       pendingRequestCount: pending === void 0 ? 0 : 1,
       actionCount: connectedOwnedElement("action") === null ? 0 : 1,
-      cardCount: connectedOwnedElement("card") === null ? 0 : 1
+      cardCount: connectedOwnedElement("card") === null ? 0 : 1,
+      annotationCount: annotationHits.length
     };
   }
   function uninstall() {
     if (uninstalled) return status();
     cleanup(true, false);
     uninstalled = true;
+    annotationCatalog = { revision: "unbound", contextFingerprint: "unbound", entries: [] };
+    if (annotationFrame !== void 0) window.cancelAnimationFrame(annotationFrame);
+    annotationFrame = void 0;
+    clearAnnotationHighlights();
     activeObserver.disconnect();
     resizeObserver?.disconnect();
     document.removeEventListener("selectionchange", selectionHandler);
@@ -2691,6 +2970,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     status,
     verifyFence,
     receiveResult,
+    updateAnnotations,
     reconcile,
     uninstall
   };
@@ -2701,8 +2981,9 @@ function createInstallPointableRendererExpression(config) {
   return `(() => {
     const evaluateEligibility = (${evaluatePointableRendererEligibility.toString()});
     const validateResponse = (${validatePointableRendererResponse.toString()});
+    const validateAnnotations = (${validatePointableAnnotationCatalog.toString()});
     const install = (${installPointableContextRenderer.toString()});
-    return install(${JSON.stringify(config)}, evaluateEligibility, validateResponse);
+    return install(${JSON.stringify(config)}, evaluateEligibility, validateResponse, validateAnnotations);
   })()`;
 }
 function createVerifyPointableRendererFenceExpression(fence, lifecycleId) {
@@ -2717,6 +2998,14 @@ function createDeliverPointableResultExpression(response, lifecycleId) {
     const renderer = window.__pointableContextRenderer;
     return renderer?.status?.().lifecycleId === ${JSON.stringify(lifecycleId)}
       ? renderer.receiveResult?.(${JSON.stringify(response)}) ?? null
+      : null;
+  })()`;
+}
+function createUpdatePointableAnnotationsExpression(catalog, lifecycleId) {
+  return `(() => {
+    const renderer = window.__pointableContextRenderer;
+    return renderer?.status?.().lifecycleId === ${JSON.stringify(lifecycleId)}
+      ? renderer.updateAnnotations?.(${JSON.stringify(catalog)}) ?? null
       : null;
   })()`;
 }
@@ -3236,6 +3525,9 @@ function parseCodexHostTaskContext(value, expectedFingerprint) {
 function record5(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+function sameHostTask(left, right) {
+  return left.host === right.host && left.hostId === right.hostId && left.threadId === right.threadId && left.routeRef === right.routeRef && left.contextFingerprint === right.contextFingerprint;
+}
 function runtimeValue(value) {
   if (!record5(value) || !record5(value.result) || value.exceptionDetails !== void 0) {
     return void 0;
@@ -3374,6 +3666,8 @@ var CodexCdpHostAdapter = class {
   #maxConcurrentLookupsPerTarget;
   #actionLabel;
   #presentationMode;
+  #annotationProvider;
+  #annotationRefreshIntervalMs;
   #attachments = /* @__PURE__ */ new Map();
   #attaching = /* @__PURE__ */ new Set();
   #recoveries = /* @__PURE__ */ new Set();
@@ -3392,6 +3686,8 @@ var CodexCdpHostAdapter = class {
     this.#maxConcurrentLookupsPerTarget = options.maxConcurrentLookupsPerTarget ?? 8;
     this.#actionLabel = options.actionLabel;
     this.#presentationMode = options.presentationMode;
+    this.#annotationProvider = options.annotationProvider;
+    this.#annotationRefreshIntervalMs = options.annotationRefreshIntervalMs ?? 15e3;
     if (this.#presentationMode !== void 0 && this.#presentationMode !== "record" && this.#presentationMode !== "narrative" && this.#presentationMode !== "mental-model") {
       throw new RangeError("presentationMode is invalid");
     }
@@ -3401,6 +3697,11 @@ var CodexCdpHostAdapter = class {
     if (!Number.isSafeInteger(this.#maxConcurrentLookupsPerTarget) || this.#maxConcurrentLookupsPerTarget < 1 || this.#maxConcurrentLookupsPerTarget > 32) {
       throw new RangeError(
         "maxConcurrentLookupsPerTarget must be an integer from 1 to 32"
+      );
+    }
+    if (!Number.isSafeInteger(this.#annotationRefreshIntervalMs) || this.#annotationRefreshIntervalMs < 1e3 || this.#annotationRefreshIntervalMs > 3e5) {
+      throw new RangeError(
+        "annotationRefreshIntervalMs must be an integer from 1000 to 300000"
       );
     }
   }
@@ -3453,6 +3754,7 @@ var CodexCdpHostAdapter = class {
       }
       await this.#attach(target, signal);
     }
+    await this.#refreshAnnotations(signal, false);
     if (!this.#isStopped() && !signal.aborted) this.#state = "running";
     return this.status();
   }
@@ -3467,7 +3769,9 @@ var CodexCdpHostAdapter = class {
         bindingName: attachment.bindingName,
         pendingLookups: attachment.inFlight.size,
         executionContextId: attachment.mainExecutionContextId,
-        rendererLifecycleId: attachment.rendererLifecycleId
+        rendererLifecycleId: attachment.rendererLifecycleId,
+        annotationCount: attachment.annotationCount,
+        ...attachment.annotationRevision === void 0 ? {} : { annotationRevision: attachment.annotationRevision }
       }]).sort((left, right) => left.targetId.localeCompare(right.targetId))
     };
   }
@@ -3476,6 +3780,78 @@ var CodexCdpHostAdapter = class {
    * used only for an explicit local bind action; zero or multiple results must
    * be treated as unavailable/ambiguous by the caller.
    */
+  async refreshAnnotations(signal, force = true) {
+    if (this.#isStopped() || signal?.aborted) return this.status();
+    const combined = signal === void 0 ? this.#stopController.signal : AbortSignal.any([signal, this.#stopController.signal]);
+    await this.#refreshAnnotations(combined, force);
+    return this.status();
+  }
+  async #refreshAnnotations(signal, force) {
+    if (this.#annotationProvider === void 0 || signal.aborted) return;
+    await Promise.all([...this.#attachments.values()].map(async (attachment) => {
+      if (signal.aborted || attachment.invalidated || attachment.connection.isClosed() || attachment.mainExecutionContextId === void 0 || attachment.rendererLifecycleId === void 0 || !force && Date.now() - attachment.annotationCheckedAt < this.#annotationRefreshIntervalMs) {
+        return;
+      }
+      attachment.annotationCheckedAt = Date.now();
+      const task = await this.#readCurrentHostTaskContext(attachment);
+      const empty = (contextFingerprint, revision) => ({
+        revision,
+        contextFingerprint,
+        entries: []
+      });
+      let catalog;
+      if (task === void 0) {
+        catalog = empty("unbound", "unbound");
+      } else {
+        const controller = new AbortController();
+        try {
+          const raw = await boundedLookup(
+            (timeoutSignal) => this.#annotationProvider?.({
+              host: {
+                targetId: attachment.target.id,
+                targetUrl: attachment.target.url,
+                bindingGeneration: attachment.bindingGeneration,
+                task,
+                revalidateTask: async (revalidateSignal) => {
+                  if (revalidateSignal?.aborted) return void 0;
+                  const current2 = await this.#readCurrentHostTaskContext(attachment);
+                  return current2 !== void 0 && sameHostTask(current2, task) ? current2 : void 0;
+                }
+              },
+              signal: AbortSignal.any([
+                timeoutSignal,
+                signal,
+                attachment.lifecycleController.signal
+              ])
+            }) ?? Promise.resolve(empty(task.contextFingerprint, "unavailable")),
+            this.#lookupTimeoutMs,
+            controller
+          );
+          catalog = validatePointableAnnotationCatalog(raw) ?? empty(task.contextFingerprint, "invalid");
+        } catch {
+          catalog = empty(task.contextFingerprint, "unavailable");
+        }
+        const current = await this.#readCurrentHostTaskContext(attachment);
+        if (current === void 0 || !sameHostTask(current, task)) {
+          catalog = empty("context-changed", "context-changed");
+        }
+      }
+      if (signal.aborted || attachment.invalidated || attachment.connection.isClosed() || this.#attachments.get(attachment.target.id) !== attachment) {
+        return;
+      }
+      await attachment.connection.send("Runtime.evaluate", {
+        expression: createUpdatePointableAnnotationsExpression(
+          catalog,
+          attachment.rendererLifecycleId
+        ),
+        contextId: attachment.mainExecutionContextId,
+        returnByValue: true,
+        awaitPromise: true
+      });
+      attachment.annotationRevision = catalog.revision;
+      attachment.annotationCount = catalog.entries.length;
+    }));
+  }
   async activeTasks(signal) {
     if (this.#isStopped() || signal?.aborted) return [];
     const byTask = /* @__PURE__ */ new Map();
@@ -3543,7 +3919,9 @@ var CodexCdpHostAdapter = class {
       contextWaiters: /* @__PURE__ */ new Set(),
       lifecycleController: new AbortController(),
       invalidated: false,
-      detached: false
+      detached: false,
+      annotationCheckedAt: 0,
+      annotationCount: 0
     };
     this.#attaching.add(attachment);
     attachment.unsubscribeEvent = connection.onEvent((event) => this.#onEvent(attachment, event));
@@ -3730,9 +4108,15 @@ var CodexCdpHostAdapter = class {
     }
   }
   async #readHostTaskContext(attachment, intent) {
+    return await this.#readCurrentHostTaskContext(
+      attachment,
+      intent.contextFingerprint
+    ) ?? false;
+  }
+  async #readCurrentHostTaskContext(attachment, expectedFingerprint) {
     const contextId = attachment.mainExecutionContextId;
     if (contextId === void 0 || this.#attachments.get(attachment.target.id) !== attachment || attachment.connection.isClosed() || attachment.invalidated) {
-      return false;
+      return void 0;
     }
     try {
       const evaluated = await attachment.connection.send("Runtime.evaluate", {
@@ -3743,10 +4127,10 @@ var CodexCdpHostAdapter = class {
       });
       return parseCodexHostTaskContext(
         runtimeValue(evaluated),
-        intent.contextFingerprint
+        expectedFingerprint
       );
     } catch {
-      return false;
+      return void 0;
     }
   }
   async #rendererFenceCurrent(attachment, intent) {

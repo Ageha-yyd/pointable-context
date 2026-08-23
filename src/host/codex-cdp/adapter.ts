@@ -11,8 +11,11 @@ import {
 import {
   createDeliverPointableResultExpression,
   createInstallPointableRendererExpression,
+  createUpdatePointableAnnotationsExpression,
   createUninstallPointableRendererExpression,
   createVerifyPointableRendererFenceExpression,
+  validatePointableAnnotationCatalog,
+  type PointableAnnotationCatalog,
   type PointableRendererStatus,
 } from "./renderer.js";
 import {
@@ -61,6 +64,21 @@ export type PointableLookupCallback = (
   request: Readonly<PointableLookupCallbackRequest>,
 ) => Promise<unknown>;
 
+export interface PointableAnnotationProviderRequest {
+  host: {
+    targetId: string;
+    targetUrl: string;
+    bindingGeneration: string;
+    task: CodexHostTaskContext;
+    revalidateTask: (signal?: AbortSignal) => Promise<CodexHostTaskContext | undefined>;
+  };
+  signal: AbortSignal;
+}
+
+export type PointableAnnotationProvider = (
+  request: Readonly<PointableAnnotationProviderRequest>,
+) => Promise<unknown>;
+
 export interface CodexCdpHostAdapterOptions {
   lookup: PointableLookupCallback;
   endpoint?: string;
@@ -71,6 +89,8 @@ export interface CodexCdpHostAdapterOptions {
   maxConcurrentLookupsPerTarget?: number;
   actionLabel?: string;
   presentationMode?: PointablePresentationMode;
+  annotationProvider?: PointableAnnotationProvider;
+  annotationRefreshIntervalMs?: number;
 }
 
 export interface CodexCdpHostAdapterStatus {
@@ -84,6 +104,8 @@ export interface CodexCdpHostAdapterStatus {
     pendingLookups: number;
     executionContextId: number;
     rendererLifecycleId: string;
+    annotationCount: number;
+    annotationRevision?: string;
   }>;
 }
 
@@ -111,10 +133,26 @@ interface TargetAttachment {
   invalidated: boolean;
   detached: boolean;
   detachPromise?: Promise<void>;
+  annotationCheckedAt: number;
+  annotationCount: number;
+  annotationRevision?: string;
 }
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function sameHostTask(
+  left: CodexHostTaskContext,
+  right: CodexHostTaskContext,
+): boolean {
+  return (
+    left.host === right.host &&
+    left.hostId === right.hostId &&
+    left.threadId === right.threadId &&
+    left.routeRef === right.routeRef &&
+    left.contextFingerprint === right.contextFingerprint
+  );
 }
 
 function runtimeValue(value: unknown): unknown {
@@ -309,6 +347,8 @@ export class CodexCdpHostAdapter {
   readonly #maxConcurrentLookupsPerTarget: number;
   readonly #actionLabel: string | undefined;
   readonly #presentationMode: PointablePresentationMode | undefined;
+  readonly #annotationProvider: PointableAnnotationProvider | undefined;
+  readonly #annotationRefreshIntervalMs: number;
   readonly #attachments = new Map<string, TargetAttachment>();
   readonly #attaching = new Set<TargetAttachment>();
   readonly #recoveries = new Set<Promise<void>>();
@@ -329,6 +369,8 @@ export class CodexCdpHostAdapter {
       options.maxConcurrentLookupsPerTarget ?? 8;
     this.#actionLabel = options.actionLabel;
     this.#presentationMode = options.presentationMode;
+    this.#annotationProvider = options.annotationProvider;
+    this.#annotationRefreshIntervalMs = options.annotationRefreshIntervalMs ?? 15_000;
     if (
       this.#presentationMode !== undefined &&
       this.#presentationMode !== "record" &&
@@ -351,6 +393,15 @@ export class CodexCdpHostAdapter {
     ) {
       throw new RangeError(
         "maxConcurrentLookupsPerTarget must be an integer from 1 to 32",
+      );
+    }
+    if (
+      !Number.isSafeInteger(this.#annotationRefreshIntervalMs) ||
+      this.#annotationRefreshIntervalMs < 1_000 ||
+      this.#annotationRefreshIntervalMs > 300_000
+    ) {
+      throw new RangeError(
+        "annotationRefreshIntervalMs must be an integer from 1000 to 300000",
       );
     }
   }
@@ -416,6 +467,7 @@ export class CodexCdpHostAdapter {
       }
       await this.#attach(target, signal);
     }
+    await this.#refreshAnnotations(signal, false);
     if (!this.#isStopped() && !signal.aborted) this.#state = "running";
     return this.status();
   }
@@ -437,6 +489,10 @@ export class CodexCdpHostAdapter {
               pendingLookups: attachment.inFlight.size,
               executionContextId: attachment.mainExecutionContextId,
               rendererLifecycleId: attachment.rendererLifecycleId,
+              annotationCount: attachment.annotationCount,
+              ...(attachment.annotationRevision === undefined
+                ? {}
+                : { annotationRevision: attachment.annotationRevision }),
             }])
         .sort((left, right) => left.targetId.localeCompare(right.targetId)),
     };
@@ -447,6 +503,100 @@ export class CodexCdpHostAdapter {
    * used only for an explicit local bind action; zero or multiple results must
    * be treated as unavailable/ambiguous by the caller.
    */
+  async refreshAnnotations(
+    signal?: AbortSignal,
+    force = true,
+  ): Promise<CodexCdpHostAdapterStatus> {
+    if (this.#isStopped() || signal?.aborted) return this.status();
+    const combined = signal === undefined
+      ? this.#stopController.signal
+      : AbortSignal.any([signal, this.#stopController.signal]);
+    await this.#refreshAnnotations(combined, force);
+    return this.status();
+  }
+
+  async #refreshAnnotations(signal: AbortSignal, force: boolean): Promise<void> {
+    if (this.#annotationProvider === undefined || signal.aborted) return;
+    await Promise.all([...this.#attachments.values()].map(async (attachment) => {
+      if (
+        signal.aborted ||
+        attachment.invalidated ||
+        attachment.connection.isClosed() ||
+        attachment.mainExecutionContextId === undefined ||
+        attachment.rendererLifecycleId === undefined ||
+        (!force && Date.now() - attachment.annotationCheckedAt < this.#annotationRefreshIntervalMs)
+      ) {
+        return;
+      }
+      attachment.annotationCheckedAt = Date.now();
+      const task = await this.#readCurrentHostTaskContext(attachment);
+      const empty = (contextFingerprint: string, revision: string): PointableAnnotationCatalog => ({
+        revision,
+        contextFingerprint,
+        entries: [],
+      });
+      let catalog: PointableAnnotationCatalog;
+      if (task === undefined) {
+        catalog = empty("unbound", "unbound");
+      } else {
+        const controller = new AbortController();
+        try {
+          const raw = await boundedLookup(
+            (timeoutSignal) => this.#annotationProvider?.({
+              host: {
+                targetId: attachment.target.id,
+                targetUrl: attachment.target.url,
+                bindingGeneration: attachment.bindingGeneration,
+                task,
+                revalidateTask: async (revalidateSignal?: AbortSignal) => {
+                  if (revalidateSignal?.aborted) return undefined;
+                  const current = await this.#readCurrentHostTaskContext(attachment);
+                  return current !== undefined && sameHostTask(current, task)
+                    ? current
+                    : undefined;
+                },
+              },
+              signal: AbortSignal.any([
+                timeoutSignal,
+                signal,
+                attachment.lifecycleController.signal,
+              ]),
+            }) ?? Promise.resolve(empty(task.contextFingerprint, "unavailable")),
+            this.#lookupTimeoutMs,
+            controller,
+          );
+          catalog = validatePointableAnnotationCatalog(raw) ??
+            empty(task.contextFingerprint, "invalid");
+        } catch {
+          catalog = empty(task.contextFingerprint, "unavailable");
+        }
+        const current = await this.#readCurrentHostTaskContext(attachment);
+        if (current === undefined || !sameHostTask(current, task)) {
+          catalog = empty("context-changed", "context-changed");
+        }
+      }
+      if (
+        signal.aborted ||
+        attachment.invalidated ||
+        attachment.connection.isClosed() ||
+        this.#attachments.get(attachment.target.id) !== attachment
+      ) {
+        return;
+      }
+      await attachment.connection.send("Runtime.evaluate", {
+        expression: createUpdatePointableAnnotationsExpression(
+          catalog,
+          attachment.rendererLifecycleId,
+        ),
+        contextId: attachment.mainExecutionContextId,
+        returnByValue: true,
+        awaitPromise: true,
+      });
+      attachment.annotationRevision = catalog.revision;
+      attachment.annotationCount = catalog.entries.length;
+    }));
+  }
+
   async activeTasks(signal?: AbortSignal): Promise<CodexHostTaskContext[]> {
     if (this.#isStopped() || signal?.aborted) return [];
     const byTask = new Map<string, CodexHostTaskContext>();
@@ -525,6 +675,8 @@ export class CodexCdpHostAdapter {
       lifecycleController: new AbortController(),
       invalidated: false,
       detached: false,
+      annotationCheckedAt: 0,
+      annotationCount: 0,
     };
     this.#attaching.add(attachment);
     attachment.unsubscribeEvent = connection.onEvent((event) =>
@@ -770,6 +922,16 @@ export class CodexCdpHostAdapter {
     attachment: TargetAttachment,
     intent: PointableLookupIntentV1,
   ): Promise<CodexHostTaskContext | undefined | false> {
+    return await this.#readCurrentHostTaskContext(
+      attachment,
+      intent.contextFingerprint,
+    ) ?? false;
+  }
+
+  async #readCurrentHostTaskContext(
+    attachment: TargetAttachment,
+    expectedFingerprint?: string,
+  ): Promise<CodexHostTaskContext | undefined> {
     const contextId = attachment.mainExecutionContextId;
     if (
       contextId === undefined ||
@@ -777,7 +939,7 @@ export class CodexCdpHostAdapter {
       attachment.connection.isClosed() ||
       attachment.invalidated
     ) {
-      return false;
+      return undefined;
     }
     try {
       const evaluated = await attachment.connection.send("Runtime.evaluate", {
@@ -788,10 +950,10 @@ export class CodexCdpHostAdapter {
       });
       return parseCodexHostTaskContext(
         runtimeValue(evaluated),
-        intent.contextFingerprint,
+        expectedFingerprint,
       );
     } catch {
-      return false;
+      return undefined;
     }
   }
 

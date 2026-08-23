@@ -3,10 +3,12 @@ import test from "node:test";
 import {
   createDeliverPointableResultExpression,
   createInstallPointableRendererExpression,
+  createUpdatePointableAnnotationsExpression,
   createUninstallPointableRendererExpression,
   createVerifyPointableRendererFenceExpression,
   evaluatePointableRendererEligibility,
   validatePointableRendererResponse,
+  validatePointableAnnotationCatalog,
 } from "../src/host/codex-cdp/renderer.js";
 import type { PointableLookupResponseV1 } from "../src/host/codex-cdp/protocol.js";
 
@@ -167,6 +169,31 @@ test("renderer response validator accepts bounded text-only views and rejects fe
   }
 });
 
+test("annotation catalogs are bounded, task-fenced, and contain no authority detail", () => {
+  const catalog = {
+    revision: "a".repeat(64),
+    contextFingerprint: '{"href":"app://-/index.html","threadId":"thread-1","hostId":"host-1"}',
+    entries: [{
+      objectKey: "b".repeat(64),
+      term: "pilot",
+      entityType: "concept",
+      priority: 83,
+    }],
+  };
+  assert.deepEqual(validatePointableAnnotationCatalog(catalog), catalog);
+  assert.equal(validatePointableAnnotationCatalog({
+    ...catalog,
+    entries: [{ ...catalog.entries[0], authorityLocator: "docs/private.md" }],
+  }), undefined);
+  assert.equal(validatePointableAnnotationCatalog({
+    ...catalog,
+    entries: Array.from({ length: 257 }, (_, index) => ({
+      ...catalog.entries[0],
+      objectKey: `object-${index.toString().padStart(9, "0")}`,
+    })),
+  }), undefined);
+});
+
 test("install expression is namespaced, generic, click-gated, text-only, and cleanup-capable", () => {
   const expression = createInstallPointableRendererExpression({
     bindingName: "__pointableContextBinding_test_12345678",
@@ -176,6 +203,16 @@ test("install expression is namespaced, generic, click-gated, text-only, and cle
   assert.match(expression, /data-user-message-bubble/u);
   assert.match(expression, /data-response-annotation-target/u);
   assert.match(expression, /selectionchange/u);
+  assert.match(expression, /openCard\.contains\(start\) &&\s+openCard\.contains\(end\)/u);
+  assert.match(expression, /Selecting\/copying rendered detail is a local reading action/u);
+  assert.match(expression, /CSS/u);
+  assert.match(expression, /highlights/u);
+  assert.match(expression, /annotationAtPoint/u);
+  assert.match(expression, /chosen\.length >= 3/u);
+  assert.match(expression, /structuralBoundaryBetween/u);
+  assert.match(expression, /between\.cloneContents/u);
+  assert.match(expression, /updateAnnotations/u);
+  assert.match(expression, /selection\?\.isCollapsed !== false/u);
   assert.match(expression, /pointerdown/u);
   assert.match(expression, /Escape/u);
   assert.match(expression, /MutationObserver/u);
@@ -216,8 +253,10 @@ test("install expression is namespaced, generic, click-gated, text-only, and cle
   assert.match(expression, /data-pointable-context-role", "revision-changes"/u);
   assert.match(
     expression,
-    /mountRevisionChanges\(body, detail\.changes\);\s+if \(presentationMode === "mental-model"/u,
+    /mountRevisionChanges\(body, detail\.changes\);\s+mountTerminalState\(body, detail\.terminalState\);\s+if \(presentationMode === "mental-model"/u,
   );
+  assert.match(expression, /data-pointable-context-role", "terminal-state"/u);
+  assert.match(expression, /此对象已由 \$\{terminalState\.replacementKey\} 替代/u);
   assert.match(expression, /data-pointable-context-role", "comprehension-model"/u);
   assert.match(expression, /data-pointable-context-role", "comprehension-flow"/u);
   assert.match(expression, /modelBlock\("comprehension-boundary"/u);
@@ -305,4 +344,17 @@ test("host expressions address only the renderer namespace and preserve all fenc
   );
   assert.match(uninstall, /lifecycle-test-1/u);
   assert.match(uninstall, /uninstall/u);
+  const annotations = createUpdatePointableAnnotationsExpression({
+    revision: "a".repeat(64),
+    contextFingerprint: response.contextFingerprint,
+    entries: [{
+      objectKey: "b".repeat(64),
+      term: "pilot",
+      entityType: "concept",
+      priority: 83,
+    }],
+  }, "lifecycle-test-1");
+  assert.match(annotations, /updateAnnotations/u);
+  assert.match(annotations, /pilot/u);
+  assert.doesNotMatch(annotations, /authorityLocator|facts|sources/u);
 });

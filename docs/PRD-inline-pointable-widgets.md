@@ -1,17 +1,17 @@
-# PRD：Quiet Context Reveal（选区式上下文速览）
+# PRD：Quiet Context Reveal（轻标注 + 选区式上下文速览）
 
-- 版本：v2.20
-- 状态：P-C 微型心智模型已选为产品默认；短任务 pilot 暂缓；精确 `OpenAI.Codex 26.814.5517.0`、executable `151.0.7922.137` 与 v2.14 renderer 已完成自动 4/4 和人工 10/10 evidence-bound 资格。TRAIN-1 与六个 measured scenario 已冻结为三轮原生 user/assistant script；默认六轮 runner 已接入私有 loopback scripted runtime、持久原生任务、轻量答题控件、条件 B companion、checkpoint 与结果管线。轻量答题控件已通过当前 build 的形成性人工验收；真实 A/B 各一次端到端、干净 Windows ZIP 和研究治理仍未完成，参与者数据收集继续关闭
-- 日期：2026-08-20
+- 版本：v2.22
+- 状态：P-C 微型心智模型继续作为详情默认；双入口的 v2.21 renderer 已完成当前精确 Codex build 自动 4/4 与人工 10/10。v2.22 新增任务内动态 Object 生命周期：显式登记、更新、替代、退役、`partial` 权威边界与同卡 revision 刷新已通过定向回归。由于 workspace companion bundle 已变化，v2.21 的人工证据只保留为历史证据；v2.22 仍需重新完成 exact-digest 自动资格与原生人工门禁。受控实验继续暂缓到功能和跨 build 兼容性收口之后
+- 日期：2026-08-23
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
 - 首个场景：长时程软件开发任务
 
-> 本文档取代 v1.0 以“Agent 输出旁默认显示 Context Capsule”为主入口的定义。v1.0 的类型化详情卡、可信对象引用、新鲜度校验和零 Chat Turn 约束继续复用；默认可视入口改为用户选区后的轻量按钮。浏览器、Dashboard、DCPM/CWA 和语义模型识别均不是主链。
+> 本文档取代 v1.0 以“Agent 输出旁默认显示 Context Capsule”为主入口的定义。v1.0 的类型化详情卡、可信对象引用、新鲜度校验和零 Chat Turn 约束继续复用；默认入口改为两条互补路径：少量高价值已登记对象以轻量虚线标注提示可交互，未标出的已登记对象仍可通过用户选区查询。浏览器、Dashboard、DCPM/CWA 和语义模型识别均不是主链。
 
 ## 1. 一句话产品定义
 
-当用户在 Codex Chat Lane 中读到压缩的文件、模块、概念、决策或任务状态时，可以选中相关文字，看到一个不打扰阅读的小型“查看上下文”入口；点击后在原阅读位置附近打开有界、可验证的详情卡，无需离开当前任务、打开完整文件或再发起一轮 Chat。
+当用户在 Codex Chat Lane 中读到压缩的文件、模块、概念、决策或任务状态时，可直接点击少量轻标注对象，或选中任何未标出的稳定引用后点击“查看上下文”；两条路径都在原阅读位置附近打开有界、可验证的详情卡，无需离开当前任务、打开完整文件或再发起一轮 Chat。
 
 ## 2. 为什么调整方向
 
@@ -24,7 +24,7 @@ v1.0 证明了原生 Chat Lane 中的胶囊能够展开、收起、显示来源/
 3. Agent 必须预判用户想查看哪个对象；
 4. 小项目和简单消息会被过度结构化。
 
-因此，产品改为“信息潜伏、用户拉取”：普通 Chat 保持原样，只有用户对某段文字产生局部理解需求时才出现入口。
+因此，产品采用“信息潜伏、可发现但不喧宾夺主、用户拉取”：Chat 正文不插入常驻卡片，只对每条消息中极少数已登记高价值对象做低显著性标注；用户也可以对没有标注但怀疑属于对象的文字使用选区入口。
 
 ## 3. 北极星目标
 
@@ -36,11 +36,11 @@ v1.0 证明了原生 Chat Lane 中的胶囊能够展开、收起、显示来源/
 - 不等待语言模型生成；
 - 不打开浏览器或完整 Dashboard；
 - 不离开当前阅读位置；
-- 只看到与当前选区相关的少量信息。
+- 只看到与当前对象或选区相关的少量信息。
 
 ### 3.2 核心指标
 
-主指标：`time_to_verified_fact`，即从用户完成选区到确认正确事实的时间。
+主指标：`time_to_verified_fact`，即从用户表达点查意图（直接点击标注，或完成选区后点击入口）到确认正确事实的时间。实验记录必须区分 `annotated_click` 与 `selection_lookup`，不能把两条入口的寻址成本混在一起。
 
 辅助指标：
 
@@ -52,23 +52,32 @@ v1.0 证明了原生 Chat Lane 中的胶囊能够展开、收起、显示来源/
 
 ### 3.3 产品主张
 
-在长时程、高信息密度的软件开发任务中，对用户主动选中的稳定项目对象提供零 Chat Turn、原位、类型化的 Context Quick Look，可以降低事实点查的寻址和理解成本，同时保持普通 Chat Lane 的视觉完整性。
+在长时程、高信息密度的软件开发任务中，对少量高价值已登记对象提供可发现的轻标注直达入口，并为其余稳定对象保留选区式零 Chat Turn Quick Look，可以降低事实点查的寻址和理解成本，同时把 Chat Lane 的视觉干扰控制在有界范围内。
 
 这是待验证的研究主张，不是当前已被正式实验确认的结论。
 
 ## 4. 冻结的交互原则
 
-### 4.1 Selection-triggered, not selection-requested
+### 4.1 Identity hint first, detail on demand
 
-选中文字只触发本地、无数据读取的资格判断。只有可信的用户点击或键盘动作才允许查询 Context Index 或 Provider。
+任务显式绑定或有界刷新时，Host 可以只读 Context Index 的身份层，生成不含 facts、authority locator、来源正文或配置值的标注目录。标注只说明“这段文字唯一对应一个当前 scope 内的已登记对象”，不说明详情已经读取、状态仍然新鲜或对象值得信任。只有可信的用户点击或键盘动作才允许读取 Provider 详情。
+
+用户选中文字时仍只做本地表面资格判断；selection 本身不读取 Context Index、不调用 Provider、不调用模型。点击“查看上下文”后才做确定性解析与详情读取。
 
 ### 4.2 Agent-known data, user-pulled UI
 
-Agent 工作过程中已知的文件、模块、决策、任务和验证结果仍是最可靠的数据来源，但这些对象默认只进入后台 Context Index，不自动变成可见胶囊。数据可以由 Agent 产生，界面必须由用户需求触发。
+Agent 工作过程中已知的文件、模块、决策、任务和验证结果仍是最可靠的数据来源。它们先进入后台 Context Index；仅有少量唯一、稳定且排序靠前的对象获得低显著性文字标注，绝不自动变成常驻胶囊。数据可以由 Agent 产生，详情界面必须由用户需求触发。
 
-### 4.3 No semantic-model recognition
+### 4.3 Two zero-turn entry paths
 
-P0 不提供“识别更多概念”、自然语言语义扩展、LLM 候选生成或选区解释。Codex 已经能够处理开放式语义提问；在 Selection 管线中再加入模型只会增加延迟、歧义、隐私风险和重复能力。
+1. `annotated_click`：每条消息最多标 3 个高价值对象，只标该对象在该消息中的首次出现；可信点击直接复用现有 resolve → detail 链路，不先显示选区按钮。
+2. `selection_lookup`：用户可以选择任意可见文字；点击轻量入口后，系统只在当前 Context Index 中做 exact key/name/path/alias 匹配。即使对象未被自动标注，这条路径仍可在零 Chat Turn 内打开它。
+
+自动标注是可发现性优化，不是对象全集，也不能替代选区入口。没有被标注不等于不是对象；被标注也不等于已经读取详情。
+
+### 4.4 No semantic-model recognition
+
+P0 不提供 LLM 语义扩展、embedding 候选生成或选区解释。这里保留的是“选择任意文字后在已登记对象中做确定性匹配”，不是把选区交给模型。这样可覆盖自动标注遗漏的对象而不新增 Chat Turn；真正未登记、开放式或需要综合推理的概念仍由 Codex Chat 处理。
 
 识别顺序仅限：
 
@@ -77,29 +86,38 @@ P0 不提供“识别更多概念”、自然语言语义扩展、LLM 候选生�
 3. 当前 scope 内的确定性 alias；
 4. 无匹配则保持安静。
 
-### 4.4 Quiet by default
+### 4.5 Quiet by default
 
-- 没有选区：零 UI；
+- 没有选区：不出现按钮或卡片；每条消息最多保留 3 个低对比度虚线标注，不改变排版；
 - 普通复制/高亮：不查询、不抢焦点；
 - 无匹配：点击后不显示详情卡，入口随选区清理；
 - 关闭后：不因原选区仍存在而自动重开；
 - 一次只显示一个入口和一个详情表面。
 
-### 4.5 Native-lane-first
+### 4.6 Native-lane-first
 
 默认体验必须发生在当前 Codex Desktop 任务中。独立网页、localhost Dashboard、App Server conversation client、CWA 或其他侧边工作台不能作为 P0 默认入口或验收替代品。
 
-### 4.6 Zero-turn and zero-model detail
+### 4.7 Zero-turn and zero-model detail
 
 打开、切换、展开、收起和关闭详情均不得创建 Chat Turn，也不得调用模型生成已有事实。卡片不足时，用户仍可使用 Codex 原有输入框；产品不额外提供“问 Agent”按钮。
 
-### 4.7 Authority before polish
+### 4.8 Authority before polish
 
 详情必须包含稳定身份、来源、修订、观察时间和 freshness。无法验证时显示 stale、partial、fixture 或 unavailable，不以流畅 UI 掩盖不确定性。
 
 ## 5. 核心用户旅程
 
-### 5.1 唯一匹配
+### 5.1 轻标注对象直达
+
+1. 当前任务已经显式绑定工作区，Host 只读身份索引，排除删除、歧义、过短和越界名称。
+2. Renderer 在当前可见消息中匹配稳定名称，按 Task → Decision → Change → Verification → Concept → Module → Document → Configuration → File 的默认优先级排序。
+3. 每条消息只保留至多 3 个互不重叠、对象身份不重复的首次出现；用低对比度点状下划线和极浅背景标注，不插入胶囊、不改变文字布局。
+4. 用户可信点击标注文字，Renderer 从该文字的真实 Range 构造与选区路径相同的 fenced lookup intent；此时才查询详情。
+5. 唯一匹配直接打开卡片；若身份在点击时已变得歧义、过期或不可用，则按现有候选/错误规则 fail closed。
+6. 这一流程不创建 Chat Turn，也不调用模型。
+
+### 5.2 未标对象的选区查询
 
 1. 用户在可见的 user/assistant 消息中选择 `architecture.md`、`ContextScopeRef` 或 `ARCH-7`。
 2. 本地规则只确认选区长度、表面、连接与可见性合格，然后显示小型“查看上下文”按钮；此时尚未读取 Context Index。
@@ -108,20 +126,20 @@ P0 不提供“识别更多概念”、自然语言语义扩展、LLM 候选生�
 5. 选区附近打开类型化详情卡。
 6. 用户关闭卡片，焦点和滚动位置恢复；Chat Turn 数不变。
 
-### 5.2 两到三个歧义匹配
+### 5.3 两到三个歧义匹配
 
 1. 用户选中的稳定名称在当前 scope 内对应 2–3 个对象。
 2. 点击后显示候选菜单，每项包含名称、类型、scope 和匹配原因。
 3. 用户选择一项后才读取详情。
 4. 候选阶段不预取详情。
 
-### 5.3 无匹配或结果过宽
+### 5.4 无匹配或结果过宽
 
 - 0 个匹配：不显示项目详情卡，入口随 selection 清理；
 - 超过 3 个或类型混杂：不展示长菜单，只提示缩小选区；
 - 不把选区发送给模型，也不自动转成 Chat 提问。
 
-### 5.4 完整内容升级
+### 5.5 完整内容升级
 
 只有用户需要全文、跨对象比较、依赖分析、批量操作、审计或编辑时，才显示“打开完整内容”。这是次级、显式动作，不能在首次 Quick Look 时自动跳转。
 
@@ -163,7 +181,17 @@ P0 不提供“识别更多概念”、自然语言语义扩展、LLM 候选生�
 
 ## 7. 界面规格
 
-### 7.1 隐式入口
+### 7.1 已登记对象轻标注
+
+- 只标当前任务 scope 内唯一对应的稳定 key/name/path/alias；标注目录不含详情和 authority locator；
+- 使用点状下划线与极浅背景，不使用 pill、badge、常驻图标或整行高亮，不造成 layout shift；
+- 每条消息最多 3 个对象，每个对象只标首次出现；同一文字范围只允许一个标注；
+- 默认优先当前工作所需的 Task、Decision、Change、Verification、Concept，其次才是 Module、Document、Configuration、File；
+- 可信主指针点击直接进入现有查询链路；脚本 click、普通拖选和复制不得触发；
+- 流式文本、虚拟列表、任务/route、Host identity 或目录 revision 变化后重新计算；旧 Range 不得跨上下文继续查询；
+- 不支持 CSS Custom Highlight 的宿主必须无损降级为选区入口，不能改写消息 DOM 来冒充兼容。
+
+### 7.2 选区入口
 
 - 只在有界、同一 Chat 消息表面的选区完成后出现；入口只表示“可发起查询”，不暗示已经匹配对象；
 - 视觉层级低于 Chat 正文和原生选择菜单；
@@ -172,14 +200,16 @@ P0 不提供“识别更多概念”、自然语言语义扩展、LLM 候选生�
 - Escape、重新选区、滚动离开、route 变化或 anchor 消失时关闭；
 - 不覆盖 Copy、文本拖选和键盘选择。
 
-### 7.2 候选菜单
+这条路径不可删除：它覆盖没有进入每条消息 Top-3、使用另一稳定 alias、或用户临时才意识到需要点查的已登记对象。键盘用户可以选中文字后使用 `Alt+Shift+K`，不依赖轻标注本身获得焦点。
+
+### 7.3 候选菜单
 
 - 只在 2–3 个确定性匹配时出现；
 - 每项显示 `名称 · 类型 · scope` 和匹配原因；
 - 不显示虚假的模型置信分数；
 - 选择候选前不得请求详情。
 
-### 7.3 详情卡
+### 7.4 详情卡
 
 默认首屏预算：
 
@@ -190,7 +220,7 @@ P0 不提供“识别更多概念”、自然语言语义扩展、LLM 候选生�
 
 职责、公开入口、本次变化、依赖与影响、路径、revision、observedAt、来源等字段默认全部收起。用户点击卡内“查看详情”后，才在同一卡片内展开这些字段；再次点击“收起详情”恢复摘要态。展开/收起只是本地 UI 状态，不重新查询 Provider，不调用模型、不创建 Chat Turn、不打开浏览器。stale/partial/unavailable 不能被收起隐藏，必须在摘要态可见。
 
-### 7.4 关闭与恢复
+### 7.5 关闭与恢复
 
 - 明确、可操作的关闭按钮；
 - 卡片标题栏是唯一拖动热区；正文仍可选择，按钮仍可点击，拖动只能由可信主指针动作启动；
@@ -203,7 +233,7 @@ P0 不提供“识别更多概念”、自然语言语义扩展、LLM 候选生�
 - 焦点回到触发入口或原阅读位置；
 - 不改变 Chat 滚动位置。
 
-### 7.5 人类理解投影
+### 7.6 人类理解投影
 
 详情卡不是统一数据库记录的缩小版。首屏应按对象类型回答用户正在建立的心智模型：
 
@@ -230,18 +260,35 @@ v1.9 首个实现只资格化显式 `concept` 制品，不借此宣称八类均�
 
 详情快照：`entityId/entityType/entityRevision/observedAt/freshness/facts/relations/sources/verification`。
 
-### 8.2 更新策略
+### 8.2 标注目录与对象选择策略
 
-- Agent 完成文件写入、模块创建、决策确认、测试运行或状态变化后，相关索引记录增量更新或失效；
+标注目录是 Context Index 的有界身份投影：`catalogRevision/contextFingerprint/objectKey/term/entityType/priority`。其中 `objectKey` 只用于同一消息内去重；它不是可读取详情的 capability。目录不得包含 `authorityRef`、facts、sources、文件内容、配置值或绝对路径。
+
+对象获得标注必须同时满足：
+
+1. 当前 Codex task 已显式绑定一个 scope；
+2. 索引记录未删除且通过完整 runtime validation；
+3. term 是 canonical name/key/path 或确定性 alias，长度 3–256；
+4. term 在当前 scope 中只对应一个对象；跨对象同名或 alias 冲突时不标；
+5. Host 在索引读取后重新验证 task、route、scope 与 binding revision；
+6. 当前可见消息中实际存在完整词边界匹配，并且不位于链接、按钮、composer、terminal、diff、browser 或其他拒绝表面。
+
+Live workspace 默认不索引 `fixtures/`、`study-dist/` 和 `study-release/`。这些目录属于测试或研究发布材料，不能与当前工作对象竞争名称、alias 或 Top-3 标注；fixture 演示必须走独立的 `FIXTURE-ONLY` 数据源。正式工作区对象仍可通过 canonical name、alias 或完整 workspace-relative path 查询。
+
+默认排序按用户恢复工作状态的价值，而不是按文件系统顺序：Task 最高，其次 Decision、Change、Verification、Concept、Module、Document、Configuration、File。canonical name 略高于 path，path 略高于 alias。排序只决定每条消息 Top-3 的可见提示，不影响选区路径能够查询的对象全集。
+
+### 8.3 更新策略
+
+- Agent 完成文件写入、模块创建、决策确认、测试运行或状态变化后，相关索引记录增量更新或失效；标注目录可有界刷新，但不会预读详情；
 - 候选索引可以缓存，详情只在显式点击后读取；
 - task、route、scope、provider revision 或对象身份变化时，旧 capability 失效；
 - stale-while-revalidate 只有在旧值明确标记 stale 时才允许。
 
-### 8.3 小项目平衡
+### 8.4 小项目平衡
 
 小项目只建立 exact ID、文件路径、明确名称和必要 alias，不预建 ontology，不显示 Dashboard。只有出现重复点查、跨对象比较、关系导航、审计或多 Agent 协作时，才考虑完整工作台。
 
-### 8.4 Deterministic Artifact Context
+### 8.5 Deterministic Artifact Context
 
 Markdown/开发文档在用户点击后可按需组合三类只读事实：
 
@@ -251,7 +298,7 @@ Markdown/开发文档在用户点击后可按需组合三类只读事实：
 
 这些信息用于回答“用途、本次变化、影响范围”，不使用 LLM、embedding 或自然语言推断。Git 不可用时仍返回文件用途、路径和 freshness，并明确把 Git 状态标为 unavailable。引用结果只代表字面引用位置，不冒充完整语义依赖图。
 
-### 8.5 Deterministic Source Module Context
+### 8.6 Deterministic Source Module Context
 
 TypeScript/JavaScript 模块在用户点击后按需组合四类只读事实：
 
@@ -264,7 +311,7 @@ TypeScript/JavaScript 模块在用户点击后按需组合四类只读事实：
 
 这里的“五项”是详情数据合同，不是默认视觉合同。默认只显示一个按场景选择的摘要；五项在卡内 disclosure 中按需展开。
 
-### 8.6 Dynamic snapshot semantics
+### 8.7 Dynamic snapshot semantics
 
 长任务中对象可能在卡片打开后继续变化。产品必须区分“用户正在阅读的快照”和“Provider 最新状态”：
 
@@ -293,7 +340,7 @@ v2.2 把首个 stat-only 切片扩展为可验证、仍然轻量的动态上下�
 
 2026-08-19 当前 Codex 任务的形成性验收使用 `local-workspace.ts` 做 relation-only 变化：目标模块保持不变，另一个已跟踪源码引用的移除触发了 `内容已更新`；可信刷新后，卡片 DOM 身份、left/top、scrollTop 与已展开的详情 disclosure 均保持，提示被清除且没有新增 Chat Turn。因为变化没有进入有界首屏字段，本次没有显示伪造的字段差异。该结果证明当前 build 的交互连续性，不证明用户效率提升或跨版本兼容性。
 
-### 8.7 Scenario relevance policy
+### 8.8 Scenario relevance policy
 
 默认摘要只回答当前场景最可能需要的一个问题：
 
@@ -366,41 +413,60 @@ Concept/Change/Decision 必须使用冻结章节，文件 stem 与 H1 归一化�
 
 这些指标只证明“显式声明的对象是否可恢复”，不能发现从未被声明的重要对象，也不证明真人信息获取效率。Coverage manifest 重名、越界、过大、结构无效或 Provider 不可读时 fail closed；工具不自动补写或修复记录。
 
+### 8.12 Task-local Dynamic Object Lifecycle
+
+长任务会先出现“当前任务已经明确、但尚不适合落盘”的概念、变化、决策、任务和验证。v2.22 用私有 Task Object Registry 填补这一层，而不是扫描 Chat 或调用模型：
+
+1. 只有当前 Codex Desktop 中唯一可见、已经显式绑定 workspace 的任务可以登记对象；Companion 自行取得 host-vouched task、route、scope 与 binding revision，调用方不能传入另一个 thread/project 身份；
+2. 输入只允许 `concept/change/decision/task/verification` 和完整的 P-C 类型字段；top-level 与类型字段均拒绝额外键，名称、alias、事实、数组、记录数与文件总字节均有硬上限；
+3. active 对象可以更新摘要与心智模型，但 `objectKey/type/canonicalName/aliases` 不可变，从而保证已打开卡片和选区 identity 稳定；身份改变必须一次性 `supersede`，无后续价值则 `retire`；
+4. superseded/retired key 是终态，不能静默复活；旧 detail ref 的 revision probe 返回 deleted，新对象以新的 identity 重新进入 Index；
+5. Registry 只存于本机 Companion 私有 state directory，不写项目仓库、不进入 Git、不发送网络，也不保存 raw Chat；对象仍按 current task/workspace/binding 做完整过滤；
+6. Identity 进入与文件 Index 组合后的同一 Annotation/Resolver 链；标注刷新只下发 identity-only catalog，不预读 detail、不打开卡片、不调用模型、不产生 Chat Turn；
+7. 用户可信点击后，Provider 现场读取当前 registry revision，详情固定显示 `freshness=partial`、`agent-task-context` 来源和“尚未固化为仓库证据”的边界；Agent 声明不等于 test evidence、完成证明或项目权威事实；
+8. 同一 active identity 内容更新时，已有 revision probe 显示 `内容已更新`，显式刷新复用同一张卡；稳定且需要跨任务复用的对象必须通过现有 records workflow 升级为 evidence-backed workspace artifact。
+
+Agent 的稀疏选择策略仍是产品规则而不是语义模型：对象必须具有可再次选取的稳定名称、预计跨过当前 Turn 仍有用、能完整回答一个类型化理解单元，并且不是已有文件/制品的重复投影。普通名词、中间推理、每个 TODO、原始 Chat、秘密、预期中的测试和无证据结论均不得登记。每次 mutation 前先列出当前任务对象，优先更新已有 identity；这套机制服务长任务信息恢复，不追求把项目变成全面知识图谱。
+
 ## 9. P0 功能需求
 
-### P0-1 Quiet eligibility
+### P0-1 Bounded object annotation
+
+Host 在显式绑定后只读身份索引，生成任务指纹绑定、最多 256 项且不含详情的目录。Renderer 每条可见消息最多标 3 个唯一对象的首次出现；歧义 term、交互元素、拒绝表面和不支持 Custom Highlight 的宿主不标。可信点击复用既有 lookup intent，不预取详情、不调用模型。
+
+### P0-2 Quiet selection eligibility
 
 只在当前可见 user/assistant 消息的单一、有限长度选区上运行本地资格判断。composer、terminal、browser、diff、已有 iframe 和跨拒绝表面的选区必须排除。
 
-### P0-2 Explicit action gate
+### P0-3 Explicit action gate
 
 只有可信 pointer/keyboard action 才创建查询请求。selectionchange 不读 Provider，不调用模型，不记录原文遥测。
 
-### P0-3 Deterministic resolution
+### P0-4 Deterministic resolution
 
 只使用 exact key/name/path 和 scope-local alias。P0 不包含语义模型、embedding、搜索扩展或“识别更多概念”。
 
-### P0-4 Adaptive routing
+### P0-5 Adaptive routing
 
 0/1/2–3/>3 路由分别为静默、直达详情、候选菜单、缩小选区。混合类型结果按过宽处理。
 
-### P0-5 Opaque capabilities
+### P0-6 Opaque capabilities
 
 入口点击后由 Host/Server 签发不可伪造、短期、一次性引用，绑定 task、route、scope、selection digest、对象身份、authority 和 revision。模型不能覆盖 locator、provider、workspaceRoot 或 entityId。
 
-### P0-6 Current authoritative detail
+### P0-7 Current authoritative detail
 
 候选选择后读取当前权威快照；在读取前后复验 context/index/provider。漂移必须 fail closed。
 
-### P0-7 Type-specific projection
+### P0-8 Type-specific projection
 
 Artifact、Module、Verification Source、Verification Result、Configuration、Decision、Task 使用不同字段优先级。测试源码不得推断 PASS/FAIL；结果只来自证据绑定的显式 Verification 制品；配置不得投影值；Decision 只消费 path-qualified Markdown 的显式章节。未知类型使用保守通用投影。
 
-### P0-8 Zero-turn native detail
+### P0-9 Zero-turn native detail
 
 详情显示在当前 Codex Desktop Chat Lane 的选区附近；不打开浏览器，不调用 `ui/message`，不产生 follow-up，不调用模型。
 
-### P0-9 Accessibility and lifecycle
+### P0-10 Accessibility and lifecycle
 
 支持键盘触发、读屏标签、Escape、焦点恢复、route/task/navigation 清理、并发上限、请求取消和 stale-response fence。
 
@@ -416,10 +482,15 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 
 对显式 opt-in 的长任务，系统提供只读结构覆盖审计，分开报告遗漏、类型/投影失败与记录冗余。该门禁不读取普通 Chat、不调用模型、不输出事实内容、不自动创建记录，并且不能把未声明对象计入“已覆盖”。
 
+### P0-13 Task-local object lifecycle
+
+显式启用的有界长任务可以登记少量临时 Agent-known 对象。Registry 必须由 Host 绑定当前 task/workspace，提供 strict upsert/supersede/retire/list，组合进现有 Index/Provider/revision 链，并始终以 `partial` 和临时来源呈现。身份变化不能伪装成普通更新，终态不能复活，登记本身不得打开卡片或产生 Chat Turn。
+
 ## 10. 明确非目标
 
 - 不默认在 Agent 每段输出旁显示胶囊条；
 - 不把普通 prose 的每个名词装饰成链接；
+- 不自动把 Chat、diff、TODO 或每个 Agent 提及转化为任务对象，也不建立全面业务知识图谱；
 - 不提供“识别更多概念”或选区语义模型；
 - 不在卡片中提供“问 Agent”；
 - 不替代 Codex 的解释、综合和决策能力；
@@ -465,14 +536,14 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 - renderer bundle SHA-256、宿主 package 版本或证据行漂移时 fail closed；
 - 只有自动四层全 PASS 且十项人工门禁全部有证据地 PASS，才允许把该精确 build 标为 `qualified`；`manual_pending` 不能外推为兼容。
 
-当前 `OpenAI.Codex 26.814.5517.0`、executable `151.0.7922.137` 与 renderer digest `d00e4620…2855` 已完成自动 4/4 和人工 10/10 evidence-bound 门禁，可以标记为该精确组合 `qualified`。该结果不能写成其他 Codex build、其他 renderer digest 或公开稳定宿主合同已支持。
+历史 v2.21 组合（`OpenAI.Codex 26.814.5517.0`、executable `151.0.7922.137`、renderer digest `616008d2…5154`）已完成自动 4/4 和人工 10/10 evidence-bound 门禁。当前 v2.22 renderer digest `6a0aaa90…c6a2` 也已独立完成自动 4/4 与人工 10/10，因此该精确组合现标记为 `qualified`；它不继承 v2.21 证据，也不能外推为其他 Codex build 或公开稳定宿主合同已支持。
 
 ## 12. 成功指标与实验
 
 ### 12.1 对照条件
 
 - A：纯线性 Chat；
-- B：相同 Chat 内容 + Selection-triggered Context Quick Look。
+- B：相同 Chat 内容 + Pointable Context 双入口（有界轻标注直达 + 选区 Quick Look fallback）。正式数据收集前必须重新冻结 condition digest，不能把 v2.20 的纯选区 B 与 v2.21 混合分析。
 
 两组使用相同项目状态和事实，B 不得获得额外信息。
 
@@ -558,7 +629,9 @@ v2.20 的默认 `runStudyV2NativeTrial` 在其上完成组合：独立 App Serve
 
 ### 13.1 交互门禁
 
-- [ ] 无 selection 时 Chat Lane 不出现常驻胶囊；
+- [ ] 无 selection 时 Chat Lane 不出现按钮或常驻胶囊；轻标注不超过每条消息 3 个且不改变排版；
+- [ ] 标注只来自当前 task/scope 的唯一稳定 identity，点击标注可直接开卡且不经过选区按钮；
+- [ ] 未标对象仍可通过选区入口查询；关闭标注不能关闭选区 fallback；
 - [ ] selection 本身不读取详情、不调用模型；
 - [ ] 只有 trusted explicit action 触发查询；
 - [ ] 0/1/2–3/>3 路由正确；
@@ -570,17 +643,20 @@ v2.20 的默认 `runStudyV2NativeTrial` 在其上完成组合：独立 App Serve
 - [ ] 显式刷新差异位于 P-C 心智模型之前，并按对象类型优先呈现决定理解/行动的字段；普通卡片没有常驻差异区；
 - [ ] 同值差异不重复；新增、删除和值长度上限均有明确、可验证的投影语义；
 - [ ] 详情打开后聚焦当前 Chat composer 不关闭卡片，输入框获得焦点且 revision 检查继续；
+- [ ] 详情卡正文可原生选择与复制；卡内 selection 保持当前卡片，不产生二次查询入口、Provider 读取或 Chat Turn；
 - [ ] 关闭按钮、Escape、普通外点和焦点恢复可用；
 - [ ] 可信标题栏拖动可移动卡片、正文和按钮不误触拖动、位置不越出视口，刷新后保持移动位置；
 - [ ] 普通复制、高亮、terminal、browser、diff 不误触。
-- [x] 当前宿主 package 版本、executable 版本与 renderer bundle digest 已写入兼容性记录；
+- [x] v2.21 当前宿主 package 版本、executable 版本与新 renderer bundle digest 已写入兼容性记录；旧 v2.20 digest 只保留历史证据；
 - [x] 自动四层状态与十项人工交互门禁分栏，pending/failed 不被表述为完整 build qualified；
-- [x] 每个手工 PASS/FAIL 均有 workspace 内 exact evidence line，版本或 bundle 漂移会使记录失配；
+- [x] v2.21 每个手工 PASS/FAIL 均有 workspace 内 exact evidence line；旧 renderer 的人工证据不得迁移到新 digest；
 
 ### 13.2 数据门禁
 
 - [ ] 只使用确定性 key/name/path/alias；
-- [ ] 产品不存在“识别更多概念”模型分支；
+- [ ] 任意选区只在已登记对象中做确定性匹配；产品不存在 LLM“识别更多概念”分支；
+- [ ] 标注目录只含 context fingerprint、opaque object key、term、type、priority 与 catalog revision，不含 authority locator、facts、sources 或配置值；
+- [ ] 同名歧义不标，详情只在可信点击后读取；
 - [ ] Markdown 用途、变化章节和引用位置均来自有界本地解析/Git，不调用模型；
 - [ ] Source Module 的职责、exports、diff 声明、imports 和测试/引用位置均来自有界本地解析/Git，不执行源码、不调用模型；
 - [ ] Test/Spec 源码只显示静态标题和“未执行”边界，不推断 PASS/FAIL；
@@ -623,9 +699,9 @@ v2.20 的默认 `runStudyV2NativeTrial` 在其上完成组合：独立 App Serve
 
 ## 14. 现有实现复用矩阵
 
-| 现有资产 | 决策 | v1.1 定位 |
+| 现有资产 | 决策 | v2.21 定位 |
 |---|---|---|
-| CDP Selection Renderer/Host Adapter | 主线保留 | 默认原生交互入口 |
+| CDP Selection Renderer/Host Adapter | 主线扩展 | 已登记对象轻标注直达 + 未标对象选区 fallback |
 | LookupService、resolver、validation | 保留 | 确定性解析与可信读取核心 |
 | opaque entity/candidate refs | 保留 | 点击后安全 capability |
 | 类型化 Context Capsule UI | 保留并降级 | 点击后的详情投影，不常驻显示 |
@@ -641,9 +717,10 @@ v2.20 的默认 `runStudyV2NativeTrial` 在其上完成组合：独立 App Serve
 
 ## 15. 当前实现状态与缺口
 
-截至 2026-08-20，已有：
+截至 2026-08-23，已有：
 
-- 原生 Chat Lane 选区资格判断与锚定按钮；
+- 原生 Chat Lane 有界对象标注：task-fenced identity-only catalog、每消息 Top-3、首次出现、同名歧义排除、CSS Custom Highlight 与可信点击直达；
+- 原生 Chat Lane 选区资格判断与锚定按钮，作为未标对象的零 Chat Turn fallback；
 - selection inert、trusted click 查询、0/1/2–3/>3 路由；
 - task/route/context/selection/lifecycle fence；
 - fixture 与显式绑定 workspace 的只读 Provider；
@@ -672,10 +749,13 @@ v2.20 的默认 `runStudyV2NativeTrial` 在其上完成组合：独立 App Serve
 - study-v2 六轮 session orchestration：逐轮 digest checkpoint、连续前缀恢复、环境/pack/participant/slot/build 复验、`awaiting_questionnaire` 两阶段终结、未完成试次 fail-closed、原生 Chat Lane 五量表问卷和完成回执；
 - study-v2 原生受控会话主 runner：私有 loopback custom provider、普通持久 Codex Turn、精确当前-task 激活门禁、轻量答题、条件 B companion、逐轮 checkpoint、结果管线和精确 task/runtime 清理；
 - study-v2 原生场景材料：TRAIN-1 与六个 measured scenario 各三轮冻结对话，pack 对 answer code、correct object、完整引用与 Agent 输出中的 exact selectable term 做一致性门禁；共享 helper 已能将任一 measured scenario 物化为普通持久 Codex Turn；
+- 真实 Edge headless 双入口验收：轻标注 `pilot` 可在不出现选区按钮时产生现有 fenced resolve intent；关闭后手动拖选同一文字仍显示入口并完成详情、拖动、composer 保持、revision 与刷新链路；两条路径均为零模型、零 Chat Turn。该证据不替代当前 Codex build 人工复验；
+- 任务内 Dynamic Object Provider：Host-vouched 当前任务登记、strict 类型化 P-C input、active update、显式 supersede/retire、终态不可复活、私有状态持久化、组合 Index/Provider、`partial` 边界和同卡 revision refresh；登记只刷新 identity catalog，不读取详情或创建 Chat Turn；
 
-仍缺：
+当前状态与仍缺：
 
-- 当前已能把稳定 Agent-known Concept/Change/Decision/Task/Verification 写成受门禁的 workspace 制品；仍缺不适合落盘的临时 Agent-known 对象 Provider；
+- v2.22 workspace companion digest `6a0aaa90…c6a2` 已在 Codex Desktop `26.814.5517.0` 上独立通过自动 4/4 与人工 10/10；v2.21 的 `616008d2…5154` 只保留为历史证据，当前资格不外推到其他宿主版本或 renderer；
+- Task Object Registry 已闭合确定性登记与生命周期，但尚未在真实长任务中校准“何时登记、何时升级为稳定 artifact、何时退役”的稀疏策略，也不构成对象自动发现或人效证据；
 - 将显式 Verification 制品从文件式人工/Agent 记录扩展到可靠的测试运行事件接入；测试源码卡本身永远不能替代运行结果；
 - 在真实长任务中测量已冻结产出策略的覆盖率、冗余率与漏记率；
 - 证明不同 Codex Desktop 版本中的 Host Adapter 兼容性；
@@ -697,17 +777,19 @@ v2.20 的默认 `runStudyV2NativeTrial` 在其上完成组合：独立 App Serve
 10. 已冻结 counterbalanced study pack v1、答案键、12-slot 分配、隔离 workspace、mutation 与完整性检查，并将其保留为非当前门禁的研究资产；
 11. 已完成首个显式长任务 Context Coverage 门禁：Module/Decision/Task/Verification 逐项验证、四类指标、隐私边界和当前仓库 4/4 基线；后续 dogfood 持续扩充真实期望对象；
 12. 已完成对象多轮修改后的 pinned snapshot、revision drift、同卡刷新、删除/不可用、任务重绑定，以及显式刷新差异的类型化优先级与首层投影；后续 dogfood 持续校准字段优先级；
-13. 已完成逐 build 兼容性证据入口、当前宿主/renderer 精确绑定、自动与人工门禁分栏及 fail-closed 检查；当前精确 `OpenAI.Codex 26.814.5517.0`、executable `151.0.7922.137` 与 v2.14 renderer digest `d00e4620…2855` 已通过自动 4/4、人工 10/10；
+13. 已完成逐 build 兼容性证据入口、当前宿主/renderer 精确绑定、自动与人工门禁分栏及 fail-closed 检查；当前精确 `OpenAI.Codex 26.814.5517.0`、executable `151.0.7922.137` 与 v2.22 renderer digest `6a0aaa90…c6a2` 已通过自动 4/4、人工 10/10；v2.21 与更早结果只保留为历史证据；
 14. 已完成 opt-in Agent 里程碑制品维护扩展：Concept/Change/Decision 与 Task/Verification 共用稀疏产出策略，前三类增加只读 Artifact Check；
-15. 开展长周期 dogfood，重点观察延迟重返、跨会话恢复、状态漂移和任务交接；当前显式 Coverage 随 Artifact Check 与首个原生理解验收扩展到七个期望对象；
-16. 已完成受控固定回复进入普通 Codex Turn 的技术垂直切片，并在 Desktop 验证四条消息可见、可选、零线上模型；
-17. 已把 TRAIN-1 与六个 measured scenario 冻结为三轮脚本，并完成答案/对象/可选词一致性门禁、私有 scripted runtime、原生 task 激活、轻量答题、B 条件 companion 与既有 checkpoint/result 管线接入；轻量答题控件的当前-build 人工形成性验收已通过；
-18. 完成 A/B 各一次当前-build 端到端和干净 Windows ZIP 演练；只有研究治理门禁也通过后，才运行效率实验，并据内部 pilot 方差决定正式样本量。
+15. 已实现 Task-local Dynamic Object 生命周期 v1：当前任务显式登记、更新、替代、退役、组合 Index/Provider、partial 边界与 revision refresh；下一步用真实开发切片校准稀疏选择和 artifact graduation；
+16. 已重新资格化 v2.22 workspace companion 的 exact renderer digest：自动四层 gate 与十项原生人工门禁均以当前证据通过，未沿用 v2.21 证据；
+17. 开展长周期 dogfood，重点观察延迟重返、跨会话恢复、状态漂移和任务交接；当前显式 Coverage 随 Artifact Check 与首个原生理解验收扩展到七个期望对象；
+18. 已完成受控固定回复进入普通 Codex Turn 的技术垂直切片，并在 Desktop 验证四条消息可见、可选、零线上模型；
+19. 已把 TRAIN-1 与六个 measured scenario 冻结为三轮脚本，并完成答案/对象/可选词一致性门禁、私有 scripted runtime、原生 task 激活、轻量答题、B 条件 companion 与既有 checkpoint/result 管线接入；轻量答题控件的当前-build 人工形成性验收已通过；
+20. 完成 A/B 各一次当前-build 端到端和干净 Windows ZIP 演练；只有研究治理门禁也通过后，才运行效率实验，并据内部 pilot 方差决定正式样本量。
 
 ## 17. 已冻结决策
 
 1. 首个宿主是 Codex Desktop 当前 Chat Lane。
-2. 默认可视入口是用户选区后的轻量按钮，不是常驻胶囊。
+2. 默认是双入口：每条消息最多 3 个已登记高价值对象采用轻标注直达；未标对象继续使用选区后的轻量按钮；两者都不是常驻胶囊。
 3. Agent-known 对象是数据来源，不等于 Agent 主动显示 UI。
 4. P0 只做确定性对象识别，不做语义模型识别。
 5. 详情是类型化、原位、零模型、零 Chat Turn 的只读卡片。
@@ -731,10 +813,16 @@ v2.20 的默认 `runStudyV2NativeTrial` 在其上完成组合：独立 App Serve
 23. 详情卡允许用户通过标题栏临时移动位置以继续阅读被遮挡的 Chat；拖动不是新查询、不产生 Chat Turn，并且不得把正文、disclosure 或关闭按钮变成拖动热区。
 24. 受控实验必须把固定历史物化为普通 Codex Turn；`thread/inject_items` 和覆盖 Chat 的仿真 surface 均不能替代原生可见对话。旧 renderer 仅保留作组件资格、培训与诊断。
 25. 实验可使用本机 loopback scripted Responses provider 维持回复可控，但不得调用线上模型、记录原始 prompt 或把 provider 配置写入正式产品路径。
+26. 卡内正文 selection 属于本地阅读与复制，不是新的 Chat Lane 查询意图；选择卡内文字必须保持原卡、不得出现查询入口，也不得读取 Provider 或创建 Chat Turn。
 26. 原生受控试次只有在 runner 创建的精确任务成为当前 Desktop task 后才开始计时；任务生成、用户切换与清理时间不计入参与者任务时间。每轮终止必须删除且只能删除本轮生成的任务，并关闭私有 provider/App Server。
+27. 自动标注只做 identity-level 可发现性：同名歧义不标、每消息 Top-3、首次出现、无详情预取；对象全集仍由选区 fallback 覆盖。
+28. “选择任意文字”不得被删除，但只在已登记对象中做确定性匹配；真正开放式语义问题仍由 Codex Chat 处理，Pointable Context 不重复调用模型。
+29. 任务内动态对象只能由当前 Host-bound task 的显式动作稀疏登记；active identity 只更新内容，身份变化必须 supersede，无后续价值则 retire，所有详情固定为 partial，稳定事实必须另行升级为 evidence-backed artifact。终态对象退出自动 Top-3 标注但必须保留历史只读查询，避免旧 Chat 引用变成不可理解的死链接；卡片显式显示 lifecycle 与 replacement。
 
 ## 18. 变更记录
 
+- v2.22：新增 Task-local Dynamic Object Lifecycle v1，覆盖长任务中“已明确但尚不适合落盘”的 Concept/Change/Decision/Task/Verification。Companion 只允许当前 host-vouched、已绑定 workspace 的任务通过 strict JSON 显式登记；active identity 可更新内容，身份变化必须 supersede，obsolete 对象 retire，终态不可复活。真实演练发现终态对象若从 Index 完全移除会让历史 Chat 成为死链接，因此终态现只退出自动 Top-3 标注，仍可确定性只读查询，并显式呈现 lifecycle/replacement。私有 Registry 与文件 Index 组合并复用现有 Resolver、Provider、selection fallback 和 revision refresh；详情固定标记 `partial`、`agent-task-context` 与临时边界。登记只刷新 identity catalog，不读取详情、不调用模型、不创建 Chat Turn。卡片正文 selection 现被固定为本地阅读/复制动作，不关闭原卡、不产生二次查询入口或 Chat Turn；真实 Edge 与当前 Codex Chat Lane 人工验收均已通过。定向与全链路自动回归已覆盖出现、更新、替代、退役、历史查询、任务隔离、同卡刷新和卡内文字选择；workspace companion digest 因而变化，v2.21 的 exact-build 10/10 没有继承，当前 v2.22 digest 已用独立证据重新完成自动 4/4 与人工 10/10。
+- v2.21：把默认交互从纯选区改为“轻标注直达 + 选区 fallback”。Host 在显式 task/workspace binding 后只读完整验证过的 identity index，排除删除、歧义和过短 term，按 Task/Decision/Change/Verification/Concept/Module/Document/Configuration/File 排序并下发不含详情的 task-fenced catalog；Renderer 使用 CSS Custom Highlight，每消息最多 3 个对象且只标首次出现，可信点击复用既有 fenced resolve/detail 链路。没有被标注的已登记对象仍可由任意选区做 exact key/name/path/alias 查询。相关定向测试和真实 Edge headless 双路径交互已通过；新 renderer 尚待当前 Codex Desktop exact-build 人工复验，不能沿用 v2.20 digest 的 10/10。
 - v2.20：把原生 scripted task 接入默认单轮与六轮 session runner。每轮使用独立 loopback custom model provider 和 App Server 创建三轮普通持久 Turn，精确任务激活后才挂载轻量答题；A 不加载 companion，B 只增加 Quiet Context Reveal。终态进入既有 digest checkpoint、问卷与原子结果管线，结束时精确删除生成任务并关闭 runtime。当前 build 的轻量答题控件已通过“展开不遮挡、收起保留入口、重新展开答题后清理”的人工形成性验收；289/289 自动回归和独立 App Server/loopback provider 探针通过。真实 A/B 完整端到端、干净机与研究治理仍待完成，不构成人效结论。
 - v2.18：把 study-v2 主表面从覆盖 Chat 的仿真 trial 改为受控原生 Codex 多轮任务。实现本机 HTTP/SSE + Responses WebSocket scripted provider 和可复用 task materializer；两轮 live probe 在 Codex Desktop 中显示 2 条用户消息、2 条 Agent 回复及 4 个标准可选 surface，且只命中 loopback、未调用线上模型。对照证明 `thread/inject_items` 只有模型历史而没有可见 Turn。该结果只是原生重放技术资格，不代表完整 A/B runner、干净机部署或效率效果。
 - v2.17：完成当前精确 `OpenAI.Codex 26.814.5517.0`、executable `151.0.7922.137` 与 v2.14 renderer digest `d00e4620…2855` 的逐 build 资格。四层自动 gates 4/4、原生交互人工 gates 10/10 均绑定 exact evidence line 并通过只读检查器；study-v2 doctor 因而在当前开发机转为 ready。该结论不外推到其他宿主版本、其他 renderer、干净机可部署性或人的效率提升。

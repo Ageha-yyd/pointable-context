@@ -67,6 +67,39 @@ test("workspace index exposes bounded file identities and ignores build trees", 
   }
 });
 
+test("live workspace index excludes fixture and generated study objects by default", async () => {
+  const fixture = await workspaceFixture();
+  try {
+    const liveConcept = join(fixture.root, "docs", "concepts");
+    const fixtureConcept = join(fixture.root, "fixtures", "baseline", "docs", "concepts");
+    const studyDistConcept = join(fixture.root, "study-dist", "pack", "docs", "concepts");
+    const studyReleaseConcept = join(fixture.root, "study-release", "pack", "docs", "concepts");
+    await Promise.all([
+      mkdir(liveConcept, { recursive: true }),
+      mkdir(fixtureConcept, { recursive: true }),
+      mkdir(studyDistConcept, { recursive: true }),
+      mkdir(studyReleaseConcept, { recursive: true }),
+    ]);
+    await Promise.all([
+      writeFile(join(liveConcept, "pilot.md"), "# Pilot\n", "utf8"),
+      writeFile(join(fixtureConcept, "pilot.md"), "# Pilot fixture\n", "utf8"),
+      writeFile(join(studyDistConcept, "pilot.md"), "# Pilot generated\n", "utf8"),
+      writeFile(join(studyReleaseConcept, "pilot.md"), "# Pilot release\n", "utf8"),
+    ]);
+
+    const records = await new LocalWorkspaceContextIndex().list(fixture.binding);
+    assert.deepEqual(records.map((record) => record.canonicalKey), ["docs/concepts/pilot.md"]);
+    assert.equal(resolveSelection(fixture.binding.scope, "Pilot", records).kind, "unique");
+    assert.equal(resolveSelection(
+      fixture.binding.scope,
+      "docs/concepts/pilot.md",
+      records,
+    ).kind, "unique");
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
 test("workspace provider performs a fresh bounded read and changes revision with content", async () => {
   const fixture = await workspaceFixture();
   try {

@@ -1,6 +1,6 @@
 # Codex Desktop Host Compatibility
 
-Observed and qualified on 2026-08-17. This matrix freezes the private Selection Host support surface; it does not turn CDP or Codex DOM selectors into a public OpenAI contract.
+Observed through 2026-08-23. This matrix freezes the private Selection Host support surface; it does not turn CDP or Codex DOM selectors into a public OpenAI contract. The v2.21 renderer is the latest fully qualified historical snapshot. The current v2.22 renderer is automatic 4/4 but manual 0/10 with 10 pending, so it is not yet fully qualified.
 
 Inline MCP App work is tracked as a separate host gate. It must not be inferred from the private Selection overlay, and the Selection overlay must not be described as an MCP App.
 

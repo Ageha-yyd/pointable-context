@@ -7,10 +7,25 @@ import type { PointableFetch } from "./targets.js";
 import type { CdpConnectionFactory } from "./transport.js";
 import type { PointablePresentationMode } from "./protocol.js";
 import {
+  LocalWorkspaceAuthoritativeProvider,
+  LocalWorkspaceContextIndex,
+  LocalWorkspaceRevisionProbe,
+} from "../../adapters/local-workspace.js";
+import {
   CodexTaskWorkspaceBindingRegistry,
   type CodexTaskWorkspaceBindingEntry,
 } from "./task-workspace-binding.js";
 import { createWorkspaceLookupCallback } from "./workspace-lookup.js";
+import { createWorkspaceAnnotationProvider } from "./workspace-annotations.js";
+import {
+  ActiveTaskObjectAnnotationIndex,
+  CompositeContextIndex,
+  RoutedWorkspaceRevisionProbe,
+  TaskObjectWorkspaceContextIndex,
+  TaskObjectRegistry,
+  type TaskObjectMutationResult,
+  type TaskObjectSummary,
+} from "./task-object-registry.js";
 
 const DEFAULT_REFRESH_INTERVAL_MS = 2_000;
 
@@ -26,6 +41,8 @@ export interface WorkspaceCompanionOptions {
   refreshIntervalMs?: number;
   actionLabel?: string;
   presentationMode?: PointablePresentationMode;
+  annotationRefreshIntervalMs?: number;
+  taskObjectRegistry?: TaskObjectRegistry;
 }
 
 export type CodexDesktopCompatibilityGate =
@@ -75,6 +92,13 @@ export interface WorkspaceCompanion {
   refresh(): Promise<WorkspaceCompanionStatus>;
   bindCurrentTask(workspaceRoot: string): Promise<WorkspaceBindingResult>;
   unbindCurrentTask(): Promise<CodexTaskWorkspaceBindingEntry | undefined>;
+  upsertCurrentTaskObject(input: unknown): Promise<TaskObjectMutationResult>;
+  supersedeCurrentTaskObject(
+    replacedObjectKey: string,
+    replacement: unknown,
+  ): Promise<TaskObjectMutationResult>;
+  retireCurrentTaskObject(objectKey: string): Promise<TaskObjectMutationResult>;
+  listCurrentTaskObjects(): Promise<TaskObjectSummary[]>;
   stop(): Promise<WorkspaceCompanionStatus>;
   status(): WorkspaceCompanionStatus;
 }
@@ -222,11 +246,37 @@ export function createWorkspaceCompanion(
 ): WorkspaceCompanion {
   const intervalMs = refreshInterval(options.refreshIntervalMs);
   const presentationMode = options.presentationMode ?? "record";
+  const localIndex = new LocalWorkspaceContextIndex();
+  const localProvider = new LocalWorkspaceAuthoritativeProvider();
+  const localRevisionProbe = new LocalWorkspaceRevisionProbe();
+  const workspaceIndex = options.taskObjectRegistry === undefined
+    ? localIndex
+    : new TaskObjectWorkspaceContextIndex(localIndex, options.taskObjectRegistry);
+  const annotationIndex = options.taskObjectRegistry === undefined
+    ? localIndex
+    : new CompositeContextIndex([
+        localIndex,
+        new ActiveTaskObjectAnnotationIndex(options.taskObjectRegistry),
+      ]);
   const lookup = createWorkspaceLookupCallback({
     registry: options.registry,
+    index: workspaceIndex,
+    ...(options.taskObjectRegistry === undefined
+      ? { provider: localProvider, revisionProbe: localRevisionProbe }
+      : {
+          providers: [localProvider, options.taskObjectRegistry],
+          revisionProbe: new RoutedWorkspaceRevisionProbe(
+            options.taskObjectRegistry,
+            localRevisionProbe,
+          ),
+        }),
     ...(options.operationTimeoutMs === undefined
       ? {}
       : { operationTimeoutMs: options.operationTimeoutMs }),
+  });
+  const annotationProvider = createWorkspaceAnnotationProvider({
+    registry: options.registry,
+    index: annotationIndex,
   });
   const adapterOptions: CodexCdpHostAdapterOptions = {
     lookup,
@@ -244,6 +294,10 @@ export function createWorkspaceCompanion(
       : { maxConcurrentLookupsPerTarget: options.maxConcurrentLookupsPerTarget }),
     actionLabel: options.actionLabel ?? "查看上下文",
     presentationMode,
+    annotationProvider,
+    ...(options.annotationRefreshIntervalMs === undefined
+      ? {}
+      : { annotationRefreshIntervalMs: options.annotationRefreshIntervalMs }),
   };
   const adapter = new CodexCdpHostAdapter(adapterOptions);
   let state: WorkspaceCompanionStatus["state"] = "idle";
@@ -345,6 +399,7 @@ export function createWorkspaceCompanion(
     const replaced = (await options.registry.find(tasks[0]!)) !== undefined;
     const entry = await options.registry.bind(tasks[0]!, workspaceRoot);
     activeBinding = entry;
+    await adapter.refreshAnnotations(undefined, true);
     return Object.freeze({ binding: entry, replaced });
   };
 
@@ -358,7 +413,63 @@ export function createWorkspaceCompanion(
     if (tasks.length !== 1) throw new Error("active_codex_task_ambiguous");
     const removed = await options.registry.unbind(tasks[0]!);
     activeBinding = undefined;
+    await adapter.refreshAnnotations(undefined, true);
     return removed;
+  };
+
+  const currentTaskBinding = async () => {
+    if (state !== "running") throw new Error("workspace_companion_not_running");
+    if (options.taskObjectRegistry === undefined) {
+      throw new Error("task_object_registry_unavailable");
+    }
+    const tasks = await adapter.activeTasks();
+    activeTaskCount = tasks.length;
+    if (tasks.length === 0) throw new Error("active_codex_task_unavailable");
+    if (tasks.length !== 1) throw new Error("active_codex_task_ambiguous");
+    const binding = await options.registry.find(tasks[0]!);
+    if (binding === undefined) throw new Error("context_binding_missing");
+    activeBinding = binding;
+    return { task: tasks[0]!, binding, registry: options.taskObjectRegistry };
+  };
+
+  const refreshObjectAnnotations = async (): Promise<void> => {
+    await adapter.refreshAnnotations(undefined, true);
+  };
+
+  const upsertCurrentTaskObject = async (input: unknown): Promise<TaskObjectMutationResult> => {
+    const current = await currentTaskBinding();
+    const result = await current.registry.upsert(current.task, current.binding, input);
+    await refreshObjectAnnotations();
+    return result;
+  };
+
+  const supersedeCurrentTaskObject = async (
+    replacedObjectKey: string,
+    replacement: unknown,
+  ): Promise<TaskObjectMutationResult> => {
+    const current = await currentTaskBinding();
+    const result = await current.registry.supersede(
+      current.task,
+      current.binding,
+      replacedObjectKey,
+      replacement,
+    );
+    await refreshObjectAnnotations();
+    return result;
+  };
+
+  const retireCurrentTaskObject = async (
+    objectKey: string,
+  ): Promise<TaskObjectMutationResult> => {
+    const current = await currentTaskBinding();
+    const result = await current.registry.retire(current.task, current.binding, objectKey);
+    await refreshObjectAnnotations();
+    return result;
+  };
+
+  const listCurrentTaskObjects = async (): Promise<TaskObjectSummary[]> => {
+    const current = await currentTaskBinding();
+    return await current.registry.listForTask(current.task, current.binding);
   };
 
   const stop = (): Promise<WorkspaceCompanionStatus> => {
@@ -388,6 +499,10 @@ export function createWorkspaceCompanion(
     refresh,
     bindCurrentTask,
     unbindCurrentTask,
+    upsertCurrentTaskObject,
+    supersedeCurrentTaskObject,
+    retireCurrentTaskObject,
+    listCurrentTaskObjects,
     stop,
     status,
   });

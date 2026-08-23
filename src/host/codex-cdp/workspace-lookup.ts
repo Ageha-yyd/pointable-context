@@ -26,6 +26,7 @@ import type {
   PointableCandidateView,
   PointableChangeView,
   PointableComprehensionView,
+  PointableTerminalStateView,
   PointableDetailView,
   PointableLookupPresentation,
 } from "./protocol.js";
@@ -53,6 +54,8 @@ export interface WorkspaceRevisionProbe {
 export interface WorkspaceLookupCallbackOptions {
   registry: CodexTaskWorkspaceBindingRegistry;
   index?: ContextIndexPort;
+  providers?: readonly AuthoritativeProvider[];
+  /** Backward-compatible single-provider seam. Do not combine with `providers`. */
   provider?: AuthoritativeProvider;
   operationTimeoutMs?: number;
   candidateRefTtlMs?: number;
@@ -136,7 +139,7 @@ function mentalModelComprehension(
 ): PointableComprehensionView | undefined {
   const evidenceExcerpt = scalarFact(outcome.detail.facts, "证据");
   const source = outcome.detail.sourceRefs.find((item) =>
-    item.sourceType === "project_evidence");
+    item.sourceType === "project_evidence" || item.sourceType === "agent-task-context");
   if (evidenceExcerpt === undefined || source === undefined) {
     return undefined;
   }
@@ -230,6 +233,14 @@ function detailView(
   outcome: Extract<LookupOutcome, { kind: "detail" }>,
   options: { detailRef?: string; changes?: PointableChangeView[] } = {},
 ): PointableDetailView {
+  const lifecycle = scalarFact(outcome.detail.facts, "生命周期");
+  const replacementKey = scalarFact(outcome.detail.facts, "替代对象");
+  const terminalState: PointableTerminalStateView | undefined = lifecycle === "superseded" &&
+      replacementKey !== undefined
+    ? { kind: "superseded", replacementKey: truncate(replacementKey, 128) }
+    : lifecycle === "retired"
+      ? { kind: "retired" }
+      : undefined;
   const purpose = outcome.detail.facts["用途"] ?? outcome.detail.facts["职责"];
   const scenarioSummary = outcome.detail.entityType === "verification"
     ? outcome.detail.facts["结果"] ?? outcome.detail.facts["验证范围"]
@@ -266,6 +277,13 @@ function detailView(
                 : `${comprehension.result} 尚未证明：${comprehension.gap}`,
         1_024,
       );
+  const allFacts = Object.entries(outcome.detail.facts);
+  const projectedFacts = terminalState === undefined
+    ? allFacts
+    : [
+        ...allFacts.filter(([label]) => label === "生命周期" || label === "替代对象"),
+        ...allFacts.filter(([label]) => label !== "生命周期" && label !== "替代对象"),
+      ];
   return {
     entityId: truncate(outcome.detail.entityId, 256),
     entityType: truncate(outcome.detail.entityType, 128),
@@ -274,7 +292,7 @@ function detailView(
     revision: outcome.detail.entityRevision,
     observedAt: outcome.detail.observedAt,
     freshness: outcome.detail.freshness,
-    facts: Object.entries(outcome.detail.facts)
+    facts: projectedFacts
       .slice(0, 5)
       .map(([label, value]) => ({ label, value: factText(value) })),
     sources: outcome.detail.sourceRefs
@@ -284,6 +302,7 @@ function detailView(
       })),
     ...(humanSummary === undefined ? {} : { humanSummary }),
     ...(comprehension === undefined ? {} : { comprehension }),
+    ...(terminalState === undefined ? {} : { terminalState }),
     ...(options.detailRef === undefined ? {} : { detailRef: options.detailRef }),
     ...(options.changes === undefined ? {} : { changes: options.changes }),
   };
@@ -466,7 +485,18 @@ export function createWorkspaceLookupCallback(
     throw new RangeError("maxDetailRefs must be an integer from 1 to 4096");
   }
   const index = options.index ?? new LocalWorkspaceContextIndex();
-  const provider = options.provider ?? new LocalWorkspaceAuthoritativeProvider();
+  if (options.provider !== undefined && options.providers !== undefined) {
+    throw new TypeError("provider and providers cannot be combined");
+  }
+  const providers = options.providers === undefined
+    ? [options.provider ?? new LocalWorkspaceAuthoritativeProvider()]
+    : [...options.providers];
+  if (providers.length < 1 || providers.length > 8) {
+    throw new RangeError("providers must contain 1 to 8 providers");
+  }
+  if (new Set(providers.map((item) => item.providerId)).size !== providers.length) {
+    throw new TypeError("providers must have unique providerId values");
+  }
   const revisionProbe = options.revisionProbe === false
     ? undefined
     : options.revisionProbe ?? new LocalWorkspaceRevisionProbe();
@@ -574,7 +604,7 @@ export function createWorkspaceLookupCallback(
       routeRef: request.host.task.routeRef,
       workspaceRoot: activeEntry.workspaceRoot,
     };
-    const service = new LookupService(binding, index, [provider], {
+    const service = new LookupService(binding, index, providers, {
       ...(options.operationTimeoutMs === undefined
         ? {}
         : { operationTimeoutMs: options.operationTimeoutMs }),

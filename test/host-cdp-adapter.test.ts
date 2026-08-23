@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import {
   CodexCdpHostAdapter,
+  type PointableAnnotationProvider,
   type PointableLookupCallbackRequest,
 } from "../src/host/codex-cdp/adapter.js";
 import type {
@@ -211,6 +212,8 @@ async function startedAdapter(
     lookupTimeoutMs?: number;
     maxConcurrentLookupsPerTarget?: number;
     presentationMode?: "record" | "narrative" | "mental-model";
+    annotationProvider?: PointableAnnotationProvider;
+    annotationRefreshIntervalMs?: number;
   } = {},
 ): Promise<CodexCdpHostAdapter> {
   const adapter = new CodexCdpHostAdapter({
@@ -275,6 +278,45 @@ test("adapter installs a namespaced renderer and removes it cleanly", async () =
   assert.ok(connection.commands.some((command) =>
     command.method === "Runtime.removeBinding" && command.params.name === bindingName));
   assert.ok(connection.ordering.includes("uninstall"));
+});
+
+test("adapter delivers a task-fenced identity-only annotation catalog without a lookup", async () => {
+  const connection = new FakeCdpConnection();
+  let lookupCalls = 0;
+  let annotationCalls = 0;
+  const adapter = await startedAdapter(connection, async () => {
+    lookupCalls += 1;
+    return detailPresentation();
+  }, {
+    annotationProvider: async (request) => {
+      annotationCalls += 1;
+      assert.equal(request.host.task.threadId, "thread-1");
+      return {
+        revision: "annotation-r1",
+        contextFingerprint: request.host.task.contextFingerprint,
+        entries: [{
+          objectKey: "b".repeat(64),
+          term: "pilot",
+          entityType: "concept",
+          priority: 83,
+        }],
+      };
+    },
+  });
+  try {
+    assert.equal(annotationCalls, 1);
+    assert.equal(lookupCalls, 0);
+    assert.equal(adapter.status().targets[0]?.annotationCount, 1);
+    assert.equal(adapter.status().targets[0]?.annotationRevision, "annotation-r1");
+    const update = connection.commands.find((command) =>
+      command.method === "Runtime.evaluate" &&
+      String(command.params.expression).includes("annotation-r1"));
+    assert.ok(update);
+    assert.match(String(update.params.expression), /pilot/u);
+    assert.doesNotMatch(String(update.params.expression), /authorityLocator|facts|sources/u);
+  } finally {
+    await adapter.stop();
+  }
 });
 
 test("adapter revalidates the renderer DOM fence before and after callback", async () => {

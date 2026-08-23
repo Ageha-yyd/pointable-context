@@ -45,6 +45,21 @@ export interface PointableRendererConfig {
   presentationMode?: PointablePresentationMode;
 }
 
+export interface PointableObjectAnnotation {
+  /** Opaque, non-authoritative identity used only to deduplicate visible marks. */
+  objectKey: string;
+  /** Exact stable name, path, key, or deterministic alias to mark. */
+  term: string;
+  entityType: string;
+  priority: number;
+}
+
+export interface PointableAnnotationCatalog {
+  revision: string;
+  contextFingerprint: string;
+  entries: readonly PointableObjectAnnotation[];
+}
+
 export interface PointableRendererStatus {
   installed: boolean;
   bindingName: string;
@@ -54,6 +69,7 @@ export interface PointableRendererStatus {
   pendingRequestCount: number;
   actionCount: number;
   cardCount: number;
+  annotationCount: number;
 }
 
 export type PointableRendererAck =
@@ -143,6 +159,13 @@ export function validatePointableRendererResponse(
     bounded(candidate.label, 1, 128) &&
     bounded(candidate.before, 1, 1_024) &&
     bounded(candidate.after, 1, 1_024);
+  const terminalStateView = (candidate: unknown): boolean =>
+    isRecord(candidate) && (
+      (candidate.kind === "superseded" &&
+        exact(candidate, ["kind", "replacementKey"]) &&
+        bounded(candidate.replacementKey, 1, 128)) ||
+      (candidate.kind === "retired" && exact(candidate, ["kind"]))
+    );
   const evidenceView = (candidate: unknown): boolean =>
     isRecord(candidate) &&
     exact(candidate, ["excerpt", "source"]) &&
@@ -266,6 +289,7 @@ export function validatePointableRendererResponse(
         "sources",
         "humanSummary",
         "comprehension",
+        "terminalState",
         "detailRef",
         "changes",
       ]) ||
@@ -288,6 +312,7 @@ export function validatePointableRendererResponse(
       !detail.sources.every(sourceView) ||
       (detail.humanSummary !== undefined && !bounded(detail.humanSummary, 1, 1_024)) ||
       (detail.comprehension !== undefined && !comprehensionView(detail.comprehension)) ||
+      (detail.terminalState !== undefined && !terminalStateView(detail.terminalState)) ||
       (detail.detailRef !== undefined && !bounded(detail.detailRef, 8, 256)) ||
       (detail.changes !== undefined &&
         (!Array.isArray(detail.changes) ||
@@ -328,10 +353,68 @@ export function validatePointableRendererResponse(
   return value as unknown as PointableLookupResponseV1;
 }
 
+/**
+ * Deliberately self-contained: it is serialized into the qualified renderer
+ * together with the installer and therefore must not close over host helpers.
+ */
+export function validatePointableAnnotationCatalog(
+  value: unknown,
+): PointableAnnotationCatalog | undefined {
+  const isRecord = (candidate: unknown): candidate is Record<string, unknown> =>
+    typeof candidate === "object" && candidate !== null && !Array.isArray(candidate);
+  const bounded = (candidate: unknown, minimum: number, maximum: number): candidate is string =>
+    typeof candidate === "string" &&
+    candidate.length >= minimum &&
+    candidate.length <= maximum &&
+    !/[\p{Cc}\p{Cf}]/u.test(candidate);
+  if (
+    !isRecord(value) ||
+    Object.keys(value).sort().join("|") !== "contextFingerprint|entries|revision" ||
+    !bounded(value.revision, 1, 128) ||
+    !bounded(value.contextFingerprint, 1, 2_048) ||
+    !Array.isArray(value.entries) ||
+    value.entries.length > 256
+  ) {
+    return undefined;
+  }
+  const entries: PointableObjectAnnotation[] = [];
+  const pairs = new Set<string>();
+  for (const raw of value.entries) {
+    if (
+      !isRecord(raw) ||
+      Object.keys(raw).sort().join("|") !== "entityType|objectKey|priority|term" ||
+      !bounded(raw.objectKey, 16, 128) ||
+      !bounded(raw.term, 3, 256) ||
+      raw.term !== raw.term.trim() ||
+      !bounded(raw.entityType, 1, 128) ||
+      !Number.isSafeInteger(raw.priority) ||
+      Number(raw.priority) < 0 ||
+      Number(raw.priority) > 100
+    ) {
+      return undefined;
+    }
+    const pair = `${raw.objectKey}\u0000${raw.term.normalize("NFKC").toLocaleLowerCase("en-US")}`;
+    if (pairs.has(pair)) return undefined;
+    pairs.add(pair);
+    entries.push({
+      objectKey: raw.objectKey,
+      term: raw.term,
+      entityType: raw.entityType,
+      priority: Number(raw.priority),
+    });
+  }
+  return Object.freeze({
+    revision: value.revision,
+    contextFingerprint: value.contextFingerprint,
+    entries: Object.freeze(entries.map((entry) => Object.freeze(entry))),
+  });
+}
+
 interface PointableRendererApi {
   status(): PointableRendererStatus;
   verifyFence(value: unknown): boolean;
   receiveResult(value: unknown): PointableRendererAck;
+  updateAnnotations(value: unknown): PointableRendererStatus;
   reconcile(): PointableRendererStatus;
   uninstall(): PointableRendererStatus;
 }
@@ -353,6 +436,7 @@ export function installPointableContextRenderer(
     observation: RendererEligibilityObservation,
   ) => RendererEligibilityDecision,
   validateResponse: (value: unknown) => PointableLookupResponseV1 | undefined,
+  validateAnnotations: (value: unknown) => PointableAnnotationCatalog | undefined,
 ): PointableRendererStatus {
   const namespace = "__pointableContextRenderer";
   const bindingNamePattern = /^__pointableContextBinding_[A-Za-z0-9_]{8,128}$/u;
@@ -457,6 +541,12 @@ export function installPointableContextRenderer(
     startTop: number;
     handle: HTMLElement;
   };
+  type AnnotationHit = PointableObjectAnnotation & {
+    range: Range;
+    sourceRoot: Element;
+    surface: PointableSelectionSurface;
+    contextFingerprint: string;
+  };
 
   let state: PointableRendererStatus["state"] = "idle";
   let generation = 0;
@@ -472,9 +562,18 @@ export function installPointableContextRenderer(
   let holdCardPlacementUntil = 0;
   let manualCardPlacement: { left: number; top: number } | undefined;
   let dragState: DragState | undefined;
+  let annotationCatalog: PointableAnnotationCatalog = {
+    revision: "unbound",
+    contextFingerprint: "unbound",
+    entries: [],
+  };
+  let annotationHits: AnnotationHit[] = [];
+  let annotationFrame: number | undefined;
+  let annotationStyle: HTMLStyleElement | undefined;
   let uninstalled = false;
   const activeObserver = new MutationObserver(() => {
     if (candidate !== undefined) scheduleReconcile();
+    if (annotationCatalog.entries.length > 0) scheduleAnnotationReconcile();
   });
   const resizeObserver = typeof ResizeObserver === "function"
     ? new ResizeObserver(() => reposition())
@@ -485,7 +584,15 @@ export function installPointableContextRenderer(
       item instanceof Element &&
       item.getAttribute("data-pointable-context-owned") === lifecycleId);
     if (event.button === 0 && !ownedInteraction) {
-      window.setTimeout(evaluateSelection, 0);
+      const selection = window.getSelection();
+      const hit = event.isTrusted && selection?.isCollapsed !== false
+        ? annotationAtPoint(event.clientX, event.clientY)
+        : undefined;
+      if (hit !== undefined) {
+        activateAnnotation(hit);
+      } else {
+        window.setTimeout(evaluateSelection, 0);
+      }
     }
   };
   const dragMoveHandler = (event: PointerEvent): void => {
@@ -554,6 +661,7 @@ export function installPointableContextRenderer(
   const viewportHandler = (): void => reposition();
   const routeHandler = (): void => {
     reconcile();
+    scheduleAnnotationReconcile();
   };
   const selectionHandler = (): void => {
     window.setTimeout(evaluateSelection, 0);
@@ -702,6 +810,283 @@ export function installPointableContextRenderer(
     );
   }
 
+  const annotationHighlightName = `pointable-context-object-${lifecycleId}`;
+  const annotationInteractiveSelector =
+    'a, button, input, textarea, select, [role="button"], [contenteditable="true"]';
+
+  function refreshObserver(): void {
+    activeObserver.disconnect();
+    if (candidate === undefined && annotationCatalog.entries.length === 0) return;
+    activeObserver.observe(document.body, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: [
+        "hidden",
+        "inert",
+        "data-app-action-sidebar-thread-active",
+        "data-app-action-sidebar-thread-id",
+        "data-app-action-sidebar-thread-host-id",
+      ],
+    });
+  }
+
+  function annotationRegistry(): {
+    set(name: string, value: unknown): void;
+    delete(name: string): boolean;
+  } | undefined {
+    if (typeof CSS === "undefined") return undefined;
+    return (CSS as unknown as {
+      highlights?: {
+        set(name: string, value: unknown): void;
+        delete(name: string): boolean;
+      };
+    }).highlights;
+  }
+
+  function clearAnnotationHighlights(): void {
+    annotationRegistry()?.delete(annotationHighlightName);
+    annotationHits = [];
+    annotationStyle?.remove();
+    annotationStyle = undefined;
+  }
+
+  function annotationSurface(root: Element): PointableSelectionSurface | undefined {
+    if (!stableRoot.contains(root) || rejectedSurface(root)) return undefined;
+    if (root.closest('[data-user-message-bubble="true"]') !== null) {
+      return "user_message";
+    }
+    return root.closest(
+      "[data-response-annotation-target], [data-local-conversation-final-assistant]",
+    ) !== null
+      ? "assistant_message"
+      : undefined;
+  }
+
+  function termBoundary(text: string, start: number, length: number): boolean {
+    const isWord = (value: string | undefined): boolean =>
+      value !== undefined && /[\p{L}\p{N}_]/u.test(value);
+    const first = text[start];
+    const last = text[start + length - 1];
+    return !(
+      (isWord(first) && isWord(text[start - 1])) ||
+      (isWord(last) && isWord(text[start + length]))
+    );
+  }
+
+  function firstTermIndex(text: string, term: string): number {
+    const foldedText = text.toLocaleLowerCase("en-US");
+    const foldedTerm = term.toLocaleLowerCase("en-US");
+    if (foldedTerm.length !== term.length) return -1;
+    let from = 0;
+    while (from <= foldedText.length - foldedTerm.length) {
+      const found = foldedText.indexOf(foldedTerm, from);
+      if (found < 0) return -1;
+      if (
+        found + term.length <= text.length &&
+        termBoundary(text, found, term.length)
+      ) {
+        return found;
+      }
+      from = found + Math.max(1, foldedTerm.length);
+    }
+    return -1;
+  }
+
+  function structuralBoundaryBetween(previous: Text, current: Text): boolean {
+    const between = document.createRange();
+    try {
+      between.setStart(previous, previous.data.length);
+      between.setEnd(current, 0);
+      const fragment = between.cloneContents();
+      return fragment.querySelector(
+        "br, p, div, li, ul, ol, pre, blockquote, section, article, header, footer, " +
+        "table, thead, tbody, tfoot, tr, td, th, hr",
+      ) !== null;
+    } catch {
+      return true;
+    } finally {
+      between.detach();
+    }
+  }
+
+  function scheduleAnnotationReconcile(): void {
+    if (annotationFrame !== undefined || uninstalled) return;
+    annotationFrame = window.requestAnimationFrame(() => {
+      annotationFrame = undefined;
+      reconcileAnnotations();
+    });
+  }
+
+  function reconcileAnnotations(): void {
+    clearAnnotationHighlights();
+    if (
+      annotationCatalog.entries.length === 0 ||
+      annotationCatalog.contextFingerprint !== readContextFingerprint()
+    ) {
+      refreshObserver();
+      return;
+    }
+    const registry = annotationRegistry();
+    const HighlightConstructor = (globalThis as unknown as {
+      Highlight?: new (...ranges: Range[]) => unknown;
+    }).Highlight;
+    if (registry === undefined || HighlightConstructor === undefined) {
+      refreshObserver();
+      return;
+    }
+    const roots = [...stableRoot.querySelectorAll<Element>(
+      "[data-selected-text-overlay-target]",
+    )].filter((root) => rootVisible(root)).slice(0, 64);
+    const contextFingerprint = readContextFingerprint();
+    let totalText = 0;
+    const nextHits: AnnotationHit[] = [];
+    for (const root of roots) {
+      if (totalText >= 262_144) break;
+      const surface = annotationSurface(root);
+      if (surface === undefined) continue;
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      const segments: Array<{ node: Text; start: number; end: number }> = [];
+      let text = "";
+      let previousText: Text | undefined;
+      for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        if (!(node instanceof Text) || node.data.length === 0) continue;
+        const parent = node.parentElement;
+        if (
+          parent === null ||
+          rejectedSurface(parent) ||
+          parent.closest(annotationInteractiveSelector) !== null
+        ) {
+          continue;
+        }
+        const separator = previousText !== undefined && structuralBoundaryBetween(previousText, node)
+          ? "\n"
+          : "";
+        if (
+          segments.length >= 2_048 ||
+          text.length + separator.length + node.data.length > 65_536
+        ) break;
+        text += separator;
+        const start = text.length;
+        text += node.data;
+        segments.push({ node, start, end: text.length });
+        previousText = node;
+      }
+      totalText += text.length;
+      if (text.length === 0) continue;
+      const candidates: Array<{
+        annotation: PointableObjectAnnotation;
+        start: number;
+        end: number;
+      }> = [];
+      for (const annotation of annotationCatalog.entries) {
+        const start = firstTermIndex(text, annotation.term);
+        if (start >= 0) {
+          candidates.push({
+            annotation,
+            start,
+            end: start + annotation.term.length,
+          });
+        }
+      }
+      candidates.sort((left, right) =>
+        right.annotation.priority - left.annotation.priority ||
+        left.start - right.start ||
+        right.annotation.term.length - left.annotation.term.length);
+      const chosen: typeof candidates = [];
+      const objectKeys = new Set<string>();
+      for (const item of candidates) {
+        if (
+          objectKeys.has(item.annotation.objectKey) ||
+          chosen.some((other) => item.start < other.end && other.start < item.end)
+        ) {
+          continue;
+        }
+        chosen.push(item);
+        objectKeys.add(item.annotation.objectKey);
+        if (chosen.length >= 3) break;
+      }
+      for (const item of chosen) {
+        const startSegment = segments.find((segment) =>
+          item.start >= segment.start && item.start < segment.end);
+        const endSegment = segments.find((segment) =>
+          item.end > segment.start && item.end <= segment.end);
+        if (startSegment === undefined || endSegment === undefined) continue;
+        const range = document.createRange();
+        range.setStart(startSegment.node, item.start - startSegment.start);
+        range.setEnd(endSegment.node, item.end - endSegment.start);
+        if (range.toString().length !== item.annotation.term.length) continue;
+        nextHits.push({
+          ...item.annotation,
+          range,
+          sourceRoot: root,
+          surface,
+          contextFingerprint,
+        });
+      }
+    }
+    if (nextHits.length > 0) {
+      const style = document.createElement("style");
+      style.setAttribute("data-pointable-context-owned", lifecycleId);
+      style.setAttribute("data-pointable-context-role", "annotation-style");
+      style.textContent = `::highlight(${annotationHighlightName}) { ` +
+        "background-color: rgba(77, 112, 255, .08); " +
+        "text-decoration-line: underline; text-decoration-style: dotted; " +
+        "text-decoration-thickness: 1.5px; text-decoration-color: rgba(77, 112, 255, .88); " +
+        "text-underline-offset: 3px; }";
+      document.head.append(style);
+      annotationStyle = style;
+      annotationHits = nextHits;
+      registry.set(annotationHighlightName, new HighlightConstructor(...nextHits.map(({ range }) => range)));
+    }
+    refreshObserver();
+  }
+
+  function annotationAnchorIsCurrent(hit: AnnotationHit): boolean {
+    return (
+      hit.sourceRoot.isConnected &&
+      hit.range.commonAncestorContainer.isConnected &&
+      hit.range.toString().toLocaleLowerCase("en-US") ===
+        hit.term.toLocaleLowerCase("en-US") &&
+      hit.contextFingerprint === readContextFingerprint() &&
+      rootVisible(hit.sourceRoot) &&
+      annotationSurface(hit.sourceRoot) === hit.surface
+    );
+  }
+
+  function annotationAtPoint(clientX: number, clientY: number): AnnotationHit | undefined {
+    return annotationHits.find((hit) =>
+      annotationAnchorIsCurrent(hit) &&
+      [...hit.range.getClientRects()].some((rect) =>
+        clientX >= rect.left && clientX <= rect.right &&
+        clientY >= rect.top && clientY <= rect.bottom));
+  }
+
+  function activateAnnotation(hit: AnnotationHit): void {
+    if (!annotationAnchorIsCurrent(hit)) return;
+    cleanup(true, false);
+    candidate = {
+      generation: ++generation,
+      text: hit.range.toString(),
+      surface: hit.surface,
+      range: hit.range.cloneRange(),
+      sourceRoot: hit.sourceRoot,
+      contextFingerprint: hit.contextFingerprint,
+    };
+    refreshObserver();
+    void submitLookup("resolve", candidate.generation);
+  }
+
+  function updateAnnotations(value: unknown): PointableRendererStatus {
+    const catalog = validateAnnotations(value);
+    if (catalog === undefined) return status();
+    annotationCatalog = catalog;
+    refreshObserver();
+    scheduleAnnotationReconcile();
+    return status();
+  }
+
   function evaluateSelection(): void {
     if (uninstalled) return;
     const selection = window.getSelection();
@@ -715,6 +1100,16 @@ export function installPointableContextRenderer(
     const end = nodeElement(range.endContainer);
     if (start === null || end === null) {
       cleanup(true, false);
+      return;
+    }
+    const openCard = connectedOwnedElement("card");
+    if (
+      openCard !== null &&
+      openCard.contains(start) &&
+      openCard.contains(end)
+    ) {
+      // Selecting/copying rendered detail is a local reading action. It must
+      // not dismiss the card or become a new project lookup selection.
       return;
     }
     const admitted = selectionSurface(start, end, range);
@@ -754,18 +1149,7 @@ export function installPointableContextRenderer(
       sourceRoot: admitted.root,
       contextFingerprint,
     };
-    activeObserver.observe(document.body, {
-      subtree: true,
-      childList: true,
-      attributes: true,
-      attributeFilter: [
-        "hidden",
-        "inert",
-        "data-app-action-sidebar-thread-active",
-        "data-app-action-sidebar-thread-id",
-        "data-app-action-sidebar-thread-host-id",
-      ],
-    });
+    refreshObserver();
     mountAction();
   }
 
@@ -1496,6 +1880,28 @@ export function installPointableContextRenderer(
     body.append(changeSummary);
   }
 
+  function mountTerminalState(
+    body: HTMLElement,
+    terminalState: PointableDetailView["terminalState"],
+  ): void {
+    if (terminalState === undefined) return;
+    const notice = document.createElement("div");
+    notice.setAttribute("data-pointable-context-role", "terminal-state");
+    Object.assign(notice.style, {
+      marginBottom: "8px",
+      padding: "8px 10px",
+      borderRadius: "8px",
+      background: "#fff7e8",
+      color: "#8a4b08",
+      fontSize: "12px",
+      lineHeight: "1.45",
+    });
+    notice.textContent = terminalState.kind === "superseded"
+      ? `此对象已由 ${terminalState.replacementKey} 替代；以下保留的是历史只读上下文。`
+      : "此对象已退役；以下保留的是历史只读上下文。";
+    body.append(notice);
+  }
+
   function mountDetail(detail: PointableDetailView, preserveUiState = false): void {
     clearRevisionTimer();
     const previousCard = preserveUiState ? connectedOwnedElement("card") : null;
@@ -1508,6 +1914,7 @@ export function installPointableContextRenderer(
     state = "detail";
     const { body } = createShell(detail.label, preserveUiState);
     mountRevisionChanges(body, detail.changes);
+    mountTerminalState(body, detail.terminalState);
     if (presentationMode === "mental-model" && detail.comprehension !== undefined) {
       mountComprehension(body, detail.comprehension, evidenceExpanded);
     } else {
@@ -1880,8 +2287,8 @@ export function installPointableContextRenderer(
     }
     if (clearCandidate) {
       candidate = undefined;
-      activeObserver.disconnect();
       state = "idle";
+      refreshObserver();
     }
     if (restore && restoreFocus?.isConnected) {
       restoreFocus.focus({ preventScroll: true });
@@ -1899,6 +2306,7 @@ export function installPointableContextRenderer(
       pendingRequestCount: pending === undefined ? 0 : 1,
       actionCount: connectedOwnedElement("action") === null ? 0 : 1,
       cardCount: connectedOwnedElement("card") === null ? 0 : 1,
+      annotationCount: annotationHits.length,
     };
   }
 
@@ -1906,6 +2314,10 @@ export function installPointableContextRenderer(
     if (uninstalled) return status();
     cleanup(true, false);
     uninstalled = true;
+    annotationCatalog = { revision: "unbound", contextFingerprint: "unbound", entries: [] };
+    if (annotationFrame !== undefined) window.cancelAnimationFrame(annotationFrame);
+    annotationFrame = undefined;
+    clearAnnotationHighlights();
     activeObserver.disconnect();
     resizeObserver?.disconnect();
     document.removeEventListener("selectionchange", selectionHandler);
@@ -1929,6 +2341,7 @@ export function installPointableContextRenderer(
     status,
     verifyFence,
     receiveResult,
+    updateAnnotations,
     reconcile,
     uninstall,
   };
@@ -1942,8 +2355,9 @@ export function createInstallPointableRendererExpression(
   return `(() => {
     const evaluateEligibility = (${evaluatePointableRendererEligibility.toString()});
     const validateResponse = (${validatePointableRendererResponse.toString()});
+    const validateAnnotations = (${validatePointableAnnotationCatalog.toString()});
     const install = (${installPointableContextRenderer.toString()});
-    return install(${JSON.stringify(config)}, evaluateEligibility, validateResponse);
+    return install(${JSON.stringify(config)}, evaluateEligibility, validateResponse, validateAnnotations);
   })()`;
 }
 
@@ -1970,6 +2384,18 @@ export function createDeliverPointableResultExpression(
     const renderer = window.__pointableContextRenderer;
     return renderer?.status?.().lifecycleId === ${JSON.stringify(lifecycleId)}
       ? renderer.receiveResult?.(${JSON.stringify(response)}) ?? null
+      : null;
+  })()`;
+}
+
+export function createUpdatePointableAnnotationsExpression(
+  catalog: PointableAnnotationCatalog,
+  lifecycleId: string,
+): string {
+  return `(() => {
+    const renderer = window.__pointableContextRenderer;
+    return renderer?.status?.().lifecycleId === ${JSON.stringify(lifecycleId)}
+      ? renderer.updateAnnotations?.(${JSON.stringify(catalog)}) ?? null
       : null;
   })()`;
 }

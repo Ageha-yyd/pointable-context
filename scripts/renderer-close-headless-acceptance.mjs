@@ -9,6 +9,7 @@ import {
   createDeliverPointableResultExpression,
   createInstallPointableRendererExpression,
   createPointableLookupResponse,
+  createUpdatePointableAnnotationsExpression,
   createUninstallPointableRendererExpression,
   parsePointableLookupIntent,
 } from "../dist/src/host/codex-cdp/index.js";
@@ -141,6 +142,16 @@ try {
     Object.assign(text.style, { font: '20px sans-serif' });
     overlay.append(text);
     message.append(overlay);
+    const priorityMessage = document.createElement('article');
+    priorityMessage.setAttribute('data-response-annotation-target', '');
+    const priorityOverlay = document.createElement('div');
+    priorityOverlay.setAttribute('data-selected-text-overlay-target', '');
+    const prefix = document.createTextNode('Native Chat Lane · Presentation Default · pilot');
+    const lineBreak = document.createElement('br');
+    const lowerPriority = document.createElement('span');
+    lowerPriority.textContent = 'workspace-annotations.ts';
+    priorityOverlay.append(prefix, lineBreak, lowerPriority);
+    priorityMessage.append(priorityOverlay);
     const composer = document.createElement('textarea');
     composer.id = 'fixture-composer';
     composer.setAttribute('aria-label', 'Reply');
@@ -148,7 +159,7 @@ try {
       position: 'fixed', right: '16px', bottom: '16px',
       width: '240px', height: '64px', zIndex: '10',
     });
-    main.append(message, composer);
+    main.append(message, priorityMessage, composer);
     document.body.append(sidebar, main);
     return true;
   })()`);
@@ -197,6 +208,114 @@ try {
   if (installed.installed !== true || typeof lifecycleId !== "string") {
     throw new Error("headless renderer did not install");
   }
+
+  const contextFingerprint = await evaluate(connection, `JSON.stringify({
+    href: window.location.href,
+    threadId: 'headless-thread',
+    hostId: 'headless-host',
+  })`);
+  await evaluate(connection, createUpdatePointableAnnotationsExpression({
+    revision: "annotation-headless-r1",
+    contextFingerprint,
+    entries: [
+      {
+        objectKey: "a".repeat(64),
+        term: "Native Chat Lane",
+        entityType: "decision",
+        priority: 96,
+      },
+      {
+        objectKey: "b".repeat(64),
+        term: "Presentation Default",
+        entityType: "change",
+        priority: 93,
+      },
+      {
+        objectKey: "c".repeat(64),
+        term: "pilot",
+        entityType: "concept",
+        priority: 87,
+      },
+      {
+        objectKey: "d".repeat(64),
+        term: "workspace-annotations.ts",
+        entityType: "module",
+        priority: 76,
+      },
+    ],
+  }, lifecycleId));
+  await waitFor(connection, `window.__pointableContextRenderer?.status?.().annotationCount === 4`);
+  const highlightedTerms = await evaluate(connection, `(() => {
+    if (!globalThis.CSS?.highlights) return [];
+    const values = [];
+    for (const highlight of CSS.highlights.values()) {
+      for (const range of highlight) values.push(range.toString());
+    }
+    return values;
+  })()`);
+  if (
+    !highlightedTerms.includes("Native Chat Lane") ||
+    !highlightedTerms.includes("Presentation Default") ||
+    !highlightedTerms.includes("pilot") ||
+    highlightedTerms.includes("workspace-annotations.ts")
+  ) {
+    throw new Error(`structural-break Top-3 annotation mismatch: ${JSON.stringify(highlightedTerms)}`);
+  }
+  const annotationPoint = await evaluate(connection, `(() => {
+    const node = document.getElementById('fixture-text');
+    if (!(node instanceof HTMLElement)) return null;
+    const rect = node.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  })()`);
+  if (annotationPoint === null) throw new Error("headless annotation target missing");
+  const annotationIntentPromise = waitForBindingIntent(connection, bindingName, "resolve");
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mousePressed", x: annotationPoint.x, y: annotationPoint.y,
+    button: "left", clickCount: 1,
+  });
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mouseReleased", x: annotationPoint.x, y: annotationPoint.y,
+    button: "left", clickCount: 1,
+  });
+  const annotationIntent = await annotationIntentPromise;
+  if (annotationIntent.selectionText !== "pilot") {
+    throw new Error("direct annotation click did not preserve the exact object term");
+  }
+  const annotationStatus = await evaluate(
+    connection,
+    "window.__pointableContextRenderer?.status?.() ?? null",
+  );
+  if (annotationStatus?.actionCount !== 0 || annotationStatus?.state !== "resolving") {
+    throw new Error(`direct annotation click unexpectedly used the selection affordance: ${JSON.stringify(annotationStatus)}`);
+  }
+  await evaluate(connection, createDeliverPointableResultExpression(
+    createPointableLookupResponse(annotationIntent, {
+      kind: "error",
+      code: "headless_annotation_probe",
+      message: "Direct annotation click reached the existing lookup channel.",
+      retryable: false,
+    }),
+    lifecycleId,
+  ));
+  const annotationClose = await waitFor(connection, `(() => {
+    const card = document.querySelector('[data-pointable-context-role="card"]');
+    const close = card?.querySelector('button[aria-label="关闭上下文详情"]');
+    if (!(close instanceof HTMLElement)) return null;
+    const rect = close.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  })()`);
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mousePressed", x: annotationClose.x, y: annotationClose.y,
+    button: "left", clickCount: 1,
+  });
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mouseReleased", x: annotationClose.x, y: annotationClose.y,
+    button: "left", clickCount: 1,
+  });
+  await waitFor(connection, `(() => {
+    const status = window.__pointableContextRenderer?.status?.();
+    return status?.state === 'idle' && status?.cardCount === 0 && status?.annotationCount === 4;
+  })()`);
 
   const drag = await evaluate(connection, `(() => {
     const node = document.getElementById('fixture-text').firstChild;
@@ -312,6 +431,44 @@ try {
   await evaluate(connection, `new Promise((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
   })`);
+
+  const cardTextSelection = await evaluate(connection, `new Promise((resolve) => {
+    const card = document.querySelector('[data-pointable-context-role="card"]');
+    const model = card?.querySelector('[data-pointable-context-role="comprehension-model"]');
+    if (!(card instanceof HTMLElement) || !(model instanceof HTMLElement)) {
+      resolve(null);
+      return;
+    }
+    const walker = document.createTreeWalker(model, NodeFilter.SHOW_TEXT);
+    let text = walker.nextNode();
+    while (text !== null && (text.textContent?.trim().length ?? 0) < 6) text = walker.nextNode();
+    if (!(text instanceof Text) || text.textContent === null) {
+      resolve(null);
+      return;
+    }
+    const range = document.createRange();
+    range.setStart(text, 0);
+    range.setEnd(text, Math.min(12, text.textContent.length));
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    const selected = selection?.toString() ?? '';
+    setTimeout(() => resolve({
+      selected,
+      sameCard: document.querySelector('[data-pointable-context-role="card"]') === card,
+      cardCount: document.querySelectorAll('[data-pointable-context-role="card"]').length,
+      actionCount: document.querySelectorAll('[data-pointable-context-role="action"]').length,
+    }), 50);
+  })`);
+  if (
+    cardTextSelection === null ||
+    cardTextSelection.selected.length < 1 ||
+    cardTextSelection.sameCard !== true ||
+    cardTextSelection.cardCount !== 1 ||
+    cardTextSelection.actionCount !== 0
+  ) {
+    throw new Error(`card text selection dismissed or re-queried the detail: ${JSON.stringify(cardTextSelection)}`);
+  }
 
   const cardDrag = await waitFor(connection, `(() => {
     const card = document.querySelector('[data-pointable-context-role="card"]');
@@ -638,8 +795,14 @@ try {
   process.stdout.write(`${JSON.stringify({
     ok: true,
     browser: "Microsoft Edge headless",
+    directAnnotationMarkedObject: true,
+    directAnnotationBypassedSelectionAction: true,
+    directAnnotationAddedChatTurns: 0,
+    structuralBreakPreservedTopThreePriority: true,
     selectedText: intent.selectionText,
+    selectionFallbackStillWorks: true,
     trustedActionProducedDetail: true,
+    cardTextSelectionPreservedCard: true,
     trustedTitleBarDragMovedCard: true,
     composerFocusPreservedCard: true,
     mentalModelRenderedInLane: true,

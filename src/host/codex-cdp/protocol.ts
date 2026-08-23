@@ -44,6 +44,10 @@ export interface PointableChangeView {
   after: string;
 }
 
+export type PointableTerminalStateView =
+  | { kind: "superseded"; replacementKey: string }
+  | { kind: "retired" };
+
 export type PointablePresentationMode = "record" | "narrative" | "mental-model";
 
 export interface PointableEvidenceView {
@@ -116,6 +120,7 @@ export interface PointableDetailView {
   sources: PointableSourceView[];
   humanSummary?: string;
   comprehension?: PointableComprehensionView;
+  terminalState?: PointableTerminalStateView;
   detailRef?: string;
   changes?: PointableChangeView[];
 }
@@ -369,6 +374,7 @@ function validateDetail(value: unknown): PointableDetailView {
     "sources",
     "humanSummary",
     "comprehension",
+    "terminalState",
     "detailRef",
     "changes",
   ])) {
@@ -396,6 +402,7 @@ function validateDetail(value: unknown): PointableDetailView {
     !Array.isArray(value.sources) ||
     value.sources.length > 5 ||
     (value.humanSummary !== undefined && !boundedString(value.humanSummary, 1, 1_024)) ||
+    (value.terminalState !== undefined && !record(value.terminalState)) ||
     (value.detailRef !== undefined && !boundedString(value.detailRef, 8, 256)) ||
     (value.changes !== undefined &&
       (!Array.isArray(value.changes) || value.changes.length > 3))
@@ -566,6 +573,24 @@ function validateDetail(value: unknown): PointableDetailView {
       );
     }
   }
+  let terminalState: PointableTerminalStateView | undefined;
+  if (value.terminalState !== undefined) {
+    const state = value.terminalState;
+    if (!record(state)) {
+      throw new PointableProtocolError("invalid_lookup_result", "detail terminal state is invalid");
+    }
+    if (
+      state.kind === "superseded" &&
+      exactKeys(state, ["kind", "replacementKey"]) &&
+      boundedString(state.replacementKey, 1, 128)
+    ) {
+      terminalState = { kind: "superseded", replacementKey: state.replacementKey };
+    } else if (state.kind === "retired" && exactKeys(state, ["kind"])) {
+      terminalState = { kind: "retired" };
+    } else {
+      throw new PointableProtocolError("invalid_lookup_result", "detail terminal state is invalid");
+    }
+  }
   const changes = value.changes === undefined
     ? undefined
     : value.changes.map((change) => {
@@ -593,6 +618,7 @@ function validateDetail(value: unknown): PointableDetailView {
     sources,
     ...(typeof value.humanSummary === "string" ? { humanSummary: value.humanSummary } : {}),
     ...(comprehension === undefined ? {} : { comprehension }),
+    ...(terminalState === undefined ? {} : { terminalState }),
     ...(typeof value.detailRef === "string" ? { detailRef: value.detailRef } : {}),
     ...(changes === undefined ? {} : { changes }),
   };

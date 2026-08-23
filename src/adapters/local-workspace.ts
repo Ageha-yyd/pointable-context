@@ -75,7 +75,10 @@ const DEFAULT_IGNORED_DIRECTORIES = new Set([
   ".turbo",
   "coverage",
   "dist",
+  "fixtures",
   "node_modules",
+  "study-dist",
+  "study-release",
 ]);
 
 export interface LocalWorkspaceIndexOptions {

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "packageManager": "pnpm@11.19.0",
   "private": true,
-  "description": "Selection-triggered, zero-turn context reveal for the native Codex Chat Lane.",
+  "description": "Zero-turn context reveal from quiet object marks or text selection in the native Codex Chat Lane.",
   "type": "module",
   "bin": {
     "pointable": "./dist/src/cli.js",

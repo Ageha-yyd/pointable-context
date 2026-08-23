@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { closeSync, existsSync, openSync } from "node:fs";
-import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,6 +14,7 @@ import {
   type WorkspaceCompanion,
 } from "./workspace-companion.js";
 import type { PointablePresentationMode } from "./protocol.js";
+import { TaskObjectRegistry } from "./task-object-registry.js";
 
 const CONTROL_SCHEMA_VERSION = 1;
 const CONTROL_TIMEOUT_MS = 3_000;
@@ -31,13 +32,26 @@ interface ControlState {
 }
 
 interface ParsedArguments {
-  command: "start" | "status" | "bind" | "unbind" | "stop" | "run";
+  command:
+    | "start"
+    | "status"
+    | "bind"
+    | "unbind"
+    | "stop"
+    | "run"
+    | "object-upsert"
+    | "object-supersede"
+    | "object-retire"
+    | "object-list";
   stateDir: string;
   registryPath: string;
   endpoint: string;
   refreshIntervalMs: number;
   presentationMode: PointablePresentationMode;
   workspaceRoot?: string;
+  objectFile?: string;
+  objectKey?: string;
+  replaces?: string;
   json: boolean;
 }
 
@@ -89,10 +103,14 @@ function parseArguments(argv: string[]): ParsedArguments {
     command !== "bind" &&
     command !== "unbind" &&
     command !== "stop" &&
-    command !== "run"
+    command !== "run" &&
+    command !== "object-upsert" &&
+    command !== "object-supersede" &&
+    command !== "object-retire" &&
+    command !== "object-list"
   ) {
     return fail(
-      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop> [options]",
+      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-list> [options]",
     );
   }
   const stateRoot = localStateRoot();
@@ -102,6 +120,9 @@ function parseArguments(argv: string[]): ParsedArguments {
   let refreshIntervalMs = 2_000;
   let presentationMode: PointablePresentationMode = "mental-model";
   let workspaceRoot: string | undefined;
+  let objectFile: string | undefined;
+  let objectKey: string | undefined;
+  let replaces: string | undefined;
   let json = false;
   for (let index = 1; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -130,12 +151,28 @@ function parseArguments(argv: string[]): ParsedArguments {
     } else if (argument === "--workspace-root") {
       if (!isAbsolute(value)) fail("--workspace-root must be absolute");
       workspaceRoot = resolve(value);
+    } else if (argument === "--object-file") {
+      if (!isAbsolute(value)) fail("--object-file must be absolute");
+      objectFile = resolve(value);
+    } else if (argument === "--object-key") {
+      objectKey = value;
+    } else if (argument === "--replaces") {
+      replaces = value;
     } else {
       fail(`unknown option: ${argument}`);
     }
   }
   if (command === "bind" && workspaceRoot === undefined) {
     fail("bind requires --workspace-root <absolute-path>");
+  }
+  if ((command === "object-upsert" || command === "object-supersede") && objectFile === undefined) {
+    fail(`${command} requires --object-file <absolute-path>`);
+  }
+  if (command === "object-supersede" && replaces === undefined) {
+    fail("object-supersede requires --replaces <object-key>");
+  }
+  if (command === "object-retire" && objectKey === undefined) {
+    fail("object-retire requires --object-key <object-key>");
   }
   return {
     command,
@@ -145,6 +182,9 @@ function parseArguments(argv: string[]): ParsedArguments {
     refreshIntervalMs,
     presentationMode,
     ...(workspaceRoot === undefined ? {} : { workspaceRoot }),
+    ...(objectFile === undefined ? {} : { objectFile }),
+    ...(objectKey === undefined ? {} : { objectKey }),
+    ...(replaces === undefined ? {} : { replaces }),
     json,
   };
 }
@@ -285,10 +325,29 @@ async function readRequestJson(
   return parsed;
 }
 
+async function readTaskObjectFile(path: string): Promise<Record<string, unknown>> {
+  const info = await stat(path);
+  if (!info.isFile() || info.size > MAX_REQUEST_BYTES) {
+    throw new Error("task object input file is invalid or too large");
+  }
+  const parsed: unknown = JSON.parse(await readFile(path, "utf8"));
+  if (!record(parsed)) throw new Error("task object input JSON is invalid");
+  return parsed;
+}
+
 async function controlRequest(
   state: ControlState,
   method: "GET" | "POST",
-  path: "/status" | "/refresh" | "/bind" | "/unbind" | "/stop",
+  path:
+    | "/status"
+    | "/refresh"
+    | "/bind"
+    | "/unbind"
+    | "/stop"
+    | "/objects"
+    | "/objects/upsert"
+    | "/objects/supersede"
+    | "/objects/retire",
   body?: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const encoded = body === undefined ? undefined : Buffer.from(JSON.stringify(body), "utf8");
@@ -367,8 +426,12 @@ async function runServer(arguments_: ParsedArguments): Promise<void> {
   const token = randomBytes(32).toString("hex");
   const startedAt = new Date().toISOString();
   const registry = new CodexTaskWorkspaceBindingRegistry(arguments_.registryPath);
+  const taskObjectRegistry = new TaskObjectRegistry(
+    join(arguments_.stateDir, "task-objects.json"),
+  );
   const companion: WorkspaceCompanion = createWorkspaceCompanion({
     registry,
+    taskObjectRegistry,
     endpoint: arguments_.endpoint,
     refreshIntervalMs: arguments_.refreshIntervalMs,
     presentationMode: arguments_.presentationMode,
@@ -434,6 +497,53 @@ async function runServer(arguments_: ParsedArguments): Promise<void> {
         (error: unknown) => sendJson(response, 409, {
           ok: false,
           error: error instanceof Error ? error.message : "unbind_failed",
+        }),
+      );
+      return;
+    }
+    if (request.method === "GET" && request.url === "/objects") {
+      void companion.listCurrentTaskObjects().then(
+        (objects) => sendJson(response, 200, { ok: true, objects }),
+        (error: unknown) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "object_list_failed",
+        }),
+      );
+      return;
+    }
+    if (request.method === "POST" && request.url === "/objects/upsert") {
+      void readRequestJson(request).then(async (body) =>
+        await companion.upsertCurrentTaskObject(body.object)).then(
+        (result) => sendJson(response, 200, { ok: true, result }),
+        (error: unknown) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "object_upsert_failed",
+        }),
+      );
+      return;
+    }
+    if (request.method === "POST" && request.url === "/objects/supersede") {
+      void readRequestJson(request).then(async (body) => {
+        if (typeof body.replaces !== "string") throw new Error("replaces_invalid");
+        return await companion.supersedeCurrentTaskObject(body.replaces, body.object);
+      }).then(
+        (result) => sendJson(response, 200, { ok: true, result }),
+        (error: unknown) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "object_supersede_failed",
+        }),
+      );
+      return;
+    }
+    if (request.method === "POST" && request.url === "/objects/retire") {
+      void readRequestJson(request).then(async (body) => {
+        if (typeof body.objectKey !== "string") throw new Error("object_key_invalid");
+        return await companion.retireCurrentTaskObject(body.objectKey);
+      }).then(
+        (result) => sendJson(response, 200, { ok: true, result }),
+        (error: unknown) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "object_retire_failed",
         }),
       );
       return;
@@ -551,6 +661,24 @@ function print(value: Record<string, unknown>, json: boolean): void {
     process.stdout.write("Active Codex task was not bound\n");
     return;
   }
+  const result = record(value.result) ? value.result : undefined;
+  const object = result && record(result.object) ? result.object : undefined;
+  if (result !== undefined && object !== undefined) {
+    process.stdout.write(
+      `Task object ${String(object.objectKey)}: ${String(result.kind)} (${String(object.lifecycle)})\n`,
+    );
+    return;
+  }
+  if (Array.isArray(value.objects)) {
+    process.stdout.write(`Current task objects: ${value.objects.length}\n`);
+    for (const item of value.objects) {
+      if (!record(item)) continue;
+      process.stdout.write(
+        `- ${String(item.objectKey)} [${String(item.entityType)}] ${String(item.lifecycle)}\n`,
+      );
+    }
+    return;
+  }
   const companion = record(value.companion) ? value.companion : undefined;
   const adapter = companion && record(companion.adapter) ? companion.adapter : undefined;
   const state = typeof companion?.state === "string"
@@ -604,6 +732,37 @@ async function main(): Promise<void> {
       fail("workspace companion is not running");
     }
     print(await controlRequest(state, "POST", "/unbind"), arguments_.json);
+    return;
+  }
+  if (
+    arguments_.command === "object-upsert" ||
+    arguments_.command === "object-supersede" ||
+    arguments_.command === "object-retire" ||
+    arguments_.command === "object-list"
+  ) {
+    const state = await readState(arguments_.stateDir);
+    if (state === undefined || !processIsAlive(state.pid)) {
+      fail("workspace companion is not running");
+    }
+    if (arguments_.command === "object-list") {
+      print(await controlRequest(state, "GET", "/objects"), arguments_.json);
+      return;
+    }
+    if (arguments_.command === "object-retire") {
+      print(await controlRequest(state, "POST", "/objects/retire", {
+        objectKey: arguments_.objectKey,
+      }), arguments_.json);
+      return;
+    }
+    const object = await readTaskObjectFile(arguments_.objectFile!);
+    if (arguments_.command === "object-supersede") {
+      print(await controlRequest(state, "POST", "/objects/supersede", {
+        replaces: arguments_.replaces,
+        object,
+      }), arguments_.json);
+      return;
+    }
+    print(await controlRequest(state, "POST", "/objects/upsert", { object }), arguments_.json);
     return;
   }
   print((await liveStatus(arguments_.stateDir)) ?? { ok: true, stopped: true }, arguments_.json);

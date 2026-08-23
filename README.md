@@ -1,6 +1,6 @@
 # Pointable Context
 
-Pointable Context explores one narrow product claim: in long-running software-development tasks, people should be able to select a compressed project reference in the current Codex conversation and reveal verified context in place, without opening a browser, reading an entire file, or creating another Chat Turn.
+Pointable Context explores one narrow product claim: in long-running software-development tasks, people should be able to recognize or select a compressed development object in the current Codex conversation and reveal verified context in place, without opening a browser, reading an entire file, or creating another Chat Turn.
 
 The normative product definition is [docs/PRD-inline-pointable-widgets.md](docs/PRD-inline-pointable-widgets.md).
 
@@ -8,19 +8,29 @@ The normative product definition is [docs/PRD-inline-pointable-widgets.md](docs/
 
 The primary interaction is **Quiet Context Reveal**:
 
-1. The Agent's work populates a lightweight Context Index with stable document, module, decision, and task identities.
-2. The ordinary Chat Lane stays visually unchanged until the user selects a relevant reference.
-3. A small `查看上下文` action appears for a bounded, eligible message selection; this local step does not inspect workspace data.
-4. A trusted click deterministically resolves exact keys, file names/paths, stable names, or scope-local aliases, then opens current detail beside the selection.
-5. No browser opens, no model call is made, and no follow-up turn is created.
+1. The Agent's work populates a lightweight Context Index with stable workspace identities and, when explicitly enabled for the bounded task, sparse task-local dynamic objects.
+2. After an explicit task/workspace binding, the Host projects a bounded identity-only catalog. It contains stable terms and types, not facts, authority locators, sources, or file content.
+3. Each visible message may mark at most three unique high-value objects with a quiet dotted underline. A trusted click goes directly through the existing fenced lookup path.
+4. Any registered object omitted by that Top-3 remains reachable: the user can select arbitrary visible text, then use the small `查看上下文` action to deterministically resolve exact keys, file names/paths, stable names, or scope-local aliases.
+5. Detail is read only after the trusted click. No browser opens, no model call is made, and no follow-up turn is created.
 
-There is deliberately no "identify more concepts" or semantic-model branch. General semantic questions already belong in Codex Chat; adding another model pass inside the selection path would increase latency and ambiguity. The browser App Server client, DCPM/CWA integration ideas, and a full Dashboard are research references, not the default product route.
+There is deliberately no LLM "identify more concepts" branch. Selecting arbitrary text is still supported, but Pointable Context only matches it against registered identities; this preserves a zero-turn fallback for unmarked objects. General open-ended semantic questions still belong in Codex Chat. The browser App Server client, DCPM/CWA integration ideas, and a full Dashboard are research references, not the default product route.
+
+The live local-workspace index excludes `fixtures/`, `study-dist/`, and `study-release/` by default, so copied research objects cannot suppress or ambiguate current-workspace marks. Fixture Quiet Mode keeps its independent, explicitly labeled data source.
+
+## Task-local dynamic objects
+
+Long Agent tasks often introduce a concept, change, decision, task, or verification before it is mature enough to become a repository artifact. The workspace Companion now has a private task-object registry for this gap. Registration is an explicit Agent action against the one host-visible, workspace-bound Codex task; it never scans Chat, invokes a model, or guesses concepts. Exact key/name/alias identities enter the same annotation and selection lookup path.
+
+An active identity can update its bounded summary and type-specific P-C mental model. Its identity fields remain immutable so an open card can refresh in place. A genuine identity transition uses explicit supersession, while obsolete objects are retired. Superseded and retired keys remain terminal and leave automatic Top-3 marking, but stay read-only resolvable from historical Chat; their card exposes the terminal lifecycle and replacement key instead of becoming a dead link. All task-local details display `freshness=partial`, identify `agent-task-context` as their source, and state that they are temporary task context rather than repository authority, test evidence, or completion proof. Stable cross-task milestones still graduate through the strict evidence-backed Concept/Change/Decision/Task/Verification artifacts.
+
+The companion CLI exposes `object-list`, `object-upsert`, `object-supersede`, and `object-retire`. Payloads are strict, bounded JSON and are persisted only under the private Companion state directory, not the project workspace. Registration refreshes the identity-only catalog but never opens a card or creates a Chat Turn.
 
 ## Per-build Codex Desktop qualification
 
 The private Chat Lane adapter is qualified per exact Codex Desktop build, never by product-family assumption. `pointable-context-compatibility` validates a strict record under `docs/compatibility/`: the `OpenAI.Codex` package/executable version, the renderer bundle SHA-256, the four automatic host-contract gates, and ten manual interaction gates. Automatic `qualified_current_runtime` is kept separate from manual selection, click, card, disclosure, close/focus, composer, virtualization, navigation, stale-response, and refresh-continuity evidence. A manual PASS/FAIL needs one exact workspace evidence line; an unrun check stays `pending`.
 
-The current `OpenAI.Codex 26.814.5517.0` / executable `151.0.7922.137` record has all four automatic gates and all ten evidence-bound manual gates passing against renderer digest `d00e4620…2855`. It is qualified only for that exact combination; it is not a cross-version support claim. Run the read-only inspector with the actual host version and current bundle:
+The historical v2.21 `OpenAI.Codex 26.814.5517.0` / executable `151.0.7922.137` record passed all four automatic and all ten evidence-bound manual gates against renderer digest `616008d2…5154`; it remains historical evidence for v2.21 only. The current v2.22 Task Object Registry and card-local text-selection bundle has digest `6a0aaa90…c6a2` and independently passes automatic 4/4 plus manual 10/10. This qualification applies only to that exact host/build/bundle combination. Run the read-only inspector with the actual host version and current bundle:
 
 ```powershell
 node dist/src/compatibility/qualification-cli.js --workspace-root . --renderer-bundle host/workspace-companion.mjs --host-version 26.814.5517.0 --json
@@ -121,7 +131,7 @@ The fixture MCP server exposes:
 - `read_project_entity`: bounded text/structured detail fallback;
 - `render_context_capsule`: optional type-specific rendering probe linked to a self-contained MCP App resource; it is not the default product trigger.
 
-The default Desktop companion keeps the lane clean until selection. A trusted click reveals 3–7 prioritized facts, revision, observed time, freshness, relations, sources, and verification. All progressive disclosure is local UI state. The optional MCP resource contains no question form, `ui/message`, model-context update, network request, or navigation.
+The default Desktop companion keeps the lane free of persistent capsules. It may add at most three identity-only dotted marks per message; unmarked objects retain the selection fallback. A trusted click reveals 3–7 prioritized facts, revision, observed time, freshness, relations, sources, and verification. All progressive disclosure is local UI state. The optional MCP resource contains no question form, `ui/message`, model-context update, network request, or navigation.
 
 The native detail card is summary-first: it initially shows only the object name, one contextual summary, type, freshness, and a quiet in-card `查看详情` disclosure. Facts, revision, observation time, and sources stay collapsed until requested. This avoids turning a successful point lookup into another dense information surface.
 
@@ -156,7 +166,8 @@ The bundled internal runner now supports a resumable two-stage session. `run-nat
 
 ## Reused foundations
 
-- Pure pre-click eligibility with no project-data request.
+- Identity-only, task-fenced annotation catalogs with no Provider detail read.
+- Pure selection eligibility with no project-data request.
 - Exact key, name, scope-local alias, and normalized matching.
 - `0 / 1 / 2–3 / >3` routing without candidate detail prefetch.
 - Opaque, time-limited references bound to trusted scope, entity identity, authority, and index revision.
@@ -165,7 +176,7 @@ The bundled internal runner now supports a resumable two-stage session. `run-nat
 - Private Codex CDP selection adapter with trusted-click, navigation, context, lifecycle, and stale-response fences.
 - Explicitly bound local-workspace file lookup as the first reference Provider.
 
-These foundations are implementation assets. Selection is the visual trigger; it is not permission to add semantic guessing or a browser-first route.
+These foundations are implementation assets. Quiet marks improve discoverability, while selection remains the completeness fallback; neither is permission to add semantic guessing or a browser-first route.
 
 ## Current boundaries
 
@@ -176,7 +187,7 @@ These foundations are implementation assets. Selection is the visual trigger; it
 - Markdown artifact, TypeScript/JavaScript module, static test-definition, known JSON configuration, path-qualified ADR, and explicitly authored concept/change/decision/task/verification context are implemented.
 - Agent work results currently enter through explicit Markdown records; no hook or runtime event source decides automatically when a record should be created or updated.
 - Static tests remain “not executed.” Actual results require `docs/verifications/*.md`; reliable direct test-run event ingestion is a later stage.
-- Concepts without an explicit identity are not connected.
+- Concepts without an explicit identity are not connected; selecting prose does not cause model inference.
 - A persistent multi-object capsule strip is no longer a default product goal.
 - No formal user study has yet proven the expected efficiency gain.
 
@@ -225,8 +236,9 @@ After a local Plugin update, reinstall it through the configured local marketpla
 
 P0 is successful only when Quiet Context Reveal:
 
-- leaves the Chat Lane unchanged until a relevant selection is made;
-- shows a small action only after local deterministic eligibility;
+- adds no persistent capsule, marks at most three unique registered objects per message without layout shift, and clears marks across task/context drift;
+- lets a trusted click on a mark open the existing lookup directly without a selection action;
+- preserves the small selection action for registered objects that were not marked;
 - performs no Provider read or model call on selection alone;
 - opens detail beside the selection after a trusted explicit action;
 - does not open a browser or Dashboard;
@@ -238,9 +250,10 @@ P0 is successful only when Quiet Context Reveal:
 - exposes identity, source, revision, observed time, and freshness;
 - pins an opened snapshot, signals detected file revision drift, and refreshes the same card only after a trusted action;
 - keeps an open card visible when the user focuses the current Chat composer, so it can remain a reading aid while drafting a reply;
+- keeps an open card visible while the user selects or copies its body text; card-local selection never starts another lookup or Chat Turn;
 - preserves the old snapshot with an explicit warning when the object is deleted or revision status is unavailable;
 - preserves text and structured fallback;
 - closes and restores reading context reliably;
-- contains no semantic-model or "identify more concepts" path.
+- contains no semantic-model or LLM "identify more concepts" path; arbitrary selections are deterministic registered-object lookups only.
 
 The primary research metrics are `time_to_verified_fact`, `chat_turns_to_fact`, fact-answer accuracy, card sufficiency, lane-leave rate, and stale/wrong-entity rate.
