@@ -33,6 +33,7 @@ export const TASK_OBJECT_ARCHIVE_MAX_RECORDS = 8_192;
 export const TASK_OBJECT_ACTIVE_SOFT_LIMIT = 64;
 export const TASK_OBJECT_ACTIVE_HARD_LIMIT = 256;
 const MAX_ALIASES = 8;
+const MAX_CURATION_REVIEW_NEEDS = 32;
 
 export type TaskObjectType =
   | "concept"
@@ -182,6 +183,62 @@ export interface TaskObjectCurationAudit {
   items: TaskObjectCurationItem[];
 }
 
+export type TaskObjectCurationNeedEntityType =
+  | TaskObjectType
+  | "module"
+  | "document"
+  | "configuration"
+  | "file";
+
+export type TaskObjectCurationNeedKind =
+  | "understand"
+  | "resume"
+  | "handoff"
+  | "decision"
+  | "status"
+  | "verification";
+
+export interface TaskObjectCurationNeedInput {
+  term: string;
+  expectedEntityType: TaskObjectCurationNeedEntityType;
+  needKind: TaskObjectCurationNeedKind;
+}
+
+export interface TaskObjectCurationReviewInput {
+  schemaVersion: 1;
+  milestoneKey: string;
+  needs: TaskObjectCurationNeedInput[];
+}
+
+export type TaskObjectCurationNeedState =
+  | "available"
+  | "missing"
+  | "ambiguous"
+  | "type_mismatch";
+
+export interface TaskObjectCurationReviewItem extends TaskObjectCurationNeedInput {
+  state: TaskObjectCurationNeedState;
+  matchCount: number;
+  candidateTypes: string[];
+  source?: "workspace" | "task_local";
+}
+
+export interface TaskObjectCurationReview {
+  milestoneKey: string;
+  observedAt: string;
+  indexSnapshot: string;
+  needCount: number;
+  available: number;
+  missing: number;
+  ambiguous: number;
+  typeMismatch: number;
+  availabilityRate: number;
+  omissionRate: number;
+  resolutionFailureRate: number;
+  measurement: "explicit_milestone_review";
+  items: TaskObjectCurationReviewItem[];
+}
+
 export interface TaskObjectArchiveResult {
   kind: "archived" | "unchanged";
   archivedCount: number;
@@ -240,6 +297,68 @@ function taskObjectType(value: unknown): TaskObjectType {
     throw new ContractError("entityType is invalid");
   }
   return value;
+}
+
+function curationNeedEntityType(value: unknown): TaskObjectCurationNeedEntityType {
+  if (
+    value !== "concept" &&
+    value !== "change" &&
+    value !== "decision" &&
+    value !== "task" &&
+    value !== "verification" &&
+    value !== "module" &&
+    value !== "document" &&
+    value !== "configuration" &&
+    value !== "file"
+  ) {
+    throw new ContractError("expectedEntityType is invalid");
+  }
+  return value;
+}
+
+function curationNeedKind(value: unknown): TaskObjectCurationNeedKind {
+  if (
+    value !== "understand" &&
+    value !== "resume" &&
+    value !== "handoff" &&
+    value !== "decision" &&
+    value !== "status" &&
+    value !== "verification"
+  ) {
+    throw new ContractError("needKind is invalid");
+  }
+  return value;
+}
+
+export function parseTaskObjectCurationReviewInput(value: unknown): TaskObjectCurationReviewInput {
+  if (
+    !objectRecord(value) ||
+    !exactKeys(value, ["schemaVersion", "milestoneKey", "needs"]) ||
+    value.schemaVersion !== 1 ||
+    !Array.isArray(value.needs) ||
+    value.needs.length < 1 ||
+    value.needs.length > MAX_CURATION_REVIEW_NEEDS
+  ) {
+    throw new ContractError("task object curation review input is invalid");
+  }
+  const seen = new Set<string>();
+  const needs = value.needs.map((rawNeed, index): TaskObjectCurationNeedInput => {
+    if (!objectRecord(rawNeed) || !exactKeys(rawNeed, ["term", "expectedEntityType", "needKind"])) {
+      throw new ContractError(`needs[${index}] is invalid`);
+    }
+    const term = boundedText(rawNeed.term, `needs[${index}].term`, 2, 256);
+    const expectedEntityType = curationNeedEntityType(rawNeed.expectedEntityType);
+    const needKind = curationNeedKind(rawNeed.needKind);
+    const identity = `${normalizedIdentity(term)}\u0000${expectedEntityType}`;
+    if (seen.has(identity)) throw new ContractError("curation review needs must be unique");
+    seen.add(identity);
+    return Object.freeze({ term, expectedEntityType, needKind });
+  });
+  return Object.freeze({
+    schemaVersion: 1,
+    milestoneKey: objectKey(value.milestoneKey),
+    needs: Object.freeze(needs),
+  }) as TaskObjectCurationReviewInput;
 }
 
 function aliases(value: unknown): string[] {
@@ -566,6 +685,19 @@ function documentBytes(document: RegistryDocument): number {
 function archiveRevision(records: readonly StoredTaskObject[]): string {
   return `task-object-archive:${createHash("sha256")
     .update(records.map((record) => `${record.entityId}:${record.entityRevision}`).sort().join("\n"), "utf8")
+    .digest("hex")}`;
+}
+
+function contextIndexSnapshot(records: readonly IdentityRecord[]): string {
+  return `context-index:${createHash("sha256")
+    .update(
+      records
+        .filter((record) => !record.deleted)
+        .map((record) => `${record.entityId}\u0000${record.entityType}\u0000${record.indexRevision}`)
+        .sort()
+        .join("\n"),
+      "utf8",
+    )
     .digest("hex")}`;
 }
 
@@ -1016,6 +1148,81 @@ export class TaskObjectRegistry implements ContextIndexPort, AuthoritativeProvid
       omissionMeasurement: "explicit_milestone_review_required",
       items: Object.freeze(items),
     }) as TaskObjectCurationAudit;
+  }
+
+  /**
+   * Measure only the terms explicitly declared as needed at a stable milestone.
+   * This is a deterministic point-lookup review over the same stable + task-local
+   * identity surface; it never scans Chat, calls a model, or reads Provider detail.
+   */
+  async reviewCuration(
+    task: CodexHostTaskContext,
+    binding: CodexTaskWorkspaceBindingEntry,
+    rawWorkspaceRecords: unknown,
+    rawReview: unknown,
+  ): Promise<TaskObjectCurationReview> {
+    const workspaceRecords = validateContextIndexForRuntime(rawWorkspaceRecords, binding.scope);
+    const review = parseTaskObjectCurationReviewInput(rawReview);
+    const taskRecords = (await this.#read()).records
+      .filter((record) => matchesEntry(record, task, binding))
+      .filter((record) =>
+        record.lifecycle === "active" || stableMatchesFor(record, workspaceRecords).length === 0);
+    const records = [
+      ...workspaceRecords,
+      ...this.#identityRecords(taskRecords),
+    ].filter((record) => !record.deleted);
+    const items = review.needs.map((need): TaskObjectCurationReviewItem => {
+      const normalizedTerm = normalizedIdentity(need.term);
+      const matches = records.filter((record) =>
+        [record.canonicalKey, record.canonicalName, ...record.aliases]
+          .filter((candidate): candidate is string => typeof candidate === "string")
+          .some((candidate) => normalizedIdentity(candidate) === normalizedTerm));
+      const candidateTypes = [...new Set(matches.map((match) => match.entityType))].sort();
+      const unique = matches.length === 1 ? matches[0] : undefined;
+      const state: TaskObjectCurationNeedState = matches.length === 0
+        ? "missing"
+        : matches.length > 1
+          ? "ambiguous"
+          : unique!.entityType === need.expectedEntityType
+            ? "available"
+            : "type_mismatch";
+      return Object.freeze({
+        term: need.term,
+        expectedEntityType: need.expectedEntityType,
+        needKind: need.needKind,
+        state,
+        matchCount: matches.length,
+        candidateTypes: Object.freeze(candidateTypes),
+        ...(state === "available"
+          ? {
+              source: unique!.authorityRef.provider === TASK_OBJECT_PROVIDER_ID
+                ? "task_local" as const
+                : "workspace" as const,
+            }
+          : {}),
+      }) as TaskObjectCurationReviewItem;
+    });
+    const count = (state: TaskObjectCurationNeedState): number =>
+      items.filter((item) => item.state === state).length;
+    const available = count("available");
+    const missing = count("missing");
+    const ambiguous = count("ambiguous");
+    const typeMismatch = count("type_mismatch");
+    return Object.freeze({
+      milestoneKey: review.milestoneKey,
+      observedAt: new Date().toISOString(),
+      indexSnapshot: contextIndexSnapshot(records),
+      needCount: items.length,
+      available,
+      missing,
+      ambiguous,
+      typeMismatch,
+      availabilityRate: available / items.length,
+      omissionRate: missing / items.length,
+      resolutionFailureRate: (missing + ambiguous + typeMismatch) / items.length,
+      measurement: "explicit_milestone_review",
+      items: Object.freeze(items),
+    }) as TaskObjectCurationReview;
   }
 
   /**

@@ -1,7 +1,7 @@
 # PRD：Quiet Context Reveal（轻标注 + 选区式上下文速览）
 
-- 版本：v2.27
-- 状态：P-C 微型心智模型继续作为详情默认；v2.27 在 v2.26 已验收的 pinned card 与公平主 term 分配上新增只读 `object-audit`，把当前任务 partial/terminal 对象与 checker-valid 稳定制品对照，并将声明外遗漏保留为显式里程碑复盘。新 digest `fbc4d463…c278` 已在当前精确 Codex build 通过自动门禁 4/4，但十项人工门禁全部保持 pending，不能继承 v2.26 的人工证据；v2.26 `f570c4de…843c` 是最近一个自动 4/4、人工 10/10 的完整历史资格。受控效率实验继续暂缓到功能和跨 build 兼容性收口之后
+- 版本：v2.28
+- 状态：P-C 微型心智模型继续作为详情默认；v2.28 在 v2.27 `object-audit` 之后新增确定性的 `object-review`，把“后来确实需要但此前未登记”的术语变成显式里程碑输入，并在当前 workspace + task-local identity surface 上测量 available、missing、ambiguous、type mismatch、omission rate 与 resolution-failure rate。它不扫描 Chat、不调用模型、不读取详情、不持久化复盘。当前真实开发任务的首轮复盘从 2/3 available、`object-review` missing 收敛到 3/3 available、omission rate 0；这只证明显式 needed terms 的 identity 可恢复，不证明对象自动发现或人效收益。精确 v2.28 renderer `77d7051e…3814` 已通过当前 Codex build 的自动宿主门禁 4/4，人工十项合并到功能冻结后的单次 Release Candidate 验收；v2.26 `f570c4de…843c` 仍是最近一个自动 4/4、人工 10/10 的完整历史资格。受控效率实验继续暂缓到功能和跨 build 兼容性收口之后
 - 日期：2026-08-24
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
@@ -428,6 +428,17 @@ Concept/Change/Decision 必须使用冻结章节，文件 stem 与 H1 归一化�
 
 Agent 的对象选择采用显式 opt-in、稳定里程碑触发的两级路由：每次 mutation 前先列出当前任务对象并检查五类冻结制品目录；已有稳定制品优先，已有 active identity 只更新内容，身份变化才 supersede，无后续决策价值则 retire；尚属当前任务、但已具备稳定名称、跨 Turn 价值和完整类型化理解单元的对象进入 task-local partial 层，具有跨任务复用价值且存在 exact workspace evidence 的对象进入 evidence-backed artifact 层。单个稳定里程碑通常最多新增一个 task-local 对象，除非用户明确命名多个对象；只有稳定制品通过适用 checker 后才退役对应临时对象，检查失败时保留 partial 并报告边界。这里的“自动”只表示一次明确授权后由 Agent 在里程碑维护，不表示扫描 Chat、调用语义模型或为每个名词建卡，也不要求用户为每张卡新增 Chat Turn。
 Registry 容量采用 active-hot、terminal-audit 策略：`object-list` 在当前任务达到 64 个 active 对象时给出软警告但不阻断有效写入，256 个 active 仍然硬性 fail closed。匹配的 evidence-backed artifact 通过 checker 且 task-local 对象进入终态后，显式 `object-archive` 必须先写入本地审计副本，且只有稳定 Index 中恰好一个同类型、同 canonical name 对象时才能移出热 Registry；active、无匹配或歧义记录绝不归档。Archive 不参与 lookup authority，历史文字改由稳定制品继续解析。
+
+### 8.13 Explicit Milestone Object Review
+
+结构 Coverage 只能检查作者已经声明的集合，`object-audit` 也只能检查已经登记的 task-local 对象。为了测量“用户或 Agent 到里程碑时确实需要，但 identity surface 没能提供”的遗漏，v2.28 增加一次性只读 `object-review`：
+
+1. 输入必须是显式有界 JSON：`schemaVersion/milestoneKey/needs`；每个 need 只含 `term/expectedEntityType/needKind`，最多 32 项；
+2. `needKind` 只允许 understand、resume、handoff、decision、status、verification，用于说明信息需求而不保存 Chat 原文；
+3. Host 只使用当前 task/workspace binding、完整 runtime-validated workspace identity 和当前 task-local identity；它不读取 Provider detail、不调用模型、不扫描历史消息；
+4. 每个 term 按确定性 exact key/name/alias 匹配，返回 available、missing、ambiguous 或 type_mismatch；available 额外区分 stable 与 task-local 来源；
+5. 输出给出 index snapshot、observedAt、availability/omission/resolution-failure rate 与有界逐项结果；复盘本身不持久化，不自动创建对象，也不证明人的效率提升；
+6. Agent 只能在真实稳定里程碑、且确有一组后来需要的信息术语时运行；不得为了让指标好看而事后补造 need，也不得把缺失结果直接升级为项目事实。
 ## 9. P0 功能需求
 
 ### P0-1 Bounded object annotation
@@ -485,6 +496,10 @@ Artifact、Module、Verification Source、Verification Result、Configuration、
 ### P0-13 Task-local object lifecycle
 
 显式启用的有界长任务可以登记少量临时 Agent-known 对象。Registry 必须由 Host 绑定当前 task/workspace，提供 strict upsert/supersede/retire/list，组合进现有 Index/Provider/revision 链，并始终以 `partial` 和临时来源呈现。身份变化不能伪装成普通更新，终态不能复活，登记本身不得打开卡片或产生 Chat Turn。
+
+### P0-14 Explicit milestone object review
+
+系统必须能对一组显式声明、真实需要的有界术语执行当前 identity-only 复盘，分开报告可用、遗漏、歧义和类型错配。复盘不得扫描 Chat、读取详情、调用模型、持久化原文、自动建卡或冒充人效实验。
 
 ## 10. 明确非目标
 
@@ -752,13 +767,14 @@ v2.20 的默认 `runStudyV2NativeTrial` 在其上完成组合：独立 App Serve
 - 真实 Edge headless 双入口验收：轻标注 `pilot` 可在不出现选区按钮时产生现有 fenced resolve intent；关闭后手动拖选同一文字仍显示入口并完成详情、拖动、composer 保持、revision 与刷新链路；两条路径均为零模型、零 Chat Turn。该证据不替代当前 Codex build 人工复验；
 - 任务内 Dynamic Object Provider：Host-vouched 当前任务登记、strict 类型化 P-C input、active update、显式 supersede/retire、终态不可复活、私有状态持久化、组合 Index/Provider、`partial` 边界和同卡 revision refresh；登记只刷新 identity catalog，不读取详情或创建 Chat Turn；
 - 只读 Task Object Curation Audit：将当前任务 Registry 与 checker-valid 稳定制品对照，分开报告 active partial、稳定重叠、terminal archive-ready、terminal unmatched 与 ambiguous；声明外遗漏继续要求显式里程碑复盘，审计不扫描 Chat、不把未观测对象伪装成自动漏记率；
+- 显式 Milestone Object Review：对最多 32 个真实需要的 term 做当前 workspace + task-local identity-only 复盘，输出 available/missing/ambiguous/type-mismatch、来源、index snapshot 与三类比率；不读详情、不扫 Chat、不调模型、不持久化复盘；
 
 当前状态与仍缺：
 
-- v2.27 workspace companion digest `fbc4d463…c278` 已在 Codex Desktop `26.814.5517.0`、executable `151.0.7922.137` 上通过自动 4/4，人工 0/10、pending 10/10，因此当前仍为 `manual_pending`；v2.26 `f570c4de…843c` 的自动 4/4、人工 10/10 只保留为该历史 bundle 的完整资格；
-- Task Object Registry 已闭合确定性登记与生命周期，并在当前真实开发任务开始首个稀疏策展切片：只登记一个 active 的 `Object Curation Dogfood` Task，同时保留 retired/superseded 终态用于审计。该切片仍不足以校准“何时登记、何时升级为稳定 artifact、何时退役”，也不构成对象自动发现或人效证据；
+- v2.28 workspace companion source、自动回归和真实安装门禁已闭合；精确 renderer `77d7051e…3814` 在 `OpenAI.Codex 26.814.5517.0` / executable `151.0.7922.137` 上通过自动 4/4。开发阶段不重复请求人工十项门禁，最终功能冻结后用一个 Release Candidate 集中验收。v2.27 `fbc4d463…c278` 保留为自动 4/4、人工 0/10 的历史 candidate；v2.26 `f570c4de…843c` 的自动 4/4、人工 10/10 只保留为该历史 bundle 的完整资格；
+- Task Object Registry 已闭合确定性登记与生命周期，并在当前真实开发任务运行一个 active 的 `Object Curation Dogfood` Task。首轮显式里程碑复盘先暴露 `object-review` 未登记，修复后同一 3 项 need 为 3/3 available；这证明当前声明项的 identity 可恢复。仍需跨多个真实里程碑校准“何时登记、何时升级为稳定 artifact、何时退役”，也不构成对象自动发现或人效证据；
 - 将显式 Verification 制品从文件式人工/Agent 记录扩展到可靠的测试运行事件接入；测试源码卡本身永远不能替代运行结果；
-- 在真实长任务中区分并测量两层质量：声明集合内的可恢复 coverage/omission/projection-failure/redundancy 已可自动计算且当前为 10/10；未声明但用户后来需要的关键对象仍需通过里程碑复盘与真实查询失败记录测量，不能由 10/10 外推；
+- 在真实长任务中继续积累两层质量观测：声明集合内的可恢复 coverage/omission/projection-failure/redundancy 已可自动计算且当前为 10/10；未声明但后来需要的术语已由 `object-review` 完成首个 2/3→3/3 dogfood，但尚无跨里程碑样本，不能由单次结果或 10/10 coverage 外推；
 - 证明不同 Codex Desktop 版本中的 Host Adapter 兼容性；
 - 在真实长周期任务中完成延迟重返、跨会话恢复、状态漂移和交接场景的效果验证；短任务受控效率研究暂缓。
 - study-v2 原生 Chat Lane 问卷已通过当前 build 的有界形成性验收，包括未选满禁用、五项提交、无 Chat Turn、收起后可见重进入口、状态保留与最终清理；仍缺干净 Windows ZIP 演练与真实提交演练。当前两阶段 CLI 仅用于内部原型，不能替代研究治理门禁。
@@ -778,10 +794,10 @@ v2.20 的默认 `runStudyV2NativeTrial` 在其上完成组合：独立 App Serve
 10. 已冻结 counterbalanced study pack v1、答案键、12-slot 分配、隔离 workspace、mutation 与完整性检查，并将其保留为非当前门禁的研究资产；
 11. 已完成显式长任务 Context Coverage 门禁：Module/Decision/Task/Verification 逐项验证、四类指标与隐私边界；当前声明扩展为 10 个真实期望对象，2026-08-24 实测 10/10 available，后续 dogfood 继续记录声明外遗漏而不是把声明内 10/10 当作完整性证明；
 12. 已完成对象多轮修改后的 pinned snapshot、revision drift、同卡刷新、删除/不可用、任务重绑定，以及显式刷新差异的类型化优先级与首层投影；后续 dogfood 持续校准字段优先级；
-13. 已完成逐 build 兼容性证据入口、当前宿主/renderer 精确绑定、自动与人工门禁分栏及 fail-closed 检查；当前精确 `OpenAI.Codex 26.814.5517.0`、executable `151.0.7922.137` 与 v2.27 renderer digest `fbc4d463…c278` 已通过自动 4/4，人工 10 项仍 pending；v2.26 的 10/10 只保留为历史 bundle 证据；
+13. 已完成逐 build 兼容性证据入口、当前宿主/renderer 精确绑定、自动与人工门禁分栏及 fail-closed 检查；当前精确 `OpenAI.Codex 26.814.5517.0`、executable `151.0.7922.137` 与 v2.28 renderer digest `77d7051e…3814` 已通过自动 4/4，人工 10 项集中留给功能冻结 Release Candidate；v2.26 的 10/10 只保留为历史 bundle 证据；
 14. 已完成 opt-in Agent 里程碑制品维护扩展：Concept/Change/Decision 与 Task/Verification 共用稀疏产出策略，前三类增加只读 Artifact Check；
-15. 已实现 Task-local Dynamic Object 生命周期 v1：当前任务显式登记、更新、替代、退役、组合 Index/Provider、partial 边界与 revision refresh；已用 `Object Curation Dogfood` 开始真实开发切片，下一步用多里程碑观测校准稀疏选择和 artifact graduation；
-16. v2.27 workspace companion 的 exact renderer digest 已完成自动四层 gate 4/4，十项原生人工门禁保持 pending，未沿用 v2.26 或更早证据；
+15. 已实现 Task-local Dynamic Object 生命周期 v1 与显式 Milestone Object Review：当前任务可登记、更新、替代、退役，并对真实 needed terms 测量 identity availability/omission/resolution failure；下一步用多里程碑观测校准稀疏选择和 artifact graduation；
+16. v2.28 开发阶段继续跑自动门禁与 live probe，不再为每个 renderer digest 重复打断用户；功能冻结后再为一个 Release Candidate 执行完整十项原生人工门禁，历史 bundle 证据不继承；
 17. 开展长周期 dogfood，重点观察延迟重返、跨会话恢复、状态漂移和任务交接；当前显式 Coverage 已扩展到 10 个期望对象并实测 10/10 available，另有 1 个当前任务 partial Task 用于策展校准；
 18. 已完成受控固定回复进入普通 Codex Turn 的技术垂直切片，并在 Desktop 验证四条消息可见、可选、零线上模型；
 19. 已把 TRAIN-1 与六个 measured scenario 冻结为三轮脚本，并完成答案/对象/可选词一致性门禁、私有 scripted runtime、原生 task 激活、轻量答题、B 条件 companion 与既有 checkpoint/result 管线接入；轻量答题控件的当前-build 人工形成性验收已通过；
@@ -824,9 +840,11 @@ v2.20 的默认 `runStudyV2NativeTrial` 在其上完成组合：独立 App Serve
 33. Task object 的持久身份属于 host task + route + scope + canonical workspace，不属于某次 binding capability；同一上下文重新绑定时采用到新 revision，任何上下文字段变化都拒绝迁移。
 34. 未拖动卡片仍受完整 Range 锚点的视觉视口约束；用户可信拖动标题栏后，卡片成为显式固定的临时阅读面板，可跨新输出和锚点位移留在视口，直到显式关闭、新选区、上下文漂移或锚点 DOM 被移除。
 35. 有界标注目录先保证每个具备唯一 term 的对象一个主入口，再用剩余容量收录 alias；不得让少数对象的多个别名耗尽目录并使其他可识别对象只能依赖选区 fallback。
+36. 声明外遗漏只能通过真实里程碑中显式列出的 needed terms 测量；`object-review` 只做当前 identity-only 精确复盘，不得扫描 Chat、读取详情、自动补对象或将结果外推为人效收益。
 
 ## 18. 变更记录
 
+- v2.28：新增只读 `object-review`。调用方以严格 JSON 显式列出当前稳定里程碑真正需要的 term、期望类型与 need kind；Host 只对当前 runtime-validated workspace + task-local identity surface 做 exact key/name/alias 匹配，输出 available、missing、ambiguous、type-mismatch、workspace/task-local 来源、index snapshot、omission rate 与 resolution-failure rate。它不扫描 Chat、不读取 Provider detail、不调用模型、不持久化复盘、不自动创建对象。开发门禁调整为自动验证持续运行、人工十项集中到功能冻结后的单个 Release Candidate。
 - v2.26：修复 refresh continuity 验收暴露的两项交互缺陷。其一，标题栏拖动现在不仅保存坐标，也把卡片显式固定在视觉视口中；新 Assistant 输出或滚动把原锚点推出屏幕时，固定卡不再消失，未拖动卡仍按完整 Range 离屏规则清理。其二，256 项身份目录改为“每个可唯一识别对象一个主 term 优先，alias 后填充”，避免长任务中少数高优先对象的多个 name/path/alias 消耗容量并令后续文档没有下划线入口。真实 Edge headless 连续回归覆盖未固定卡离屏关闭与固定卡跨锚点位移保持；当前工作区探针确认 `manual-refresh-probe.md` 重新进入有界目录。新 digest `f570c4de…843c` 不继承 v2.25 的 9/10 人工证据，已用 v2.26 独立证据完成当前精确 Codex build 的自动 4/4 与人工 10/10。
 - v2.27：新增只读 `object-audit`，以当前 task/workspace binding 对照 Registry 与 checker-valid 稳定制品，分开给出 active partial、稳定重叠、terminal archive-ready、unmatched 和 ambiguous；声明外遗漏只允许通过显式里程碑复盘补充。真实安装后的审计得到 1 个 active partial、2 个 terminal unmatched、其余为 0。新 digest `fbc4d463…c278` 已通过自动 4/4，人工 10 项全部 pending，因此尚未完整资格化。
 - v2.25：关闭滚动后脱离文本锚点的浮窗。Renderer 以完整 Range 的 client rect 与 visual viewport 做交集判断；只要仍有部分文本可见就保持入口或卡片，所有文本 rect 完全离开视口后则通过既有清理链关闭，不把详情卡夹在屏幕边缘冒充仍然锚定。新增真实 Edge headless 回归，覆盖打开详情、滚动锚点完全离屏和 action/card 全部清理。v2.24 因人工验收暴露此缺陷而不资格化；v2.25 digest `475ee384…7974` 自动宿主门禁 4/4、九项人工 PASS，仅 refresh continuity pending。该最后一项随后暴露“用户已拖动的卡片仍会随锚点离屏关闭”和 alias 容量挤占，因此 v2.25 最终保持未资格化。

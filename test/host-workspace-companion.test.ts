@@ -243,6 +243,7 @@ test("workspace companion manages task objects only for the current bound task",
     const evidence = "EVIDENCE: companion task object graduated";
     await mkdir(join(workspace, "docs", "tasks"), { recursive: true });
     await writeFile(join(workspace, "evidence.txt"), `${evidence}\n`, "utf8");
+    await writeFile(join(workspace, "README.md"), "# Companion test workspace\n", "utf8");
     await writeFile(join(workspace, "docs", "tasks", "companion-lifecycle-v2.md"), `# Companion Lifecycle v2
 
 ## 目标
@@ -275,6 +276,19 @@ evidence.txt:1
     assert.equal(audit.terminalUnmatched, 1);
     assert.equal(audit.stableOverlapRate, 0.5);
     assert.equal(audit.omissionMeasurement, "explicit_milestone_review_required");
+    const review = await companion.reviewCurrentTaskObjectNeeds({
+      schemaVersion: 1,
+      milestoneKey: "COMPANION-REVIEW-1",
+      needs: [
+        { term: "Companion Lifecycle v2", expectedEntityType: "task", needKind: "resume" },
+        { term: "README.md", expectedEntityType: "document", needKind: "handoff" },
+        { term: "Pilot", expectedEntityType: "concept", needKind: "understand" },
+      ],
+    });
+    assert.equal(review.available, 2);
+    assert.equal(review.missing, 1);
+    assert.equal(review.omissionRate, 1 / 3);
+    assert.deepEqual(review.items.map((item) => item.state), ["available", "available", "missing"]);
     const archive = await companion.archiveGraduatedCurrentTaskObjects();
     assert.equal(archive.kind, "archived");
     assert.equal(archive.archivedCount, 1);

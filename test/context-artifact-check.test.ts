@@ -151,6 +151,7 @@ test("artifact checker rejects ambiguous identity, title drift, extra sections, 
 test("repository milestone artifacts pass without being modified", async () => {
   const paths = [
     "docs/concepts/long-task-dogfood.md",
+    "docs/concepts/object-review.md",
     "docs/concepts/pilot.md",
     "docs/concepts/task-object-graduation.md",
     "docs/changes/presentation-default.md",
@@ -162,8 +163,9 @@ test("repository milestone artifacts pass without being modified", async () => {
   const before = await Promise.all(paths.map((path) => readFile(path, "utf8")));
   const result = await checkContextMilestoneArtifacts(resolve("."));
   assert.equal(result.valid, true, JSON.stringify(result.issues));
-  assert.equal(result.candidateCount, 8);
-  assert.equal(result.artifacts.length, 8);
+  assert.equal(result.candidateCount, 9);
+  assert.equal(result.artifacts.length, 9);
+  assert.ok(result.artifacts.some((artifact) => artifact.identity === "object-review"));
   assert.ok(result.artifacts.some((artifact) => artifact.identity === "object-curation-policy"));
   assert.ok(result.artifacts.some((artifact) => artifact.identity === "task-object-capacity"));
   assert.deepEqual(await Promise.all(paths.map((path) => readFile(path, "utf8"))), before);

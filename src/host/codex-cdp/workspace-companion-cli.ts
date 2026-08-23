@@ -43,6 +43,7 @@ interface ParsedArguments {
     | "object-supersede"
     | "object-retire"
     | "object-audit"
+    | "object-review"
     | "object-archive"
     | "object-list";
   stateDir: string;
@@ -52,6 +53,7 @@ interface ParsedArguments {
   presentationMode: PointablePresentationMode;
   workspaceRoot?: string;
   objectFile?: string;
+  reviewFile?: string;
   objectKey?: string;
   replaces?: string;
   json: boolean;
@@ -110,11 +112,12 @@ function parseArguments(argv: string[]): ParsedArguments {
     command !== "object-supersede" &&
     command !== "object-retire" &&
     command !== "object-audit" &&
+    command !== "object-review" &&
     command !== "object-archive" &&
     command !== "object-list"
   ) {
     return fail(
-      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-audit|object-archive|object-list> [options]",
+      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-audit|object-review|object-archive|object-list> [options]",
     );
   }
   const stateRoot = localStateRoot();
@@ -125,6 +128,7 @@ function parseArguments(argv: string[]): ParsedArguments {
   let presentationMode: PointablePresentationMode = "mental-model";
   let workspaceRoot: string | undefined;
   let objectFile: string | undefined;
+  let reviewFile: string | undefined;
   let objectKey: string | undefined;
   let replaces: string | undefined;
   let json = false;
@@ -158,6 +162,9 @@ function parseArguments(argv: string[]): ParsedArguments {
     } else if (argument === "--object-file") {
       if (!isAbsolute(value)) fail("--object-file must be absolute");
       objectFile = resolve(value);
+    } else if (argument === "--review-file") {
+      if (!isAbsolute(value)) fail("--review-file must be absolute");
+      reviewFile = resolve(value);
     } else if (argument === "--object-key") {
       objectKey = value;
     } else if (argument === "--replaces") {
@@ -171,6 +178,9 @@ function parseArguments(argv: string[]): ParsedArguments {
   }
   if ((command === "object-upsert" || command === "object-supersede") && objectFile === undefined) {
     fail(`${command} requires --object-file <absolute-path>`);
+  }
+  if (command === "object-review" && reviewFile === undefined) {
+    fail("object-review requires --review-file <absolute-path>");
   }
   if (command === "object-supersede" && replaces === undefined) {
     fail("object-supersede requires --replaces <object-key>");
@@ -187,6 +197,7 @@ function parseArguments(argv: string[]): ParsedArguments {
     presentationMode,
     ...(workspaceRoot === undefined ? {} : { workspaceRoot }),
     ...(objectFile === undefined ? {} : { objectFile }),
+    ...(reviewFile === undefined ? {} : { reviewFile }),
     ...(objectKey === undefined ? {} : { objectKey }),
     ...(replaces === undefined ? {} : { replaces }),
     json,
@@ -329,13 +340,13 @@ async function readRequestJson(
   return parsed;
 }
 
-async function readTaskObjectFile(path: string): Promise<Record<string, unknown>> {
+async function readJsonInputFile(path: string): Promise<Record<string, unknown>> {
   const info = await stat(path);
   if (!info.isFile() || info.size > MAX_REQUEST_BYTES) {
-    throw new Error("task object input file is invalid or too large");
+    throw new Error("input file is invalid or too large");
   }
   const parsed: unknown = JSON.parse(await readFile(path, "utf8"));
-  if (!record(parsed)) throw new Error("task object input JSON is invalid");
+  if (!record(parsed)) throw new Error("input JSON is invalid");
   return parsed;
 }
 
@@ -353,6 +364,7 @@ async function controlRequest(
     | "/objects/supersede"
     | "/objects/retire"
     | "/objects/audit"
+    | "/objects/review"
     | "/objects/archive",
   body?: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
@@ -523,6 +535,17 @@ async function runServer(arguments_: ParsedArguments): Promise<void> {
         (error: unknown) => sendJson(response, 409, {
           ok: false,
           error: error instanceof Error ? error.message : "object_audit_failed",
+        }),
+      );
+      return;
+    }
+    if (request.method === "POST" && request.url === "/objects/review") {
+      void readRequestJson(request).then(async (body) =>
+        await companion.reviewCurrentTaskObjectNeeds(body.review)).then(
+        (review) => sendJson(response, 200, { ok: true, review }),
+        (error: unknown) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "object_review_failed",
         }),
       );
       return;
@@ -799,6 +822,7 @@ async function main(): Promise<void> {
     arguments_.command === "object-supersede" ||
     arguments_.command === "object-retire" ||
     arguments_.command === "object-audit" ||
+    arguments_.command === "object-review" ||
     arguments_.command === "object-archive" ||
     arguments_.command === "object-list"
   ) {
@@ -814,6 +838,11 @@ async function main(): Promise<void> {
       print(await controlRequest(state, "GET", "/objects/audit"), arguments_.json);
       return;
     }
+    if (arguments_.command === "object-review") {
+      const review = await readJsonInputFile(arguments_.reviewFile!);
+      print(await controlRequest(state, "POST", "/objects/review", { review }), arguments_.json);
+      return;
+    }
     if (arguments_.command === "object-archive") {
       print(await controlRequest(state, "POST", "/objects/archive"), arguments_.json);
       return;
@@ -824,7 +853,7 @@ async function main(): Promise<void> {
       }), arguments_.json);
       return;
     }
-    const object = await readTaskObjectFile(arguments_.objectFile!);
+    const object = await readJsonInputFile(arguments_.objectFile!);
     if (arguments_.command === "object-supersede") {
       print(await controlRequest(state, "POST", "/objects/supersede", {
         replaces: arguments_.replaces,

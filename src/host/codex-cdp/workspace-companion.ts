@@ -29,6 +29,7 @@ import {
   TaskObjectRegistry,
   type TaskObjectArchiveResult,
   type TaskObjectCurationAudit,
+  type TaskObjectCurationReview,
   type TaskObjectInventory,
   type TaskObjectMutationResult,
   type TaskObjectSummary,
@@ -108,6 +109,7 @@ export interface WorkspaceCompanion {
   listCurrentTaskObjects(): Promise<TaskObjectSummary[]>;
   inventoryCurrentTaskObjects(): Promise<TaskObjectInventory>;
   auditCurrentTaskObjects(): Promise<TaskObjectCurationAudit>;
+  reviewCurrentTaskObjectNeeds(input: unknown): Promise<TaskObjectCurationReview>;
   archiveGraduatedCurrentTaskObjects(): Promise<TaskObjectArchiveResult>;
   stop(): Promise<WorkspaceCompanionStatus>;
   status(): WorkspaceCompanionStatus;
@@ -533,6 +535,19 @@ export function createWorkspaceCompanion(
     );
   };
 
+  const reviewCurrentTaskObjectNeeds = async (
+    input: unknown,
+  ): Promise<TaskObjectCurationReview> => {
+    const current = await currentTaskBinding();
+    const trusted = await trustedBindingFor(current);
+    return await current.registry.reviewCuration(
+      current.task,
+      current.binding,
+      await localIndex.list(trusted),
+      input,
+    );
+  };
+
   const archiveGraduatedCurrentTaskObjects = async (): Promise<TaskObjectArchiveResult> => {
     const current = await currentTaskBinding();
     const result = await current.registry.archiveGraduated(
@@ -577,6 +592,7 @@ export function createWorkspaceCompanion(
     listCurrentTaskObjects,
     inventoryCurrentTaskObjects,
     auditCurrentTaskObjects,
+    reviewCurrentTaskObjectNeeds,
     archiveGraduatedCurrentTaskObjects,
     stop,
     status,

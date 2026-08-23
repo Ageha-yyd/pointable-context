@@ -8,7 +8,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v2.27 audits task-object curation without inheriting v2.26 manual qualification", async () => {
+test("v2.28 reviews explicit milestone needs without inheriting v2.26 manual qualification", async () => {
   const [prd, readme, mainSkill, workspaceSkill, recordsSkill, curationDecision, capacityDecision, coverage, compatibility, bundle] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -22,7 +22,7 @@ test("v2.27 audits task-object curation without inheriting v2.26 manual qualific
     readFile(resolve("host/workspace-companion.mjs")),
   ]);
 
-  assert.match(prd, /版本：v2\.27/u);
+  assert.match(prd, /版本：v2\.28/u);
   assert.match(prd, /`annotated_click`/u);
   assert.match(prd, /`selection_lookup`/u);
   assert.match(prd, /每条消息最多标 3 个高价值对象/u);
@@ -49,7 +49,9 @@ test("v2.27 audits task-object curation without inheriting v2.26 manual qualific
   assert.match(prd, /绝不跨任务、route、scope 或 workspace 迁移/u);
   assert.match(prd, /显式固定的临时阅读面板/u);
   assert.match(prd, /每个具备唯一 term 的对象一个主入口/u);
-  assert.match(prd, /自动门禁 4\/4.*人工门禁.*pending/u);
+  assert.match(prd, /Explicit Milestone Object Review/u);
+  assert.match(prd, /不得扫描 Chat、读取详情、自动补对象/u);
+  assert.match(prd, /人工十项合并到功能冻结后的单次 Release Candidate 验收/u);
 
   assert.match(readme, /bounded identity-only catalog/u);
   assert.match(readme, /Any registered object omitted by that Top-3 remains reachable/u);
@@ -62,7 +64,12 @@ test("v2.27 audits task-object curation without inheriting v2.26 manual qualific
   assert.match(readme, /Active, unmatched, and ambiguous records are never archived/u);
   assert.match(readme, /Records are never adopted across another task, route, scope, or workspace/u);
   assert.match(readme, /one primary annotation term per unambiguous object before aliases/u);
-  assert.match(readme, /current v2\.27 bundle.*all ten evidence-bound manual gates remain pending/u);
+  assert.match(
+    readme,
+    /current v2\.28 bundle.*ten evidence-bound manual gates are intentionally consolidated into the later feature-freeze Release Candidate/u,
+  );
+  assert.match(readme, /object-review --review-file/u);
+  assert.match(readme, /available, missing, ambiguous, and type-mismatch/u);
 
   assert.match(mainSkill, /two zero-turn entries/u);
   assert.match(mainSkill, /Any registered object not marked remains reachable/u);
@@ -78,7 +85,8 @@ test("v2.27 audits task-object curation without inheriting v2.26 manual qualific
   assert.match(workspaceSkill, /active_soft_limit_reached/u);
   assert.match(workspaceSkill, /object-archive --json/u);
   assert.match(workspaceSkill, /object-audit --json/u);
-  assert.match(workspaceSkill, /omission measurement requires explicit milestone review/iu);
+  assert.match(workspaceSkill, /object-review --review-file/u);
+  assert.match(workspaceSkill, /It must not read Provider detail, persist the review, infer undeclared needs/u);
   assert.match(workspaceSkill, /Active, unmatched, and ambiguous records never archive/u);
   assert.match(workspaceSkill, /must never migrate objects across another task, route, scope, or workspace/u);
   assert.match(workspaceSkill, /moved card is explicitly pinned/u);
@@ -87,6 +95,7 @@ test("v2.27 audits task-object curation without inheriting v2.26 manual qualific
   assert.match(recordsSkill, /Two-tier object curation/u);
   assert.match(recordsSkill, /Retire the corresponding task-local object only after the stable artifact reports `valid: true`/u);
   assert.match(recordsSkill, /Archive is maintenance, not graduation evidence/u);
+  assert.match(recordsSkill, /workspace companion's `object-review`/u);
   assert.match(curationDecision, /Agent 在明确授权的有界任务中只于稳定里程碑维护对象/u);
   assert.match(capacityDecision, /热 Registry 在每个当前任务达到 64 个 active 对象时给出软警告/u);
   assert.match(capacityDecision, /Archive 不参与查询/u);
@@ -98,7 +107,7 @@ test("v2.27 audits task-object curation without inheriting v2.26 manual qualific
     automatic?: { state?: string };
     manualChecks?: Array<{ result?: string }>;
   };
-  assert.equal(current.implementation?.productVersion, "v2.27");
+  assert.equal(current.implementation?.productVersion, "v2.28");
   assert.equal(
     current.implementation?.rendererBundleSha256,
     createHash("sha256").update(bundle).digest("hex"),

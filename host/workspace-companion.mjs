@@ -7676,6 +7676,7 @@ var TASK_OBJECT_ARCHIVE_MAX_RECORDS = 8192;
 var TASK_OBJECT_ACTIVE_SOFT_LIMIT = 64;
 var TASK_OBJECT_ACTIVE_HARD_LIMIT = 256;
 var MAX_ALIASES = 8;
+var MAX_CURATION_REVIEW_NEEDS = 32;
 function objectRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -7705,6 +7706,41 @@ function taskObjectType(value) {
     throw new ContractError("entityType is invalid");
   }
   return value;
+}
+function curationNeedEntityType(value) {
+  if (value !== "concept" && value !== "change" && value !== "decision" && value !== "task" && value !== "verification" && value !== "module" && value !== "document" && value !== "configuration" && value !== "file") {
+    throw new ContractError("expectedEntityType is invalid");
+  }
+  return value;
+}
+function curationNeedKind(value) {
+  if (value !== "understand" && value !== "resume" && value !== "handoff" && value !== "decision" && value !== "status" && value !== "verification") {
+    throw new ContractError("needKind is invalid");
+  }
+  return value;
+}
+function parseTaskObjectCurationReviewInput(value) {
+  if (!objectRecord(value) || !exactKeys3(value, ["schemaVersion", "milestoneKey", "needs"]) || value.schemaVersion !== 1 || !Array.isArray(value.needs) || value.needs.length < 1 || value.needs.length > MAX_CURATION_REVIEW_NEEDS) {
+    throw new ContractError("task object curation review input is invalid");
+  }
+  const seen = /* @__PURE__ */ new Set();
+  const needs = value.needs.map((rawNeed, index) => {
+    if (!objectRecord(rawNeed) || !exactKeys3(rawNeed, ["term", "expectedEntityType", "needKind"])) {
+      throw new ContractError(`needs[${index}] is invalid`);
+    }
+    const term = boundedText5(rawNeed.term, `needs[${index}].term`, 2, 256);
+    const expectedEntityType = curationNeedEntityType(rawNeed.expectedEntityType);
+    const needKind = curationNeedKind(rawNeed.needKind);
+    const identity2 = `${normalizedIdentity(term)}\0${expectedEntityType}`;
+    if (seen.has(identity2)) throw new ContractError("curation review needs must be unique");
+    seen.add(identity2);
+    return Object.freeze({ term, expectedEntityType, needKind });
+  });
+  return Object.freeze({
+    schemaVersion: 1,
+    milestoneKey: objectKey2(value.milestoneKey),
+    needs: Object.freeze(needs)
+  });
 }
 function aliases(value) {
   if (!Array.isArray(value) || value.length > MAX_ALIASES) {
@@ -7975,6 +8011,12 @@ function documentBytes(document2) {
 }
 function archiveRevision(records) {
   return `task-object-archive:${createHash9("sha256").update(records.map((record8) => `${record8.entityId}:${record8.entityRevision}`).sort().join("\n"), "utf8").digest("hex")}`;
+}
+function contextIndexSnapshot(records) {
+  return `context-index:${createHash9("sha256").update(
+    records.filter((record8) => !record8.deleted).map((record8) => `${record8.entityId}\0${record8.entityType}\0${record8.indexRevision}`).sort().join("\n"),
+    "utf8"
+  ).digest("hex")}`;
 }
 function normalizedIdentity(value) {
   return value.normalize("NFKC").toLocaleLowerCase("en-US");
@@ -8300,6 +8342,58 @@ var TaskObjectRegistry = class {
       terminalAmbiguous: count("terminal_ambiguous"),
       stableOverlapRate: items.length === 0 ? 0 : stableOverlaps / items.length,
       omissionMeasurement: "explicit_milestone_review_required",
+      items: Object.freeze(items)
+    });
+  }
+  /**
+   * Measure only the terms explicitly declared as needed at a stable milestone.
+   * This is a deterministic point-lookup review over the same stable + task-local
+   * identity surface; it never scans Chat, calls a model, or reads Provider detail.
+   */
+  async reviewCuration(task, binding, rawWorkspaceRecords, rawReview) {
+    const workspaceRecords = validateContextIndexForRuntime(rawWorkspaceRecords, binding.scope);
+    const review = parseTaskObjectCurationReviewInput(rawReview);
+    const taskRecords = (await this.#read()).records.filter((record8) => matchesEntry(record8, task, binding)).filter((record8) => record8.lifecycle === "active" || stableMatchesFor(record8, workspaceRecords).length === 0);
+    const records = [
+      ...workspaceRecords,
+      ...this.#identityRecords(taskRecords)
+    ].filter((record8) => !record8.deleted);
+    const items = review.needs.map((need) => {
+      const normalizedTerm2 = normalizedIdentity(need.term);
+      const matches = records.filter((record8) => [record8.canonicalKey, record8.canonicalName, ...record8.aliases].filter((candidate) => typeof candidate === "string").some((candidate) => normalizedIdentity(candidate) === normalizedTerm2));
+      const candidateTypes = [...new Set(matches.map((match) => match.entityType))].sort();
+      const unique = matches.length === 1 ? matches[0] : void 0;
+      const state = matches.length === 0 ? "missing" : matches.length > 1 ? "ambiguous" : unique.entityType === need.expectedEntityType ? "available" : "type_mismatch";
+      return Object.freeze({
+        term: need.term,
+        expectedEntityType: need.expectedEntityType,
+        needKind: need.needKind,
+        state,
+        matchCount: matches.length,
+        candidateTypes: Object.freeze(candidateTypes),
+        ...state === "available" ? {
+          source: unique.authorityRef.provider === TASK_OBJECT_PROVIDER_ID ? "task_local" : "workspace"
+        } : {}
+      });
+    });
+    const count = (state) => items.filter((item) => item.state === state).length;
+    const available = count("available");
+    const missing = count("missing");
+    const ambiguous = count("ambiguous");
+    const typeMismatch = count("type_mismatch");
+    return Object.freeze({
+      milestoneKey: review.milestoneKey,
+      observedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      indexSnapshot: contextIndexSnapshot(records),
+      needCount: items.length,
+      available,
+      missing,
+      ambiguous,
+      typeMismatch,
+      availabilityRate: available / items.length,
+      omissionRate: missing / items.length,
+      resolutionFailureRate: (missing + ambiguous + typeMismatch) / items.length,
+      measurement: "explicit_milestone_review",
       items: Object.freeze(items)
     });
   }
@@ -8830,6 +8924,16 @@ function createWorkspaceCompanion(options) {
       await checkedStableRecords(current)
     );
   };
+  const reviewCurrentTaskObjectNeeds = async (input) => {
+    const current = await currentTaskBinding();
+    const trusted = await trustedBindingFor(current);
+    return await current.registry.reviewCuration(
+      current.task,
+      current.binding,
+      await localIndex.list(trusted),
+      input
+    );
+  };
   const archiveGraduatedCurrentTaskObjects = async () => {
     const current = await currentTaskBinding();
     const result = await current.registry.archiveGraduated(
@@ -8872,6 +8976,7 @@ function createWorkspaceCompanion(options) {
     listCurrentTaskObjects,
     inventoryCurrentTaskObjects,
     auditCurrentTaskObjects,
+    reviewCurrentTaskObjectNeeds,
     archiveGraduatedCurrentTaskObjects,
     stop,
     status
@@ -8918,9 +9023,9 @@ function boundedInteger2(value, name) {
 }
 function parseArguments(argv) {
   const command = argv[0];
-  if (command !== "start" && command !== "status" && command !== "bind" && command !== "unbind" && command !== "stop" && command !== "run" && command !== "object-upsert" && command !== "object-supersede" && command !== "object-retire" && command !== "object-audit" && command !== "object-archive" && command !== "object-list") {
+  if (command !== "start" && command !== "status" && command !== "bind" && command !== "unbind" && command !== "stop" && command !== "run" && command !== "object-upsert" && command !== "object-supersede" && command !== "object-retire" && command !== "object-audit" && command !== "object-review" && command !== "object-archive" && command !== "object-list") {
     return fail(
-      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-audit|object-archive|object-list> [options]"
+      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-audit|object-review|object-archive|object-list> [options]"
     );
   }
   const stateRoot = localStateRoot();
@@ -8931,6 +9036,7 @@ function parseArguments(argv) {
   let presentationMode = "mental-model";
   let workspaceRoot;
   let objectFile;
+  let reviewFile;
   let objectKey3;
   let replaces;
   let json = false;
@@ -8964,6 +9070,9 @@ function parseArguments(argv) {
     } else if (argument === "--object-file") {
       if (!isAbsolute4(value)) fail("--object-file must be absolute");
       objectFile = resolve8(value);
+    } else if (argument === "--review-file") {
+      if (!isAbsolute4(value)) fail("--review-file must be absolute");
+      reviewFile = resolve8(value);
     } else if (argument === "--object-key") {
       objectKey3 = value;
     } else if (argument === "--replaces") {
@@ -8977,6 +9086,9 @@ function parseArguments(argv) {
   }
   if ((command === "object-upsert" || command === "object-supersede") && objectFile === void 0) {
     fail(`${command} requires --object-file <absolute-path>`);
+  }
+  if (command === "object-review" && reviewFile === void 0) {
+    fail("object-review requires --review-file <absolute-path>");
   }
   if (command === "object-supersede" && replaces === void 0) {
     fail("object-supersede requires --replaces <object-key>");
@@ -8993,6 +9105,7 @@ function parseArguments(argv) {
     presentationMode,
     ...workspaceRoot === void 0 ? {} : { workspaceRoot },
     ...objectFile === void 0 ? {} : { objectFile },
+    ...reviewFile === void 0 ? {} : { reviewFile },
     ...objectKey3 === void 0 ? {} : { objectKey: objectKey3 },
     ...replaces === void 0 ? {} : { replaces },
     json
@@ -9105,13 +9218,13 @@ async function readRequestJson(request) {
   if (!record7(parsed)) throw new Error("control request JSON is invalid");
   return parsed;
 }
-async function readTaskObjectFile(path) {
+async function readJsonInputFile(path) {
   const info = await stat6(path);
   if (!info.isFile() || info.size > MAX_REQUEST_BYTES) {
-    throw new Error("task object input file is invalid or too large");
+    throw new Error("input file is invalid or too large");
   }
   const parsed = JSON.parse(await readFile3(path, "utf8"));
-  if (!record7(parsed)) throw new Error("task object input JSON is invalid");
+  if (!record7(parsed)) throw new Error("input JSON is invalid");
   return parsed;
 }
 async function controlRequest(state, method, path, body) {
@@ -9272,6 +9385,16 @@ async function runServer(arguments_) {
         (error) => sendJson(response, 409, {
           ok: false,
           error: error instanceof Error ? error.message : "object_audit_failed"
+        })
+      );
+      return;
+    }
+    if (request.method === "POST" && request.url === "/objects/review") {
+      void readRequestJson(request).then(async (body) => await companion.reviewCurrentTaskObjectNeeds(body.review)).then(
+        (review) => sendJson(response, 200, { ok: true, review }),
+        (error) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "object_review_failed"
         })
       );
       return;
@@ -9527,7 +9650,7 @@ async function main() {
     print(await controlRequest(state, "POST", "/unbind"), arguments_.json);
     return;
   }
-  if (arguments_.command === "object-upsert" || arguments_.command === "object-supersede" || arguments_.command === "object-retire" || arguments_.command === "object-audit" || arguments_.command === "object-archive" || arguments_.command === "object-list") {
+  if (arguments_.command === "object-upsert" || arguments_.command === "object-supersede" || arguments_.command === "object-retire" || arguments_.command === "object-audit" || arguments_.command === "object-review" || arguments_.command === "object-archive" || arguments_.command === "object-list") {
     const state = await readState(arguments_.stateDir);
     if (state === void 0 || !processIsAlive(state.pid)) {
       fail("workspace companion is not running");
@@ -9540,6 +9663,11 @@ async function main() {
       print(await controlRequest(state, "GET", "/objects/audit"), arguments_.json);
       return;
     }
+    if (arguments_.command === "object-review") {
+      const review = await readJsonInputFile(arguments_.reviewFile);
+      print(await controlRequest(state, "POST", "/objects/review", { review }), arguments_.json);
+      return;
+    }
     if (arguments_.command === "object-archive") {
       print(await controlRequest(state, "POST", "/objects/archive"), arguments_.json);
       return;
@@ -9550,7 +9678,7 @@ async function main() {
       }), arguments_.json);
       return;
     }
-    const object = await readTaskObjectFile(arguments_.objectFile);
+    const object = await readJsonInputFile(arguments_.objectFile);
     if (arguments_.command === "object-supersede") {
       print(await controlRequest(state, "POST", "/objects/supersede", {
         replaces: arguments_.replaces,

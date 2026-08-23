@@ -18,6 +18,7 @@ import {
   RoutedWorkspaceRevisionProbe,
   TaskObjectRegistry,
   TaskObjectWorkspaceContextIndex,
+  parseTaskObjectCurationReviewInput,
   parseTaskObjectInput,
 } from "../src/host/codex-cdp/task-object-registry.js";
 import {
@@ -108,6 +109,136 @@ test("task object input is strict and type-specific", () => {
     }),
     /exactly one 当前 step/u,
   );
+  const review = parseTaskObjectCurationReviewInput({
+    schemaVersion: 1,
+    milestoneKey: "MILESTONE-1",
+    needs: [{ term: "Pilot", expectedEntityType: "concept", needKind: "understand" }],
+  });
+  assert.equal(review.needs[0]?.term, "Pilot");
+  assert.throws(
+    () => parseTaskObjectCurationReviewInput({
+      schemaVersion: 1,
+      milestoneKey: "MILESTONE-1",
+      needs: [
+        { term: "Pilot", expectedEntityType: "concept", needKind: "understand" },
+        { term: "pilot", expectedEntityType: "concept", needKind: "resume" },
+      ],
+    }),
+    /must be unique/u,
+  );
+});
+
+test("explicit milestone review measures deterministic availability without reading detail", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pointable-task-object-review-"));
+  const workspace = join(root, "workspace");
+  await mkdir(workspace);
+  const bindingRegistry = new CodexTaskWorkspaceBindingRegistry(join(root, "bindings.json"));
+  const objects = new TaskObjectRegistry(join(root, "task-objects.json"));
+  const activeTask = task("thread-review");
+  const entry = await bindingRegistry.bind(activeTask, workspace);
+  try {
+    await objects.upsert(activeTask, entry, {
+      ...numberedConcept(1),
+      objectKey: "TASK-LOCAL",
+      canonicalName: "Task Local Object",
+      aliases: ["local-alias"],
+    });
+    await objects.upsert(activeTask, entry, {
+      ...numberedConcept(2),
+      objectKey: "OVERLAP",
+      canonicalName: "Overlap Object",
+      aliases: [],
+    });
+    const stable = [
+      {
+        schemaVersion: "1.0" as const,
+        scope: { ...entry.scope },
+        entityId: "concept:stable",
+        entityType: "concept",
+        canonicalKey: "docs/concepts/stable.md",
+        canonicalName: "Stable Object",
+        aliases: ["stable-alias"],
+        summary: "stable",
+        authorityRef: { provider: "local-filesystem", locator: "docs/concepts/stable.md" },
+        indexRevision: "stable:r1",
+        indexedAt: new Date().toISOString(),
+        deleted: false,
+      },
+      {
+        schemaVersion: "1.0" as const,
+        scope: { ...entry.scope },
+        entityId: "concept:overlap",
+        entityType: "concept",
+        canonicalKey: "docs/concepts/overlap.md",
+        canonicalName: "Overlap Object",
+        aliases: [],
+        summary: "stable overlap",
+        authorityRef: { provider: "local-filesystem", locator: "docs/concepts/overlap.md" },
+        indexRevision: "stable:r1",
+        indexedAt: new Date().toISOString(),
+        deleted: false,
+      },
+      {
+        schemaVersion: "1.0" as const,
+        scope: { ...entry.scope },
+        entityId: "module:typed",
+        entityType: "module",
+        canonicalKey: "src/typed.ts",
+        canonicalName: "Typed Object",
+        aliases: [],
+        summary: "typed",
+        authorityRef: { provider: "local-filesystem", locator: "src/typed.ts" },
+        indexRevision: "stable:r1",
+        indexedAt: new Date().toISOString(),
+        deleted: false,
+      },
+    ];
+    const review = await objects.reviewCuration(activeTask, entry, stable, {
+      schemaVersion: 1,
+      milestoneKey: "CURATION-REVIEW-1",
+      needs: [
+        { term: "Task Local Object", expectedEntityType: "concept", needKind: "resume" },
+        { term: "stable-alias", expectedEntityType: "concept", needKind: "understand" },
+        { term: "Overlap Object", expectedEntityType: "concept", needKind: "handoff" },
+        { term: "Typed Object", expectedEntityType: "concept", needKind: "decision" },
+        { term: "Pilot", expectedEntityType: "concept", needKind: "status" },
+      ],
+    });
+    assert.deepEqual({
+      needCount: review.needCount,
+      available: review.available,
+      missing: review.missing,
+      ambiguous: review.ambiguous,
+      typeMismatch: review.typeMismatch,
+      availabilityRate: review.availabilityRate,
+      omissionRate: review.omissionRate,
+      resolutionFailureRate: review.resolutionFailureRate,
+      measurement: review.measurement,
+    }, {
+      needCount: 5,
+      available: 2,
+      missing: 1,
+      ambiguous: 1,
+      typeMismatch: 1,
+      availabilityRate: 0.4,
+      omissionRate: 0.2,
+      resolutionFailureRate: 0.6,
+      measurement: "explicit_milestone_review",
+    });
+    assert.match(review.indexSnapshot, /^context-index:[a-f0-9]{64}$/u);
+    assert.deepEqual(
+      review.items.map((item) => [item.term, item.state, item.source ?? null, item.candidateTypes]),
+      [
+        ["Task Local Object", "available", "task_local", ["concept"]],
+        ["stable-alias", "available", "workspace", ["concept"]],
+        ["Overlap Object", "ambiguous", null, ["concept"]],
+        ["Typed Object", "type_mismatch", null, ["module"]],
+        ["Pilot", "missing", null, []],
+      ],
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("task objects are task-bound, partial, mutable, supersedable, and retireable", async () => {

@@ -11,10 +11,11 @@ const execFileAsync = promisify(execFile);
 const entrypoint = resolve("dist/src/host/codex-cdp/workspace-companion-cli.js");
 
 async function runCli(
-  command: "start" | "status" | "stop" | "object-list" | "object-audit" | "object-archive",
+  command: "start" | "status" | "stop" | "object-list" | "object-audit" | "object-review" | "object-archive",
   stateDir: string,
   registry: string,
   endpoint: string,
+  extra: string[] = [],
 ): Promise<Record<string, unknown>> {
   const { stdout } = await execFileAsync(process.execPath, [
     entrypoint,
@@ -27,6 +28,7 @@ async function runCli(
     endpoint,
     "--refresh-ms",
     "100",
+    ...extra,
     "--json",
   ], { cwd: process.cwd(), timeout: 15_000, windowsHide: true });
   return JSON.parse(stdout) as Record<string, unknown>;
@@ -68,6 +70,16 @@ test("detached workspace companion supports lifecycle without guessing an active
     );
     await assert.rejects(
       () => runCli("object-audit", stateDir, registry, endpoint),
+      /active_codex_task_unavailable/u,
+    );
+    const reviewFile = join(root, "review.json");
+    await writeFile(reviewFile, JSON.stringify({
+      schemaVersion: 1,
+      milestoneKey: "CLI-REVIEW-1",
+      needs: [{ term: "Pilot", expectedEntityType: "concept", needKind: "understand" }],
+    }), "utf8");
+    await assert.rejects(
+      () => runCli("object-review", stateDir, registry, endpoint, ["--review-file", reviewFile]),
       /active_codex_task_unavailable/u,
     );
     await assert.rejects(
