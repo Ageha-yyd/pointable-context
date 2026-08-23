@@ -1718,6 +1718,14 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     const rect = root.getBoundingClientRect();
     return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
   }
+  function rangeIntersectsVisualViewport(range) {
+    const viewport = window.visualViewport;
+    const left = viewport?.offsetLeft ?? 0;
+    const top = viewport?.offsetTop ?? 0;
+    const right = left + (viewport?.width ?? window.innerWidth);
+    const bottom = top + (viewport?.height ?? window.innerHeight);
+    return [...range.getClientRects()].some((rect) => rect.width > 0 && rect.height > 0 && rect.right > left && rect.left < right && rect.bottom > top && rect.top < bottom);
+  }
   const annotationHighlightName = `pointable-context-object-${lifecycleId}`;
   const annotationInteractiveSelector = 'a, button, input, textarea, select, [role="button"], [contenteditable="true"]';
   function refreshObserver() {
@@ -2807,7 +2815,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   }
   function candidateAnchorIsCurrent() {
     const current = candidate;
-    if (current === void 0 || !current.sourceRoot.isConnected || !current.range.commonAncestorContainer.isConnected || current.range.toString().trim() !== current.text || !rootVisible(current.sourceRoot)) {
+    if (current === void 0 || !current.sourceRoot.isConnected || !current.range.commonAncestorContainer.isConnected || current.range.toString().trim() !== current.text || !rootVisible(current.sourceRoot) || manualCardPlacement === void 0 && !rangeIntersectsVisualViewport(current.range)) {
       return false;
     }
     const start = nodeElement(current.range.startContainer);

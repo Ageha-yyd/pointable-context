@@ -284,6 +284,9 @@ test("install expression is namespaced, generic, click-gated, text-only, and cle
   assert.match(expression, /为什么这样说/u);
   assert.match(expression, /Commit the explicit trusted activation synchronously/u);
   assert.match(expression, /range\.toString\(\)\.trim\(\)/u);
+  assert.match(expression, /rangeIntersectsVisualViewport/u);
+  assert.match(expression, /range\.getClientRects\(\)/u);
+  assert.match(expression, /manualCardPlacement === undefined &&\s*!rangeIntersectsVisualViewport/u);
   assert.match(expression, /range\.intersectsNode/u);
   assert.match(expression, /visited > 2_048/u);
   assert.match(expression, /data-pointable-context-owned/u);

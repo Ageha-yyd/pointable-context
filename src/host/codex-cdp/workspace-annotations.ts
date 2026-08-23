@@ -130,7 +130,21 @@ export function buildWorkspaceAnnotationCatalog(
     right.priority - left.priority ||
     right.term.length - left.term.length ||
     left.term.localeCompare(right.term, "en"));
-  const bounded = entries.slice(0, maxAnnotations);
+  const primary: PointableObjectAnnotation[] = [];
+  const aliases: PointableObjectAnnotation[] = [];
+  const primaryObjectKeys = new Set<string>();
+  for (const entry of entries) {
+    if (primaryObjectKeys.has(entry.objectKey)) {
+      aliases.push(entry);
+      continue;
+    }
+    primaryObjectKeys.add(entry.objectKey);
+    primary.push(entry);
+  }
+  const bounded = [
+    ...primary.slice(0, maxAnnotations),
+    ...aliases,
+  ].slice(0, maxAnnotations);
   const revision = createHash("sha256")
     .update(bindingRevision, "utf8")
     .update("\u0000", "utf8")

@@ -67,6 +67,23 @@ test("annotation catalog prioritizes mental-model objects and omits ambiguous te
   assert.equal(Object.isFrozen(catalog.entries), true);
 });
 
+test("bounded annotation catalog reserves one primary term per object before aliases", () => {
+  const catalog = buildWorkspaceAnnotationCatalog([
+    record("task:high-priority", "task", "High Priority Task", [
+      "high-priority-task",
+      "priority-task",
+    ], "docs/tasks/high-priority.md"),
+    record("document:refresh-probe", "document", "manual-refresh-probe.md", [
+      "manual-refresh-probe",
+    ], "docs/compatibility/manual-refresh-probe.md"),
+  ], "binding-1", "fingerprint-1", 2);
+
+  assert.equal(catalog.entries.length, 2);
+  assert.equal(new Set(catalog.entries.map((entry) => entry.objectKey)).size, 2);
+  assert.equal(catalog.entries.some((entry) => entry.term === "High Priority Task"), true);
+  assert.equal(catalog.entries.some((entry) => entry.term === "manual-refresh-probe.md"), true);
+});
+
 test("workspace annotation provider reads only the identity index and binds the catalog to the task", async () => {
   const root = await mkdtemp(join(tmpdir(), "pointable-annotations-"));
   const workspace = join(root, "workspace");

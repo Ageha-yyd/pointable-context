@@ -810,6 +810,21 @@ export function installPointableContextRenderer(
     );
   }
 
+  function rangeIntersectsVisualViewport(range: Range): boolean {
+    const viewport = window.visualViewport;
+    const left = viewport?.offsetLeft ?? 0;
+    const top = viewport?.offsetTop ?? 0;
+    const right = left + (viewport?.width ?? window.innerWidth);
+    const bottom = top + (viewport?.height ?? window.innerHeight);
+    return [...range.getClientRects()].some((rect) =>
+      rect.width > 0 &&
+      rect.height > 0 &&
+      rect.right > left &&
+      rect.left < right &&
+      rect.bottom > top &&
+      rect.top < bottom);
+  }
+
   const annotationHighlightName = `pointable-context-object-${lifecycleId}`;
   const annotationInteractiveSelector =
     'a, button, input, textarea, select, [role="button"], [contenteditable="true"]';
@@ -2151,7 +2166,9 @@ export function installPointableContextRenderer(
       !current.sourceRoot.isConnected ||
       !current.range.commonAncestorContainer.isConnected ||
       current.range.toString().trim() !== current.text ||
-      !rootVisible(current.sourceRoot)
+      !rootVisible(current.sourceRoot) ||
+      (manualCardPlacement === undefined &&
+        !rangeIntersectsVisualViewport(current.range))
     ) {
       return false;
     }

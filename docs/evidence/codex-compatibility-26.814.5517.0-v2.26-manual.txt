@@ -1,0 +1,10 @@
+refresh_continuity=PASS 2026-08-24T02:09:28+08:00 user confirmed that the deliberately dragged card remained visible across the new Assistant output, exposed 内容已更新 after the fourth bounded snapshot, and refreshed in place without a new Chat Turn.
+selection_inert=PASS 2026-08-24T02:12:05+08:00 user confirmed selecting the complete workspace-annotations.ts reference exposed only the quiet action and did not open detail automatically.
+trusted_click=PASS 2026-08-24T02:12:05+08:00 user confirmed both the quiet marked-object click and the explicit 查看上下文 action opened the registered workspace object without another Chat Turn.
+anchored_card=PASS 2026-08-24T02:12:05+08:00 user confirmed the native detail appeared beside the current Chat Lane without opening a browser.
+progressive_disclosure=PASS 2026-08-24T02:12:05+08:00 user confirmed 查看详情 and 收起详情 operated in the same card.
+close_and_focus_restore=PASS 2026-08-24T02:12:05+08:00 user confirmed the close control removed the card without moving the Chat Lane unexpectedly and left the composer usable.
+composer_persistence=PASS 2026-08-24T02:12:05+08:00 user confirmed focusing and temporarily typing in the current composer kept the card open.
+navigation_recovery=PASS 2026-08-24T02:14:38+08:00 user confirmed switching to another Codex task cleaned the old card and returning restored one current marked-object interaction without stale, duplicate, or unavailable UI; the returned entry opened a fresh card normally.
+scroll_and_virtualization=PASS 2026-08-24T02:15:56+08:00 user confirmed an un-moved workspace-annotations.ts card closed after its complete anchor left the viewport without leaving an orphaned edge card or action, and returning restored one working quiet mark.
+stale_response_cleanup=PASS 2026-08-24T02:17:54+08:00 user confirmed the controlled three-second stale-alpha response was discarded after selecting stale-beta; the old detail did not mount, the new selection could expose only its own entry, and it did not auto-open detail.

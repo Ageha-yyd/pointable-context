@@ -131,7 +131,7 @@ try {
     sidebar.setAttribute('data-app-action-sidebar-thread-host-id', 'headless-host');
     const main = document.createElement('main');
     main.setAttribute('data-app-shell-main-surface', '');
-    Object.assign(main.style, { minHeight: '600px', padding: '120px' });
+    Object.assign(main.style, { minHeight: '2400px', padding: '120px' });
     const message = document.createElement('article');
     message.setAttribute('data-response-annotation-target', '');
     const overlay = document.createElement('div');
@@ -792,6 +792,166 @@ try {
   ) {
     throw new Error(`study metric observer captured foreign or unidentified UI: ${JSON.stringify(studyEvents)}`);
   }
+
+  const offscreenIntentPromise = waitForBindingIntent(connection, bindingName, "resolve");
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mousePressed", x: annotationPoint.x, y: annotationPoint.y,
+    button: "left", clickCount: 1,
+  });
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mouseReleased", x: annotationPoint.x, y: annotationPoint.y,
+    button: "left", clickCount: 1,
+  });
+  const offscreenIntent = await offscreenIntentPromise;
+  await evaluate(connection, createDeliverPointableResultExpression(
+    createPointableLookupResponse(offscreenIntent, {
+      kind: "error",
+      code: "offscreen_anchor_probe",
+      message: "This card must close when its complete anchor leaves the visual viewport.",
+      retryable: false,
+    }),
+    lifecycleId,
+  ));
+  await waitFor(connection, `window.__pointableContextRenderer?.status?.().cardCount === 1`);
+  await evaluate(connection, `window.scrollTo({ top: 900, behavior: 'instant' }); true`);
+  await waitFor(connection, `(() => {
+    const anchor = document.getElementById('fixture-text')?.getBoundingClientRect();
+    const status = window.__pointableContextRenderer?.status?.();
+    return window.scrollY >= 800 && anchor !== undefined && anchor.bottom <= 0 &&
+      status?.state === 'idle' && status?.cardCount === 0 && status?.actionCount === 0;
+  })()`);
+  await evaluate(connection, `window.scrollTo({ top: 0, behavior: 'instant' }); true`);
+  await waitFor(connection, `(() => {
+    const anchor = document.getElementById('fixture-text')?.getBoundingClientRect();
+    return anchor !== undefined && anchor.bottom > 0 && anchor.top < innerHeight;
+  })()`);
+  const pinnedAnnotationPoint = await evaluate(connection, `(() => {
+    const node = document.getElementById('fixture-text');
+    if (!(node instanceof HTMLElement)) return null;
+    const rect = node.getBoundingClientRect();
+    if (rect.bottom <= 0 || rect.top >= innerHeight) return null;
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  })()`);
+  if (pinnedAnnotationPoint === null) throw new Error("pinned annotation target is not visible");
+  const pinnedIntentPromise = waitForBindingIntent(connection, bindingName, "resolve");
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mousePressed", x: pinnedAnnotationPoint.x, y: pinnedAnnotationPoint.y,
+    button: "left", clickCount: 1,
+  });
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mouseReleased", x: pinnedAnnotationPoint.x, y: pinnedAnnotationPoint.y,
+    button: "left", clickCount: 1,
+  });
+  const pinnedIntent = await pinnedIntentPromise;
+  await evaluate(connection, createDeliverPointableResultExpression(
+    createPointableLookupResponse(pinnedIntent, {
+      kind: "error",
+      code: "pinned_anchor_probe",
+      message: "A deliberately moved card must survive later anchor displacement.",
+      retryable: false,
+    }),
+    lifecycleId,
+  ));
+  const pinnedDrag = await waitFor(connection, `(() => {
+    const card = document.querySelector('[data-pointable-context-role="card"]');
+    const handle = card?.querySelector('[data-pointable-context-role="drag-handle"]');
+    if (!(card instanceof HTMLElement) || !(handle instanceof HTMLElement)) return null;
+    const cardRect = card.getBoundingClientRect();
+    const handleRect = handle.getBoundingClientRect();
+    if (
+      handleRect.bottom <= 0 || handleRect.top >= innerHeight ||
+      handleRect.right <= 0 || handleRect.left >= innerWidth
+    ) return null;
+    const deltaX = handleRect.left < 100 ? 72 :
+      handleRect.right > innerWidth - 100 ? -72 : 72;
+    const deltaY = handleRect.top < 100 ? 48 :
+      handleRect.bottom > innerHeight - 100 ? -48 : 48;
+    return {
+      beforeLeft: cardRect.left,
+      beforeTop: cardRect.top,
+      startX: handleRect.left + Math.min(56, handleRect.width / 3),
+      startY: handleRect.top + handleRect.height / 2,
+      endX: handleRect.left + Math.min(56, handleRect.width / 3) + deltaX,
+      endY: handleRect.top + handleRect.height / 2 + deltaY,
+    };
+  })()`);
+  await evaluate(connection, `(() => {
+    window.__pointablePinnedDragEvents = [];
+    for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
+      document.addEventListener(type, (event) => {
+        window.__pointablePinnedDragEvents.push({
+          type,
+          trusted: event.isTrusted,
+          pointerId: event.pointerId,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          targetRole: event.target?.getAttribute?.('data-pointable-context-role') ?? null,
+        });
+      }, true);
+    }
+    return true;
+  })()`);
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mousePressed", x: pinnedDrag.startX, y: pinnedDrag.startY,
+    button: "left", clickCount: 1,
+  });
+  for (let step = 1; step <= 6; step += 1) {
+    const progress = step / 6;
+    await connection.send("Input.dispatchMouseEvent", {
+      type: "mouseMoved",
+      x: pinnedDrag.startX + (pinnedDrag.endX - pinnedDrag.startX) * progress,
+      y: pinnedDrag.startY + (pinnedDrag.endY - pinnedDrag.startY) * progress,
+      button: "left",
+      buttons: 1,
+    });
+  }
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mouseReleased", x: pinnedDrag.endX, y: pinnedDrag.endY,
+    button: "left", clickCount: 1,
+  });
+  await sleep(200);
+  const pinnedMoved = await evaluate(connection, `(() => {
+    const card = document.querySelector('[data-pointable-context-role="card"]');
+    if (!(card instanceof HTMLElement)) return {
+      moved: false,
+      missing: true,
+      status: window.__pointableContextRenderer?.status?.(),
+      events: window.__pointablePinnedDragEvents,
+    };
+    const rect = card.getBoundingClientRect();
+    return {
+      moved: Math.abs(rect.left - ${JSON.stringify(pinnedDrag.beforeLeft)}) > 10 ||
+        Math.abs(rect.top - ${JSON.stringify(pinnedDrag.beforeTop)}) > 10,
+      left: rect.left,
+      top: rect.top,
+      events: window.__pointablePinnedDragEvents,
+    };
+  })()`);
+  if (pinnedMoved?.moved !== true) {
+    throw new Error(`pinned card drag did not move: ${JSON.stringify(pinnedMoved)}`);
+  }
+  await evaluate(connection, `window.scrollTo({ top: 900, behavior: 'instant' }); true`);
+  await waitFor(connection, `(() => {
+    const anchor = document.getElementById('fixture-text')?.getBoundingClientRect();
+    const status = window.__pointableContextRenderer?.status?.();
+    return window.scrollY >= 800 && anchor !== undefined && anchor.bottom <= 0 &&
+      status?.cardCount === 1;
+  })()`);
+  const pinnedClose = await waitFor(connection, `(() => {
+    const button = document.querySelector('button[aria-label="关闭上下文详情"]');
+    if (!(button instanceof HTMLElement)) return null;
+    const rect = button.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  })()`);
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mousePressed", x: pinnedClose.x, y: pinnedClose.y,
+    button: "left", clickCount: 1,
+  });
+  await connection.send("Input.dispatchMouseEvent", {
+    type: "mouseReleased", x: pinnedClose.x, y: pinnedClose.y,
+    button: "left", clickCount: 1,
+  });
+  await waitFor(connection, `window.__pointableContextRenderer?.status?.().cardCount === 0`);
   process.stdout.write(`${JSON.stringify({
     ok: true,
     browser: "Microsoft Edge headless",
@@ -814,6 +974,8 @@ try {
     closeClearedSelection: true,
     closePreventedRemountAfterMs: 250,
     studyMetricCardEventsScoped: true,
+    anchorOutsideViewportClosedCard: true,
+    manuallyPinnedCardSurvivedAnchorDisplacement: true,
   }, null, 2)}\n`);
 } finally {
   if (connection !== undefined) {

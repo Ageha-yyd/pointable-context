@@ -1,7 +1,7 @@
 # PRD：Quiet Context Reveal（轻标注 + 选区式上下文速览）
 
-- 版本：v2.24
-- 状态：P-C 微型心智模型继续作为详情默认；v2.24 为任务内对象加入容量可见性、安全终态归档和同上下文 rebind 连续性，不改变对象选择或卡片交互语义。当前精确 Codex build 的 v2.22 bundle 已完成自动 4/4 与人工 10/10；v2.24 digest `2c46a836…d1e8` 已重新通过自动 4/4，人工 0/10、十项 pending，不继承旧 bundle 结论。受控效率实验继续暂缓到功能和跨 build 兼容性收口之后
+- 版本：v2.26
+- 状态：P-C 微型心智模型继续作为详情默认；v2.26 区分“仍依附锚点的卡片”和“用户已拖动固定的卡片”：前者在完整锚点离屏时关闭，后者可跨新 Chat 输出与锚点位移留在当前视口。同时标注目录先为每个可唯一识别对象保留一个主 term，再用剩余容量收录 alias，避免少数对象的别名挤掉其他对象的可点击入口。v2.25 因 refresh continuity 验收暴露这两个缺陷保持未资格化；v2.26 digest `f570c4de…843c` 已完成当前精确 Codex build 的自动门禁 4/4 与人工门禁 10/10，全部结论均绑定当前 bundle 的独立证据，不继承旧 bundle。受控效率实验继续暂缓到功能和跨 build 兼容性收口之后
 - 日期：2026-08-24
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
@@ -197,7 +197,7 @@ P0 不提供 LLM 语义扩展、embedding 候选生成或选区解释。这里�
 - 视觉层级低于 Chat 正文和原生选择菜单；
 - 默认文案为“查看上下文”；
 - 不用浮动大卡预告详情；
-- Escape、重新选区、滚动离开、route 变化或 anchor 消失时关闭；
+- Escape、重新选区、route 变化或 anchor 消失时关闭；尚未被用户拖动的入口或卡片在完整文本锚点的所有 client rect 离开视觉视口时关闭，部分锚点仍可见时继续保持；用户已通过标题栏拖动的卡片视为当前阅读任务中的显式固定，不因新 Chat 输出把原锚点推出视口而关闭；
 - 不覆盖 Copy、文本拖选和键盘选择。
 
 这条路径不可删除：它覆盖没有进入每条消息 Top-3、使用另一稳定 alias、或用户临时才意识到需要点查的已登记对象。键盘用户可以选中文字后使用 `Alt+Shift+K`，不依赖轻标注本身获得焦点。
@@ -225,7 +225,7 @@ P0 不提供 LLM 语义扩展、embedding 候选生成或选区解释。这里�
 - 明确、可操作的关闭按钮；
 - 卡片标题栏是唯一拖动热区；正文仍可选择，按钮仍可点击，拖动只能由可信主指针动作启动；
 - 拖动位置限制在当前可视区域内；窗口尺寸、视觉视口或卡片高度变化时自动夹回可用范围；
-- 后台 revision 提示与显式刷新复用同一卡片 DOM，并保留用户移动后的位置；新选区或关闭后不继承旧位置；
+- 一次有效拖动同时表达“把这张卡暂时固定在屏幕中”：后续 Chat 输出、滚动或锚点位移不再仅因锚点离开视口关闭它；后台 revision 提示与显式刷新复用同一卡片 DOM，并保留用户移动后的位置；新选区、显式关闭、task/route 漂移或 anchor DOM 被移除后不继承旧位置；
 - Escape 与普通外点关闭；
 - 详情卡打开时，点击当前 Chat composer 的 `textarea`、`input`、`contenteditable` 或 `role=textbox` 不属于外点关闭：输入框获得焦点，卡片继续作为回复时的阅读参照，后台 revision 检查不中断；
 - 仅入口尚未打开详情时，点击 composer 仍按普通外点清理入口；
@@ -275,7 +275,7 @@ v1.9 首个实现只资格化显式 `concept` 制品，不借此宣称八类均�
 
 Live workspace 默认不索引 `fixtures/`、`study-dist/` 和 `study-release/`。这些目录属于测试或研究发布材料，不能与当前工作对象竞争名称、alias 或 Top-3 标注；fixture 演示必须走独立的 `FIXTURE-ONLY` 数据源。正式工作区对象仍可通过 canonical name、alias 或完整 workspace-relative path 查询。
 
-默认排序按用户恢复工作状态的价值，而不是按文件系统顺序：Task 最高，其次 Decision、Change、Verification、Concept、Module、Document、Configuration、File。canonical name 略高于 path，path 略高于 alias。排序只决定每条消息 Top-3 的可见提示，不影响选区路径能够查询的对象全集。
+默认排序按用户恢复工作状态的价值，而不是按文件系统顺序：Task 最高，其次 Decision、Change、Verification、Concept、Module、Document、Configuration、File。canonical name 略高于 path，path 略高于 alias。目录容量分两轮分配：先按该顺序为每个仍有唯一 term 的对象保留一个最高优先主 term，再用剩余容量加入第二及后续 alias；同名歧义仍不进入目录。这样 256 项是 term 上限而不是“先到的少数对象可独占的 alias 上限”。排序只决定每条消息 Top-3 的可见提示，不影响选区路径能够查询的对象全集。
 
 ### 8.3 更新策略
 
@@ -432,7 +432,7 @@ Registry 容量采用 active-hot、terminal-audit 策略：`object-list` 在当�
 
 ### P0-1 Bounded object annotation
 
-Host 在显式绑定后只读身份索引，生成任务指纹绑定、最多 256 项且不含详情的目录。Renderer 每条可见消息最多标 3 个唯一对象的首次出现；歧义 term、交互元素、拒绝表面和不支持 Custom Highlight 的宿主不标。可信点击复用既有 lookup intent，不预取详情、不调用模型。
+Host 在显式绑定后只读身份索引，生成任务指纹绑定、最多 256 项且不含详情的目录。目录先给每个具备唯一 term 的对象分配一个主入口，再用余量分配 alias。Renderer 每条可见消息最多标 3 个唯一对象的首次出现；歧义 term、交互元素、拒绝表面和不支持 Custom Highlight 的宿主不标。可信点击复用既有 lookup intent，不预取详情、不调用模型。
 
 ### P0-2 Quiet selection eligibility
 
@@ -821,9 +821,13 @@ v2.20 的默认 `runStudyV2NativeTrial` 在其上完成组合：独立 App Serve
 31. 对象维护只在一次明确 opt-in 后由 Agent 于稳定里程碑执行：稳定制品优先、临时对象默认每里程碑最多新增一个，升级必须先通过 evidence checker 再退役临时版本；该自动化不是 Chat 语义挖掘，也不要求用户逐卡发起对话。
 32. 当前任务达到 64 个 active 对象时只提示治理风险，256 个仍硬拒绝；仅 checker-valid 稳定制品唯一接管后的终态 task-local 对象可显式归档，写审计副本必须先于热记录移除，active、无匹配和歧义对象不得归档，archive 不成为查询权威。
 33. Task object 的持久身份属于 host task + route + scope + canonical workspace，不属于某次 binding capability；同一上下文重新绑定时采用到新 revision，任何上下文字段变化都拒绝迁移。
+34. 未拖动卡片仍受完整 Range 锚点的视觉视口约束；用户可信拖动标题栏后，卡片成为显式固定的临时阅读面板，可跨新输出和锚点位移留在视口，直到显式关闭、新选区、上下文漂移或锚点 DOM 被移除。
+35. 有界标注目录先保证每个具备唯一 term 的对象一个主入口，再用剩余容量收录 alias；不得让少数对象的多个别名耗尽目录并使其他可识别对象只能依赖选区 fallback。
 
 ## 18. 变更记录
 
+- v2.26：修复 refresh continuity 验收暴露的两项交互缺陷。其一，标题栏拖动现在不仅保存坐标，也把卡片显式固定在视觉视口中；新 Assistant 输出或滚动把原锚点推出屏幕时，固定卡不再消失，未拖动卡仍按完整 Range 离屏规则清理。其二，256 项身份目录改为“每个可唯一识别对象一个主 term 优先，alias 后填充”，避免长任务中少数高优先对象的多个 name/path/alias 消耗容量并令后续文档没有下划线入口。真实 Edge headless 连续回归覆盖未固定卡离屏关闭与固定卡跨锚点位移保持；当前工作区探针确认 `manual-refresh-probe.md` 重新进入有界目录。新 digest `f570c4de…843c` 不继承 v2.25 的 9/10 人工证据，已用 v2.26 独立证据完成当前精确 Codex build 的自动 4/4 与人工 10/10。
+- v2.25：关闭滚动后脱离文本锚点的浮窗。Renderer 以完整 Range 的 client rect 与 visual viewport 做交集判断；只要仍有部分文本可见就保持入口或卡片，所有文本 rect 完全离开视口后则通过既有清理链关闭，不把详情卡夹在屏幕边缘冒充仍然锚定。新增真实 Edge headless 回归，覆盖打开详情、滚动锚点完全离屏和 action/card 全部清理。v2.24 因人工验收暴露此缺陷而不资格化；v2.25 digest `475ee384…7974` 自动宿主门禁 4/4、九项人工 PASS，仅 refresh continuity pending。该最后一项随后暴露“用户已拖动的卡片仍会随锚点离屏关闭”和 alias 容量挤占，因此 v2.25 最终保持未资格化。
 - v2.24：为 Task Object Registry 增加容量可见性、安全终态归档和同上下文 rebind 连续性。`object-list` 同时返回 current-task active/terminal、热 Registry、审计 Archive 的条目与字节使用量；64 active 是不阻断写入的治理软警告，256 active 继续 fail closed。显式 `object-archive` 只处理 checker-valid 稳定制品已唯一同类型/同名接管的 terminal 对象，先原子写本地 audit copy，再移出 hot Registry；active、unmatched、ambiguous 均保留。Archive 不进入 Context Index，历史 Chat 通过稳定制品继续查询。同一 host task/route/scope/canonical workspace 重新绑定时既有对象采用到新 capability revision，跨上下文绝不迁移。该变更不构成人效证据；当前 digest `2c46a836…d1e8` 已通过自动 4/4，但人工十项全部 pending，不继承 v2.22 资格。
 - v2.23：冻结 Object Curation Policy。对象层改为 opt-in、稳定里程碑触发的两级路由：已有稳定制品优先；task-local partial 用于当前任务内已经明确但证据尚未稳定的对象；跨任务复用且具备 exact evidence 的对象进入 evidence-backed artifact。默认每个里程碑最多新增一个临时对象，升级必须先通过适用 checker，再退役临时版本；检查失败则保留 partial。该策略由 Agent 在授权任务内维护，不扫描 Chat、不调用语义模型、不要求用户逐卡新增 Chat Turn。本版不改变 renderer，v2.22 exact-build 自动 4/4 与人工 10/10 资格继续有效。
 - v2.22：新增 Task-local Dynamic Object Lifecycle v1，覆盖长任务中“已明确但尚不适合落盘”的 Concept/Change/Decision/Task/Verification。Companion 只允许当前 host-vouched、已绑定 workspace 的任务通过 strict JSON 显式登记；active identity 可更新内容，身份变化必须 supersede，obsolete 对象 retire，终态不可复活。真实演练发现终态对象若从 Index 完全移除会让历史 Chat 成为死链接，因此终态现只退出自动 Top-3 标注，仍可确定性只读查询，并显式呈现 lifecycle/replacement。私有 Registry 与文件 Index 组合并复用现有 Resolver、Provider、selection fallback 和 revision refresh；详情固定标记 `partial`、`agent-task-context` 与临时边界。登记只刷新 identity catalog，不读取详情、不调用模型、不创建 Chat Turn。卡片正文 selection 现被固定为本地阅读/复制动作，不关闭原卡、不产生二次查询入口或 Chat Turn；真实 Edge 与当前 Codex Chat Lane 人工验收均已通过。定向与全链路自动回归已覆盖出现、更新、替代、退役、历史查询、任务隔离、同卡刷新和卡内文字选择；workspace companion digest 因而变化，v2.21 的 exact-build 10/10 没有继承，当前 v2.22 digest 已用独立证据重新完成自动 4/4 与人工 10/10。

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "contract": "private-codex-chat-lane-v1",
+  "host": {
+    "packageName": "OpenAI.Codex",
+    "packageVersion": "26.814.5517.0",
+    "executableVersion": "151.0.7922.137",
+    "architecture": "x64",
+    "capturedAt": "2026-08-24T01:35:13+08:00"
+  },
+  "implementation": {
+    "productVersion": "v2.25",
+    "rendererBundleSha256": "475ee3844ca0ef95b384551b880feea3696cfc1d027c4ce8981bd98b2da87974"
+  },
+  "automatic": {
+    "checkedAt": "2026-08-23T17:35:13.409Z",
+    "state": "qualified",
+    "code": "qualified_current_runtime",
+    "gates": {
+      "exactMainTarget": "pass",
+      "mainFrame": "pass",
+      "mainExecutionContext": "pass",
+      "rendererLifecycle": "pass"
+    }
+  },
+  "manualChecks": [
+    { "id": "selection_inert", "result": "pass", "observedAt": "2026-08-24T01:48:46+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-v2.25-manual.txt:2", "evidenceExcerpt": "selection_inert=PASS 2026-08-24T01:48:46+08:00 user confirmed selecting the complete workspace-annotations.ts reference exposed only the quiet action and did not open detail automatically." },
+    { "id": "trusted_click", "result": "pass", "observedAt": "2026-08-24T01:48:46+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-v2.25-manual.txt:3", "evidenceExcerpt": "trusted_click=PASS 2026-08-24T01:48:46+08:00 user confirmed the explicit 查看上下文 action opened the registered workspace object without another Chat turn." },
+    { "id": "anchored_card", "result": "pass", "observedAt": "2026-08-24T01:48:46+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-v2.25-manual.txt:4", "evidenceExcerpt": "anchored_card=PASS 2026-08-24T01:48:46+08:00 user confirmed the native detail appeared in the current Chat Lane without opening a browser." },
+    { "id": "progressive_disclosure", "result": "pass", "observedAt": "2026-08-24T01:48:46+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-v2.25-manual.txt:5", "evidenceExcerpt": "progressive_disclosure=PASS 2026-08-24T01:48:46+08:00 user confirmed 查看详情 and 收起详情 operated in the same card." },
+    { "id": "close_and_focus_restore", "result": "pass", "observedAt": "2026-08-24T01:48:46+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-v2.25-manual.txt:6", "evidenceExcerpt": "close_and_focus_restore=PASS 2026-08-24T01:48:46+08:00 user confirmed the close control removed the card without moving the Chat Lane unexpectedly and left the composer usable." },
+    { "id": "composer_persistence", "result": "pass", "observedAt": "2026-08-24T01:48:46+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-v2.25-manual.txt:7", "evidenceExcerpt": "composer_persistence=PASS 2026-08-24T01:48:46+08:00 user confirmed focusing and temporarily typing in the current composer kept the card open." },
+    { "id": "scroll_and_virtualization", "result": "pass", "observedAt": "2026-08-24T01:43:58+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-v2.25-manual.txt:1", "evidenceExcerpt": "scroll_and_virtualization=PASS 2026-08-24T01:43:58+08:00 user confirmed scrolling the annotated workspace-annotations.ts anchor fully out of view closed the card normally instead of leaving an orphan at the viewport edge, and returning allowed normal interaction." },
+    { "id": "navigation_recovery", "result": "pass", "observedAt": "2026-08-24T01:50:15+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-v2.25-manual.txt:8", "evidenceExcerpt": "navigation_recovery=PASS 2026-08-24T01:50:15+08:00 user confirmed switching to another Codex task cleaned the old card and returning restored one current marked-object interaction without stale or duplicate UI." },
+    { "id": "stale_response_cleanup", "result": "pass", "observedAt": "2026-08-24T01:52:13+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.814.5517.0-v2.25-manual.txt:9", "evidenceExcerpt": "stale_response_cleanup=PASS 2026-08-24T01:52:13+08:00 user confirmed the controlled three-second stale-alpha response was discarded after selecting stale-beta; the old detail did not mount and the new selection did not auto-open detail." },
+    { "id": "refresh_continuity", "result": "pending" }
+  ]
+}

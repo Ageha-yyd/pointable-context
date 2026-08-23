@@ -8,7 +8,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v2.24 freezes bounded task-object capacity plus safe terminal archive", async () => {
+test("v2.26 pins deliberately moved cards and allocates annotation capacity fairly across objects", async () => {
   const [prd, readme, mainSkill, workspaceSkill, recordsSkill, curationDecision, capacityDecision, coverage, compatibility, bundle] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -22,7 +22,7 @@ test("v2.24 freezes bounded task-object capacity plus safe terminal archive", as
     readFile(resolve("host/workspace-companion.mjs")),
   ]);
 
-  assert.match(prd, /版本：v2\.24/u);
+  assert.match(prd, /版本：v2\.26/u);
   assert.match(prd, /`annotated_click`/u);
   assert.match(prd, /`selection_lookup`/u);
   assert.match(prd, /每条消息最多标 3 个高价值对象/u);
@@ -47,7 +47,9 @@ test("v2.24 freezes bounded task-object capacity plus safe terminal archive", as
   assert.match(prd, /active、无匹配或歧义记录绝不归档/u);
   assert.match(prd, /Archive 不参与 lookup authority/u);
   assert.match(prd, /绝不跨任务、route、scope 或 workspace 迁移/u);
-  assert.match(prd, /人工 0\/10、十项 pending/u);
+  assert.match(prd, /显式固定的临时阅读面板/u);
+  assert.match(prd, /每个具备唯一 term 的对象一个主入口/u);
+  assert.match(prd, /自动门禁 4\/4 与人工门禁 10\/10/u);
 
   assert.match(readme, /bounded identity-only catalog/u);
   assert.match(readme, /Any registered object omitted by that Top-3 remains reachable/u);
@@ -59,7 +61,8 @@ test("v2.24 freezes bounded task-object capacity plus safe terminal archive", as
   assert.match(readme, /non-blocking curation warning at 64 active current-task objects/u);
   assert.match(readme, /Active, unmatched, and ambiguous records are never archived/u);
   assert.match(readme, /Records are never adopted across another task, route, scope, or workspace/u);
-  assert.match(readme, /automatic host-contract gates pass 4\/4, while all ten manual interaction gates remain pending/u);
+  assert.match(readme, /one primary annotation term per unambiguous object before aliases/u);
+  assert.match(readme, /all ten evidence-bound manual gates on exact Codex package/u);
 
   assert.match(mainSkill, /two zero-turn entries/u);
   assert.match(mainSkill, /Any registered object not marked remains reachable/u);
@@ -76,6 +79,8 @@ test("v2.24 freezes bounded task-object capacity plus safe terminal archive", as
   assert.match(workspaceSkill, /object-archive --json/u);
   assert.match(workspaceSkill, /Active, unmatched, and ambiguous records never archive/u);
   assert.match(workspaceSkill, /must never migrate objects across another task, route, scope, or workspace/u);
+  assert.match(workspaceSkill, /moved card is explicitly pinned/u);
+  assert.match(workspaceSkill, /reserve one highest-priority unambiguous primary term/u);
   assert.match(recordsSkill, /Normally create no more than one explanatory artifact/u);
   assert.match(recordsSkill, /Two-tier object curation/u);
   assert.match(recordsSkill, /Retire the corresponding task-local object only after the stable artifact reports `valid: true`/u);
@@ -91,14 +96,14 @@ test("v2.24 freezes bounded task-object capacity plus safe terminal archive", as
     automatic?: { state?: string };
     manualChecks?: Array<{ result?: string }>;
   };
-  assert.equal(current.implementation?.productVersion, "v2.24");
+  assert.equal(current.implementation?.productVersion, "v2.26");
   assert.equal(
     current.implementation?.rendererBundleSha256,
     createHash("sha256").update(bundle).digest("hex"),
   );
   assert.equal(current.automatic?.state, "qualified");
   assert.equal(current.manualChecks?.length, 10);
-  assert.ok(current.manualChecks?.every((check) => check.result === "pending"));
+  assert.ok(current.manualChecks?.every((check) => check.result === "pass"));
 });
 
 test("plugin defaults enable Quiet Mode instead of proactively rendering capsules", async () => {

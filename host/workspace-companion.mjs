@@ -1648,6 +1648,14 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     const rect = root.getBoundingClientRect();
     return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
   }
+  function rangeIntersectsVisualViewport(range) {
+    const viewport = window.visualViewport;
+    const left = viewport?.offsetLeft ?? 0;
+    const top = viewport?.offsetTop ?? 0;
+    const right = left + (viewport?.width ?? window.innerWidth);
+    const bottom = top + (viewport?.height ?? window.innerHeight);
+    return [...range.getClientRects()].some((rect) => rect.width > 0 && rect.height > 0 && rect.right > left && rect.left < right && rect.bottom > top && rect.top < bottom);
+  }
   const annotationHighlightName = `pointable-context-object-${lifecycleId}`;
   const annotationInteractiveSelector = 'a, button, input, textarea, select, [role="button"], [contenteditable="true"]';
   function refreshObserver() {
@@ -2737,7 +2745,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   }
   function candidateAnchorIsCurrent() {
     const current = candidate;
-    if (current === void 0 || !current.sourceRoot.isConnected || !current.range.commonAncestorContainer.isConnected || current.range.toString().trim() !== current.text || !rootVisible(current.sourceRoot)) {
+    if (current === void 0 || !current.sourceRoot.isConnected || !current.range.commonAncestorContainer.isConnected || current.range.toString().trim() !== current.text || !rootVisible(current.sourceRoot) || manualCardPlacement === void 0 && !rangeIntersectsVisualViewport(current.range)) {
       return false;
     }
     const start = nodeElement(current.range.startContainer);
@@ -7580,7 +7588,21 @@ function buildWorkspaceAnnotationCatalog(records, bindingRevision, contextFinger
     });
   }
   entries.sort((left, right) => right.priority - left.priority || right.term.length - left.term.length || left.term.localeCompare(right.term, "en"));
-  const bounded = entries.slice(0, maxAnnotations);
+  const primary = [];
+  const aliases2 = [];
+  const primaryObjectKeys = /* @__PURE__ */ new Set();
+  for (const entry of entries) {
+    if (primaryObjectKeys.has(entry.objectKey)) {
+      aliases2.push(entry);
+      continue;
+    }
+    primaryObjectKeys.add(entry.objectKey);
+    primary.push(entry);
+  }
+  const bounded = [
+    ...primary.slice(0, maxAnnotations),
+    ...aliases2
+  ].slice(0, maxAnnotations);
   const revision2 = createHash8("sha256").update(bindingRevision, "utf8").update("\0", "utf8").update(JSON.stringify(bounded), "utf8").digest("hex");
   return Object.freeze({
     revision: revision2,
