@@ -29,6 +29,11 @@
       "key": "docs/decisions/object-curation-policy.md"
     },
     {
+      "id": "task-object-capacity",
+      "kind": "decision",
+      "key": "docs/decisions/task-object-capacity.md"
+    },
+    {
       "id": "work-result-context-task",
       "kind": "task",
       "key": "docs/tasks/work-result-context.md"

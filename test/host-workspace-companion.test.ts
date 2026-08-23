@@ -199,6 +199,13 @@ test("workspace companion manages task objects only for the current bound task",
       ["COMPANION-LIFECYCLE"],
     );
 
+    const rebound = await companion.bindCurrentTask(workspace);
+    assert.equal(rebound.replaced, true);
+    assert.deepEqual(
+      (await companion.listCurrentTaskObjects()).map((item) => item.objectKey),
+      ["COMPANION-LIFECYCLE"],
+    );
+
     const updated = await companion.upsertCurrentTaskObject({
       ...taskObjectInput(),
       summary: "动态对象内容已更新。",
@@ -228,6 +235,47 @@ test("workspace companion manages task objects only for the current bound task",
       (await companion.listCurrentTaskObjects()).filter((item) => item.lifecycle === "active").length,
       0,
     );
+    const inventory = await companion.inventoryCurrentTaskObjects();
+    assert.equal(inventory.capacity.active, 0);
+    assert.equal(inventory.capacity.terminal, 2);
+    assert.deepEqual(inventory.capacity.warnings, []);
+
+    const evidence = "EVIDENCE: companion task object graduated";
+    await mkdir(join(workspace, "docs", "tasks"), { recursive: true });
+    await writeFile(join(workspace, "evidence.txt"), `${evidence}\n`, "utf8");
+    await writeFile(join(workspace, "docs", "tasks", "companion-lifecycle-v2.md"), `# Companion Lifecycle v2
+
+## 目标
+让稳定任务记录接管终态 task-local object。
+
+## 当前状态
+已完成。
+
+## 已完成
+严格任务记录已经落盘。
+
+## 下一步
+从热 Registry 安全归档重复终态记录。
+
+## 阻塞
+无。
+
+## 更新时间
+2026-08-24T12:00:00+08:00
+
+## 证据
+> ${evidence}
+
+## 来源
+evidence.txt:1
+`, "utf8");
+    const archive = await companion.archiveGraduatedCurrentTaskObjects();
+    assert.equal(archive.kind, "archived");
+    assert.equal(archive.archivedCount, 1);
+    const afterArchive = await companion.inventoryCurrentTaskObjects();
+    assert.equal(afterArchive.capacity.terminal, 1);
+    assert.equal(afterArchive.capacity.archivedRecords, 1);
+    assert.equal(afterArchive.objects[0]?.objectKey, "COMPANION-LIFECYCLE");
   } finally {
     await companion.stop();
     await rm(root, { recursive: true, force: true });

@@ -3,9 +3,9 @@
 // src/host/codex-cdp/workspace-companion-cli.ts
 import { randomBytes as randomBytes4, randomUUID as randomUUID5, timingSafeEqual as timingSafeEqual2 } from "node:crypto";
 import { closeSync, existsSync, openSync } from "node:fs";
-import { mkdir as mkdir3, open as open2, readFile as readFile3, rename as rename3, rm, stat as stat4, writeFile as writeFile3 } from "node:fs/promises";
+import { mkdir as mkdir3, open as open4, readFile as readFile3, rename as rename3, rm, stat as stat6, writeFile as writeFile3 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname as dirname4, isAbsolute as isAbsolute4, join, resolve as resolve6 } from "node:path";
+import { dirname as dirname4, isAbsolute as isAbsolute4, join as join3, resolve as resolve8 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer, request as httpRequest } from "node:http";
 import { spawn } from "node:child_process";
@@ -3031,7 +3031,7 @@ async function readBoundedResponseText(response, maximumBytes, signal) {
 }
 function awaitWithAbort(promise, signal) {
   if (signal.aborted) return Promise.reject(signal.reason);
-  return new Promise((resolve7, reject) => {
+  return new Promise((resolve9, reject) => {
     const aborted = () => {
       cleanup();
       reject(signal.reason);
@@ -3041,7 +3041,7 @@ function awaitWithAbort(promise, signal) {
     promise.then(
       (value) => {
         cleanup();
-        resolve7(value);
+        resolve9(value);
       },
       (error) => {
         cleanup();
@@ -3194,7 +3194,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
   } catch {
     throw new CdpTransportError("cdp_connect_failed", "CDP websocket failed");
   }
-  await new Promise((resolve7, reject) => {
+  await new Promise((resolve9, reject) => {
     const timer = setTimeout(() => {
       cleanup();
       socket.close();
@@ -3208,7 +3208,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
     };
     const opened = () => {
       cleanup();
-      resolve7();
+      resolve9();
     };
     const failed = () => {
       cleanup();
@@ -3331,7 +3331,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
         closeForProtocolError(error, 1009);
         return Promise.reject(error);
       }
-      return new Promise((resolve7, reject) => {
+      return new Promise((resolve9, reject) => {
         const timer = setTimeout(() => {
           pending.delete(id);
           reject(
@@ -3341,7 +3341,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
             )
           );
         }, timeoutMs);
-        pending.set(id, { resolve: resolve7, reject, timer });
+        pending.set(id, { resolve: resolve9, reject, timer });
         try {
           socket.send(serialized);
         } catch (error) {
@@ -3494,7 +3494,7 @@ function lookupError(code, message, retryable) {
   return { kind: "error", code, message, retryable };
 }
 function boundedLookup(callback, timeoutMs, controller) {
-  return new Promise((resolve7, reject) => {
+  return new Promise((resolve9, reject) => {
     let settled = false;
     const timer = setTimeout(() => {
       if (settled) return;
@@ -3507,7 +3507,7 @@ function boundedLookup(callback, timeoutMs, controller) {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        resolve7(value);
+        resolve9(value);
       },
       (error) => {
         if (settled) return;
@@ -3522,7 +3522,7 @@ function waitForMainContext(attachment, signal, timeoutMs = 2e3) {
   if (attachment.mainExecutionContextId !== void 0) {
     return Promise.resolve(attachment.mainExecutionContextId);
   }
-  return new Promise((resolve7, reject) => {
+  return new Promise((resolve9, reject) => {
     let settled = false;
     let timer;
     const cleanup = () => {
@@ -3534,7 +3534,7 @@ function waitForMainContext(attachment, signal, timeoutMs = 2e3) {
       if (settled) return;
       settled = true;
       cleanup();
-      resolve7(contextId);
+      resolve9(contextId);
     };
     const aborted = () => {
       if (settled) return;
@@ -3558,7 +3558,7 @@ function connectWithAbort(connectionPromise, signal) {
     connectionPromise.then((connection) => connection.close(), () => void 0);
     return Promise.reject(signal.reason);
   }
-  return new Promise((resolve7, reject) => {
+  return new Promise((resolve9, reject) => {
     let settled = false;
     const aborted = () => {
       if (settled) return;
@@ -3575,7 +3575,7 @@ function connectWithAbort(connectionPromise, signal) {
         }
         settled = true;
         signal.removeEventListener("abort", aborted);
-        resolve7(connection);
+        resolve9(connection);
       },
       (error) => {
         if (settled) return;
@@ -5782,6 +5782,402 @@ var LocalWorkspaceAuthoritativeProvider = class {
   }
 };
 
+// src/records/context-artifact-check.ts
+import { basename as basename4, extname as extname4, join, relative as relative2, resolve as resolve5, sep as sep2 } from "node:path";
+import { open as open2, readdir as readdir2, realpath as realpath3, stat as stat3 } from "node:fs/promises";
+var ARTIFACT_DIRECTORIES = Object.freeze([
+  { kind: "concept", path: "docs/concepts" },
+  { kind: "change", path: "docs/changes" },
+  { kind: "decision", path: "docs/decisions" }
+]);
+var MANAGED_CONTEXT_PREFIXES = Object.freeze([
+  "docs/concepts/",
+  "docs/changes/",
+  "docs/decisions/",
+  "docs/tasks/",
+  "docs/verifications/"
+]);
+var MAX_ARTIFACTS = 256;
+var MAX_ARTIFACT_BYTES = 128 * 1024;
+var EXACT_SECTIONS = Object.freeze({
+  concept: Object.freeze([
+    "\u5B83\u662F\u4EC0\u4E48\u610F\u601D",
+    "\u4E3A\u4EC0\u4E48\u73B0\u5728\u51FA\u73B0",
+    "\u5B83\u4E0D\u662F\u4EC0\u4E48",
+    "\u6240\u5904\u6D41\u7A0B",
+    "\u8BC1\u636E",
+    "\u6765\u6E90"
+  ]),
+  change: Object.freeze(["\u539F\u6765\u600E\u6837", "\u73B0\u5728\u600E\u6837", "\u5F71\u54CD\u4EC0\u4E48", "\u8BC1\u636E", "\u6765\u6E90"]),
+  decision: Object.freeze([
+    "\u4E3A\u4EC0\u4E48\u9700\u8981\u51B3\u5B9A",
+    "\u9009\u62E9\u4E86\u4EC0\u4E48",
+    "\u540E\u679C\u662F\u4EC0\u4E48",
+    "\u8BC1\u636E",
+    "\u6765\u6E90"
+  ])
+});
+function portableRelative(root, target) {
+  const value = relative2(root, target);
+  if (value === "" || value === ".." || value.startsWith(`..${sep2}`)) return void 0;
+  return value.split(sep2).join("/");
+}
+function safeIdentity(path) {
+  const stem = basename4(path, extname4(path)).normalize("NFKC").trim().toLocaleLowerCase("en-US");
+  if (stem.length === 0 || stem.length > 128 || /[\p{Cc}\p{Cf}]/u.test(stem)) return void 0;
+  return stem;
+}
+function titleIdentity(title) {
+  const value = title.normalize("NFKC").trim().toLocaleLowerCase("en-US").replace(/[\s_]+/gu, "-").replace(/-+/gu, "-");
+  if (value.length === 0 || value.length > 128 || /[\p{Cc}\p{Cf}]/u.test(value)) return void 0;
+  return value;
+}
+function decodeUtf8(content) {
+  const decoded = new TextDecoder("utf-8", { fatal: true }).decode(content);
+  return decoded.includes("\0") ? void 0 : decoded;
+}
+async function collectCandidates(root, issues) {
+  const candidates2 = [];
+  for (const directory of ARTIFACT_DIRECTORIES) {
+    const requested = resolve5(root, ...directory.path.split("/"));
+    let entries;
+    try {
+      const canonical = await realpath3(requested);
+      if (portableRelative(root, canonical) !== directory.path || !(await stat3(canonical)).isDirectory()) {
+        issues.push({ code: "artifact_directory_unavailable", path: directory.path });
+        continue;
+      }
+      entries = await readdir2(canonical, { withFileTypes: true });
+    } catch (error) {
+      if (error.code === "ENOENT") continue;
+      issues.push({ code: "artifact_directory_unavailable", path: directory.path });
+      continue;
+    }
+    for (const entry of entries) {
+      if (!entry.isFile() || extname4(entry.name).toLocaleLowerCase("en-US") !== ".md") continue;
+      if (candidates2.length >= MAX_ARTIFACTS) {
+        issues.push({ code: "artifact_capacity_exceeded" });
+        return candidates2;
+      }
+      const identity2 = safeIdentity(entry.name);
+      const relativePath = `${directory.path}/${entry.name}`;
+      if (identity2 === void 0) {
+        issues.push({ code: "artifact_schema_invalid", path: relativePath });
+        continue;
+      }
+      candidates2.push({
+        kind: directory.kind,
+        absolutePath: join(root, ...relativePath.split("/")),
+        relativePath,
+        identity: identity2
+      });
+    }
+  }
+  return candidates2;
+}
+async function readStableArtifact(root, candidate) {
+  let handle;
+  try {
+    const canonical = await realpath3(candidate.absolutePath);
+    if (portableRelative(root, canonical) !== candidate.relativePath) {
+      return { issue: { code: "artifact_file_unavailable", path: candidate.relativePath } };
+    }
+    handle = await open2(canonical, "r");
+    const before = await handle.stat();
+    if (!before.isFile()) {
+      return { issue: { code: "artifact_file_unavailable", path: candidate.relativePath } };
+    }
+    if (before.size > MAX_ARTIFACT_BYTES) {
+      return { issue: { code: "artifact_file_too_large", path: candidate.relativePath } };
+    }
+    const raw = await handle.readFile();
+    const after = await handle.stat();
+    if (before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs || before.ino !== after.ino) {
+      return { issue: { code: "artifact_file_unavailable", path: candidate.relativePath } };
+    }
+    const content = decodeUtf8(raw);
+    return content === void 0 ? { issue: { code: "artifact_encoding_invalid", path: candidate.relativePath } } : { content };
+  } catch {
+    return { issue: { code: "artifact_file_unavailable", path: candidate.relativePath } };
+  } finally {
+    await handle?.close().catch(() => void 0);
+  }
+}
+function parseArtifact(candidate, content) {
+  const headings = [...content.matchAll(/^##[ \t]+(.+?)[ \t]*$/gmu)].map(
+    (match) => match[1]?.trim() ?? ""
+  );
+  const expected = EXACT_SECTIONS[candidate.kind];
+  if (headings.length !== expected.length || headings.some((heading, index) => heading !== expected[index])) {
+    return void 0;
+  }
+  if (candidate.kind === "concept") return extractContextConceptArtifact(content);
+  if (candidate.kind === "change") return extractContextChangeArtifact(content);
+  return extractContextDecisionArtifact(content);
+}
+function managedEvidenceSource(path) {
+  const source = path.replace(/\\/gu, "/");
+  return MANAGED_CONTEXT_PREFIXES.some((prefix) => source.startsWith(prefix));
+}
+async function checkContextMilestoneArtifacts(workspaceRoot, options = {}) {
+  const checkedAt = (options.now ?? (() => /* @__PURE__ */ new Date()))().toISOString();
+  const issues = [];
+  const artifacts = [];
+  let root;
+  try {
+    root = await realpath3(resolve5(workspaceRoot));
+    if (!(await stat3(root)).isDirectory()) throw new Error("not a directory");
+  } catch {
+    return Object.freeze({
+      schemaVersion: 1,
+      valid: false,
+      checkedAt,
+      candidateCount: 0,
+      artifacts: Object.freeze([]),
+      issues: Object.freeze([{ code: "workspace_unavailable" }])
+    });
+  }
+  const candidates2 = await collectCandidates(root, issues);
+  const identities = /* @__PURE__ */ new Map();
+  for (const candidate of candidates2) {
+    const group = identities.get(candidate.identity) ?? [];
+    group.push(candidate);
+    identities.set(candidate.identity, group);
+  }
+  const duplicateIdentities = /* @__PURE__ */ new Set();
+  for (const [identity2, group] of identities) {
+    if (group.length < 2) continue;
+    duplicateIdentities.add(identity2);
+    for (const candidate of group) {
+      issues.push({ code: "duplicate_identity", path: candidate.relativePath, identity: identity2 });
+    }
+  }
+  for (const candidate of candidates2) {
+    if (options.signal?.aborted || duplicateIdentities.has(candidate.identity)) continue;
+    const read = await readStableArtifact(root, candidate);
+    if (read.issue !== void 0) {
+      issues.push(read.issue);
+      continue;
+    }
+    const artifact = parseArtifact(candidate, read.content ?? "");
+    if (artifact === void 0) {
+      issues.push({ code: "artifact_schema_invalid", path: candidate.relativePath });
+      continue;
+    }
+    if (titleIdentity(artifact.title) !== candidate.identity) {
+      issues.push({
+        code: "artifact_identity_mismatch",
+        path: candidate.relativePath,
+        identity: candidate.identity
+      });
+      continue;
+    }
+    if (managedEvidenceSource(artifact.evidence.sourcePath)) {
+      issues.push({ code: "artifact_evidence_invalid", path: candidate.relativePath });
+      continue;
+    }
+    const evidence = await verifyContextArtifactEvidence(root, artifact, options.signal);
+    if (evidence === void 0) {
+      issues.push({ code: "artifact_evidence_invalid", path: candidate.relativePath });
+      continue;
+    }
+    artifacts.push(Object.freeze({
+      kind: candidate.kind,
+      path: candidate.relativePath,
+      identity: candidate.identity,
+      title: artifact.title,
+      evidenceSource: evidence.sourceId,
+      evidenceRevision: evidence.revision
+    }));
+  }
+  return Object.freeze({
+    schemaVersion: 1,
+    valid: issues.length === 0 && !options.signal?.aborted,
+    workspaceRoot: root,
+    checkedAt,
+    candidateCount: candidates2.length,
+    artifacts: Object.freeze(artifacts),
+    issues: Object.freeze(issues)
+  });
+}
+
+// src/records/context-record-check.ts
+import { basename as basename5, extname as extname5, join as join2, relative as relative3, resolve as resolve6, sep as sep3 } from "node:path";
+import { open as open3, readdir as readdir3, realpath as realpath4, stat as stat4 } from "node:fs/promises";
+var RECORD_DIRECTORIES = Object.freeze([
+  { kind: "task", path: "docs/tasks" },
+  { kind: "verification", path: "docs/verifications" }
+]);
+var MAX_RECORDS = 256;
+var MAX_RECORD_BYTES = 128 * 1024;
+function portableRelative2(root, target) {
+  const value = relative3(root, target);
+  if (value === "" || value === ".." || value.startsWith(`..${sep3}`)) return void 0;
+  return value.split(sep3).join("/");
+}
+function safeIdentity2(path) {
+  const stem = basename5(path, extname5(path)).normalize("NFKC").trim().toLocaleLowerCase("en-US");
+  if (stem.length === 0 || stem.length > 128 || /[\p{Cc}\p{Cf}]/u.test(stem)) return void 0;
+  return stem;
+}
+function decodeUtf82(content) {
+  const decoded = new TextDecoder("utf-8", { fatal: true }).decode(content);
+  return decoded.includes("\0") ? void 0 : decoded;
+}
+async function collectCandidates2(root, issues) {
+  const candidates2 = [];
+  for (const directory of RECORD_DIRECTORIES) {
+    const requested = resolve6(root, ...directory.path.split("/"));
+    let entries;
+    try {
+      const canonical = await realpath4(requested);
+      if (portableRelative2(root, canonical) !== directory.path) {
+        issues.push({ code: "record_directory_unavailable", path: directory.path });
+        continue;
+      }
+      const info = await stat4(canonical);
+      if (!info.isDirectory()) {
+        issues.push({ code: "record_directory_unavailable", path: directory.path });
+        continue;
+      }
+      entries = await readdir3(canonical, { withFileTypes: true });
+    } catch (error) {
+      if (error.code === "ENOENT") continue;
+      issues.push({ code: "record_directory_unavailable", path: directory.path });
+      continue;
+    }
+    for (const entry of entries) {
+      if (!entry.isFile() || extname5(entry.name).toLocaleLowerCase("en-US") !== ".md") continue;
+      if (candidates2.length >= MAX_RECORDS) {
+        issues.push({ code: "record_capacity_exceeded" });
+        return candidates2;
+      }
+      const identity2 = safeIdentity2(entry.name);
+      const relativePath = `${directory.path}/${entry.name}`;
+      if (identity2 === void 0) {
+        issues.push({ code: "record_schema_invalid", path: relativePath });
+        continue;
+      }
+      candidates2.push({
+        kind: directory.kind,
+        absolutePath: join2(root, ...relativePath.split("/")),
+        relativePath,
+        identity: identity2
+      });
+    }
+  }
+  return candidates2;
+}
+async function readStableRecord(root, candidate) {
+  let handle;
+  try {
+    const canonical = await realpath4(candidate.absolutePath);
+    if (portableRelative2(root, canonical) !== candidate.relativePath) {
+      return { issue: { code: "record_file_unavailable", path: candidate.relativePath } };
+    }
+    handle = await open3(canonical, "r");
+    const before = await handle.stat();
+    if (!before.isFile()) {
+      return { issue: { code: "record_file_unavailable", path: candidate.relativePath } };
+    }
+    if (before.size > MAX_RECORD_BYTES) {
+      return { issue: { code: "record_file_too_large", path: candidate.relativePath } };
+    }
+    const raw = await handle.readFile();
+    const after = await handle.stat();
+    if (before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs || before.ino !== after.ino) {
+      return { issue: { code: "record_file_unavailable", path: candidate.relativePath } };
+    }
+    const content = decodeUtf82(raw);
+    return content === void 0 ? { issue: { code: "record_encoding_invalid", path: candidate.relativePath } } : { content };
+  } catch {
+    return { issue: { code: "record_file_unavailable", path: candidate.relativePath } };
+  } finally {
+    await handle?.close().catch(() => void 0);
+  }
+}
+function parseRecord(candidate, content) {
+  return candidate.kind === "task" ? extractContextTaskArtifact(content) : extractContextVerificationArtifact(content);
+}
+async function checkContextRecords(workspaceRoot, options = {}) {
+  const checkedAt = (options.now ?? (() => /* @__PURE__ */ new Date()))().toISOString();
+  const issues = [];
+  const records = [];
+  let root;
+  try {
+    root = await realpath4(resolve6(workspaceRoot));
+    if (!(await stat4(root)).isDirectory()) throw new Error("not a directory");
+  } catch {
+    return Object.freeze({
+      schemaVersion: 1,
+      valid: false,
+      checkedAt,
+      candidateCount: 0,
+      records: Object.freeze([]),
+      issues: Object.freeze([{ code: "workspace_unavailable" }])
+    });
+  }
+  const candidates2 = await collectCandidates2(root, issues);
+  const identities = /* @__PURE__ */ new Map();
+  for (const candidate of candidates2) {
+    const group = identities.get(candidate.identity) ?? [];
+    group.push(candidate);
+    identities.set(candidate.identity, group);
+  }
+  const duplicateIdentities = /* @__PURE__ */ new Set();
+  for (const [identity2, group] of identities) {
+    if (group.length < 2) continue;
+    duplicateIdentities.add(identity2);
+    for (const candidate of group) {
+      issues.push({
+        code: "duplicate_identity",
+        path: candidate.relativePath,
+        identity: identity2
+      });
+    }
+  }
+  for (const candidate of candidates2) {
+    if (options.signal?.aborted || duplicateIdentities.has(candidate.identity)) continue;
+    const read = await readStableRecord(root, candidate);
+    if (read.issue !== void 0) {
+      issues.push(read.issue);
+      continue;
+    }
+    const artifact = parseRecord(candidate, read.content ?? "");
+    if (artifact === void 0) {
+      issues.push({ code: "record_schema_invalid", path: candidate.relativePath });
+      continue;
+    }
+    const sourcePath = artifact.evidence.sourcePath.replace(/\\/gu, "/");
+    if (sourcePath.startsWith("docs/tasks/") || sourcePath.startsWith("docs/verifications/")) {
+      issues.push({ code: "record_evidence_invalid", path: candidate.relativePath });
+      continue;
+    }
+    const evidence = await verifyContextArtifactEvidence(root, artifact, options.signal);
+    if (evidence === void 0) {
+      issues.push({ code: "record_evidence_invalid", path: candidate.relativePath });
+      continue;
+    }
+    records.push(Object.freeze({
+      kind: candidate.kind,
+      path: candidate.relativePath,
+      identity: candidate.identity,
+      title: artifact.title,
+      evidenceSource: evidence.sourceId,
+      evidenceRevision: evidence.revision
+    }));
+  }
+  return Object.freeze({
+    schemaVersion: 1,
+    valid: issues.length === 0 && !options.signal?.aborted,
+    workspaceRoot: root,
+    checkedAt,
+    candidateCount: candidates2.length,
+    records: Object.freeze(records),
+    issues: Object.freeze(issues)
+  });
+}
+
 // src/host/codex-cdp/workspace-lookup.ts
 import { createHash as createHash7, randomBytes as randomBytes3 } from "node:crypto";
 
@@ -6109,7 +6505,7 @@ function interruptionOutcome(error) {
   return void 0;
 }
 function runBounded(operationName, operation, callerSignal, timeoutMs) {
-  return new Promise((resolve7, reject) => {
+  return new Promise((resolve9, reject) => {
     const controller = new AbortController();
     const deadlineAt = performance2.now() + timeoutMs;
     let settled = false;
@@ -6126,7 +6522,7 @@ function runBounded(operationName, operation, callerSignal, timeoutMs) {
       }
       settled = true;
       cleanup();
-      resolve7(value);
+      resolve9(value);
     };
     const settleFailure = (error) => {
       if (settled) return;
@@ -7246,14 +7642,17 @@ function createWorkspaceAnnotationProvider(options) {
 
 // src/host/codex-cdp/task-object-registry.ts
 import { createHash as createHash9, randomUUID as randomUUID4 } from "node:crypto";
-import { mkdir as mkdir2, readFile as readFile2, rename as rename2, stat as stat3, writeFile as writeFile2 } from "node:fs/promises";
-import { dirname as dirname3, isAbsolute as isAbsolute3, resolve as resolve5 } from "node:path";
+import { mkdir as mkdir2, readFile as readFile2, rename as rename2, stat as stat5, writeFile as writeFile2 } from "node:fs/promises";
+import { dirname as dirname3, isAbsolute as isAbsolute3, resolve as resolve7 } from "node:path";
 var TASK_OBJECT_PROVIDER_ID = "agent-task-context";
 var TASK_OBJECT_ENTITY_PREFIX = "task-object:";
 var REGISTRY_SCHEMA_VERSION2 = 1;
-var MAX_REGISTRY_BYTES2 = 1024 * 1024;
-var MAX_RECORDS = 1024;
-var MAX_ACTIVE_PER_BINDING = 256;
+var TASK_OBJECT_REGISTRY_MAX_BYTES = 1024 * 1024;
+var TASK_OBJECT_REGISTRY_MAX_RECORDS = 1024;
+var TASK_OBJECT_ARCHIVE_MAX_BYTES = 16 * 1024 * 1024;
+var TASK_OBJECT_ARCHIVE_MAX_RECORDS = 8192;
+var TASK_OBJECT_ACTIVE_SOFT_LIMIT = 64;
+var TASK_OBJECT_ACTIVE_HARD_LIMIT = 256;
 var MAX_ALIASES = 8;
 function objectRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -7508,7 +7907,7 @@ function parseStored(value, index) {
     },
     threadRef: boundedText5(value.threadRef, `records[${index}].threadRef`, 1, 768),
     routeRef: boundedText5(value.routeRef, `records[${index}].routeRef`, 1, 2048),
-    workspaceRoot: resolve5(value.workspaceRoot),
+    workspaceRoot: resolve7(value.workspaceRoot),
     bindingRevision: value.bindingRevision,
     entityId: value.entityId,
     lifecycle: value.lifecycle,
@@ -7518,9 +7917,9 @@ function parseStored(value, index) {
     entityRevision: value.entityRevision
   };
 }
-function parseDocument2(value) {
-  if (!objectRecord(value) || !exactKeys3(value, ["schemaVersion", "records"]) || value.schemaVersion !== REGISTRY_SCHEMA_VERSION2 || !Array.isArray(value.records) || value.records.length > MAX_RECORDS) {
-    throw new ContractError("task object registry is invalid");
+function parseRecordsDocument(value, maximumRecords, invalidMessage) {
+  if (!objectRecord(value) || !exactKeys3(value, ["schemaVersion", "records"]) || value.schemaVersion !== REGISTRY_SCHEMA_VERSION2 || !Array.isArray(value.records) || value.records.length > maximumRecords) {
+    throw new ContractError(invalidMessage);
   }
   const records = value.records.map(parseStored);
   const identities = /* @__PURE__ */ new Set();
@@ -7531,11 +7930,41 @@ function parseDocument2(value) {
   }
   return { schemaVersion: 1, records };
 }
+function parseDocument2(value) {
+  return parseRecordsDocument(
+    value,
+    TASK_OBJECT_REGISTRY_MAX_RECORDS,
+    "task object registry is invalid"
+  );
+}
+function parseArchiveDocument(value) {
+  return parseRecordsDocument(
+    value,
+    TASK_OBJECT_ARCHIVE_MAX_RECORDS,
+    "task object archive is invalid"
+  );
+}
+function serializedDocument(document2) {
+  return `${JSON.stringify(document2, null, 2)}
+`;
+}
+function documentBytes(document2) {
+  return Buffer.byteLength(serializedDocument(document2), "utf8");
+}
+function archiveRevision(records) {
+  return `task-object-archive:${createHash9("sha256").update(records.map((record8) => `${record8.entityId}:${record8.entityRevision}`).sort().join("\n"), "utf8").digest("hex")}`;
+}
+function normalizedIdentity(value) {
+  return value.normalize("NFKC").toLocaleLowerCase("en-US");
+}
 function matchesBinding(record8, binding) {
   return sameContextScope(record8.scope, binding.scope) && record8.bindingRevision === binding.bindingRevision && record8.threadRef === binding.threadRef && record8.routeRef === binding.routeRef && record8.workspaceRoot === binding.workspaceRoot;
 }
 function matchesEntry(record8, task, entry) {
-  return sameContextScope(record8.scope, entry.scope) && record8.bindingRevision === entry.bindingRevision && record8.threadRef === codexTaskThreadRef(task) && record8.routeRef === task.routeRef && record8.workspaceRoot === entry.workspaceRoot;
+  return matchesTaskWorkspace(record8, task, entry) && record8.bindingRevision === entry.bindingRevision;
+}
+function matchesTaskWorkspace(record8, task, entry) {
+  return sameContextScope(record8.scope, entry.scope) && record8.threadRef === codexTaskThreadRef(task) && record8.routeRef === task.routeRef && record8.workspaceRoot === entry.workspaceRoot;
 }
 function facts(record8) {
   const common = {
@@ -7590,18 +8019,28 @@ function facts(record8) {
 var TaskObjectRegistry = class {
   providerId = TASK_OBJECT_PROVIDER_ID;
   path;
+  archivePath;
   #mutation = Promise.resolve();
-  constructor(path) {
+  constructor(path, archivePath) {
     if (!isAbsolute3(path)) throw new TypeError("task object registry path must be absolute");
-    this.path = resolve5(path);
+    this.path = resolve7(path);
+    const defaultArchive = this.path.endsWith(".json") ? `${this.path.slice(0, -5)}.archive.json` : `${this.path}.archive.json`;
+    const candidateArchive = archivePath ?? defaultArchive;
+    if (!isAbsolute3(candidateArchive)) {
+      throw new TypeError("task object archive path must be absolute");
+    }
+    this.archivePath = resolve7(candidateArchive);
+    if (this.archivePath === this.path) {
+      throw new TypeError("task object archive path must differ from registry path");
+    }
   }
   ownsEntityId(entityId) {
     return new RegExp(`^${TASK_OBJECT_ENTITY_PREFIX}[a-f0-9]{64}$`, "u").test(entityId);
   }
   async #read() {
     try {
-      const info = await stat3(this.path);
-      if (!info.isFile() || info.size > MAX_REGISTRY_BYTES2) {
+      const info = await stat5(this.path);
+      if (!info.isFile() || info.size > TASK_OBJECT_REGISTRY_MAX_BYTES) {
         throw new ContractError("task object registry file is invalid");
       }
       const content = await readFile2(this.path, "utf8");
@@ -7614,16 +8053,47 @@ var TaskObjectRegistry = class {
       throw new ContractError("task object registry JSON is malformed");
     }
   }
-  async #write(document2) {
-    const body = `${JSON.stringify(document2, null, 2)}
-`;
-    if (Buffer.byteLength(body, "utf8") > MAX_REGISTRY_BYTES2) {
-      throw new ContractError("task object registry exceeds its byte budget");
+  async #readArchive() {
+    try {
+      const info = await stat5(this.archivePath);
+      if (!info.isFile() || info.size > TASK_OBJECT_ARCHIVE_MAX_BYTES) {
+        throw new ContractError("task object archive file is invalid");
+      }
+      const content = await readFile2(this.archivePath, "utf8");
+      return parseArchiveDocument(JSON.parse(content));
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        return { schemaVersion: 1, records: [] };
+      }
+      if (error instanceof ContractError) throw error;
+      throw new ContractError("task object archive JSON is malformed");
     }
-    await mkdir2(dirname3(this.path), { recursive: true, mode: 448 });
-    const temporary = `${this.path}.${process.pid}.${randomUUID4()}.tmp`;
+  }
+  async #writeDocument(path, document2, maximumBytes, budgetMessage) {
+    const body = serializedDocument(document2);
+    if (Buffer.byteLength(body, "utf8") > maximumBytes) {
+      throw new ContractError(budgetMessage);
+    }
+    await mkdir2(dirname3(path), { recursive: true, mode: 448 });
+    const temporary = `${path}.${process.pid}.${randomUUID4()}.tmp`;
     await writeFile2(temporary, body, { encoding: "utf8", mode: 384, flag: "wx" });
-    await rename2(temporary, this.path);
+    await rename2(temporary, path);
+  }
+  async #write(document2) {
+    await this.#writeDocument(
+      this.path,
+      document2,
+      TASK_OBJECT_REGISTRY_MAX_BYTES,
+      "task object registry exceeds its byte budget"
+    );
+  }
+  async #writeArchive(document2) {
+    await this.#writeDocument(
+      this.archivePath,
+      document2,
+      TASK_OBJECT_ARCHIVE_MAX_BYTES,
+      "task object archive exceeds its byte budget"
+    );
   }
   async #mutate(operation) {
     const previous = this.#mutation;
@@ -7654,7 +8124,7 @@ var TaskObjectRegistry = class {
         return { kind: "unchanged", object: summary(existing) };
       }
       const activeCount = document2.records.filter((record9) => matchesEntry(record9, task, binding) && record9.lifecycle === "active" && record9.objectKey !== input.objectKey).length;
-      if (activeCount >= MAX_ACTIVE_PER_BINDING) {
+      if (activeCount >= TASK_OBJECT_ACTIVE_HARD_LIMIT) {
         throw new ContractError("active task object capacity is full");
       }
       const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -7672,7 +8142,7 @@ var TaskObjectRegistry = class {
         entityRevision: nextRevision
       };
       if (index < 0) {
-        if (document2.records.length >= MAX_RECORDS) {
+        if (document2.records.length >= TASK_OBJECT_REGISTRY_MAX_RECORDS) {
           throw new ContractError("task object registry is full");
         }
         document2.records.push(record8);
@@ -7698,7 +8168,7 @@ var TaskObjectRegistry = class {
       if (existingReplacement !== void 0) {
         throw new ContractError("replacement objectKey has already been used");
       }
-      if (replacementIndex < 0 && document2.records.length >= MAX_RECORDS) {
+      if (replacementIndex < 0 && document2.records.length >= TASK_OBJECT_REGISTRY_MAX_RECORDS) {
         throw new ContractError("task object registry is full");
       }
       const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -7745,8 +8215,106 @@ var TaskObjectRegistry = class {
       return { kind: "retired", object: summary(retired) };
     });
   }
+  #capacityStatus(document2, archive, task, binding) {
+    const current = document2.records.filter((record8) => matchesEntry(record8, task, binding));
+    const active = current.filter((record8) => record8.lifecycle === "active").length;
+    const warnings = active >= TASK_OBJECT_ACTIVE_SOFT_LIMIT ? ["active_soft_limit_reached"] : [];
+    return Object.freeze({
+      active,
+      terminal: current.length - active,
+      currentTaskRecords: current.length,
+      registryRecords: document2.records.length,
+      archivedRecords: archive.records.length,
+      registryBytes: documentBytes(document2),
+      archivedBytes: documentBytes(archive),
+      activeSoftLimit: TASK_OBJECT_ACTIVE_SOFT_LIMIT,
+      activeHardLimit: TASK_OBJECT_ACTIVE_HARD_LIMIT,
+      registryRecordLimit: TASK_OBJECT_REGISTRY_MAX_RECORDS,
+      registryByteLimit: TASK_OBJECT_REGISTRY_MAX_BYTES,
+      archiveRecordLimit: TASK_OBJECT_ARCHIVE_MAX_RECORDS,
+      archiveByteLimit: TASK_OBJECT_ARCHIVE_MAX_BYTES,
+      warnings: Object.freeze([...warnings])
+    });
+  }
+  async inventoryForTask(task, binding) {
+    const [document2, archive] = await Promise.all([this.#read(), this.#readArchive()]);
+    const objects = document2.records.filter((record8) => matchesEntry(record8, task, binding)).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)).map(summary);
+    return Object.freeze({
+      objects: Object.freeze(objects),
+      capacity: this.#capacityStatus(document2, archive, task, binding)
+    });
+  }
+  async capacityForTask(task, binding) {
+    return (await this.inventoryForTask(task, binding)).capacity;
+  }
+  /**
+   * Rebind durable task objects to a fresh capability revision only when the
+   * host-vouched task, route, canonical workspace root, and scope are all
+   * unchanged. This makes an explicit same-workspace rebind or unbind/rebind
+   * recoverable without weakening the current binding fence.
+   */
+  async adoptBinding(task, binding) {
+    return await this.#mutate(async (document2) => {
+      const candidates2 = document2.records.filter((record8) => matchesTaskWorkspace(record8, task, binding) && record8.bindingRevision !== binding.bindingRevision);
+      if (candidates2.length === 0) return 0;
+      const candidateIds = new Set(candidates2.map((record8) => record8.entityId));
+      document2.records = document2.records.map((record8) => candidateIds.has(record8.entityId) ? { ...copyStored(record8), bindingRevision: binding.bindingRevision } : record8);
+      await this.#write(document2);
+      return candidates2.length;
+    });
+  }
+  /**
+   * Move only terminal task objects that have exactly one same-type/same-name
+   * stable workspace identity into an audit-only archive. The archive is
+   * written first; a crash can therefore leave a harmless duplicate but can
+   * never delete the only historical copy.
+   */
+  async archiveGraduated(task, binding, rawStableRecords) {
+    const stableRecords = validateContextIndexForRuntime(rawStableRecords, binding.scope);
+    return await this.#mutate(async (document2) => {
+      const eligible = document2.records.filter((record8) => {
+        if (record8.lifecycle === "active" || !matchesEntry(record8, task, binding)) return false;
+        const name = normalizedIdentity(record8.canonicalName);
+        return stableRecords.filter((stable) => !stable.deleted && stable.authorityRef.provider !== TASK_OBJECT_PROVIDER_ID && stable.entityType === record8.entityType && normalizedIdentity(stable.canonicalName) === name).length === 1;
+      });
+      const archive = await this.#readArchive();
+      if (eligible.length === 0) {
+        return Object.freeze({
+          kind: "unchanged",
+          archivedCount: 0,
+          archiveRevision: archiveRevision(archive.records)
+        });
+      }
+      const archivedByEntityId = new Map(
+        archive.records.map((record8) => [record8.entityId, record8])
+      );
+      for (const record8 of eligible) {
+        const existing = archivedByEntityId.get(record8.entityId);
+        if (existing !== void 0 && existing.entityRevision !== record8.entityRevision) {
+          throw new ContractError("task object archive contains a conflicting revision");
+        }
+        if (existing === void 0) {
+          const copied = copyStored(record8);
+          archive.records.push(copied);
+          archivedByEntityId.set(copied.entityId, copied);
+        }
+      }
+      if (archive.records.length > TASK_OBJECT_ARCHIVE_MAX_RECORDS) {
+        throw new ContractError("task object archive is full");
+      }
+      await this.#writeArchive(archive);
+      const eligibleIds = new Set(eligible.map((record8) => record8.entityId));
+      document2.records = document2.records.filter((record8) => !eligibleIds.has(record8.entityId));
+      await this.#write(document2);
+      return Object.freeze({
+        kind: "archived",
+        archivedCount: eligible.length,
+        archiveRevision: archiveRevision(archive.records)
+      });
+    });
+  }
   async listForTask(task, binding) {
-    return (await this.#read()).records.filter((record8) => matchesEntry(record8, task, binding)).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)).map(summary);
+    return (await this.inventoryForTask(task, binding)).objects;
   }
   async listActive(binding, signal) {
     if (signal?.aborted) throw signal.reason;
@@ -8105,6 +8673,7 @@ function createWorkspaceCompanion(options) {
     if (tasks.length !== 1) throw new Error("active_codex_task_ambiguous");
     const replaced = await options.registry.find(tasks[0]) !== void 0;
     const entry = await options.registry.bind(tasks[0], workspaceRoot);
+    await options.taskObjectRegistry?.adoptBinding(tasks[0], entry);
     activeBinding = entry;
     await adapter.refreshAnnotations(void 0, true);
     return Object.freeze({ binding: entry, replaced });
@@ -8131,11 +8700,28 @@ function createWorkspaceCompanion(options) {
     if (tasks.length !== 1) throw new Error("active_codex_task_ambiguous");
     const binding = await options.registry.find(tasks[0]);
     if (binding === void 0) throw new Error("context_binding_missing");
+    await options.taskObjectRegistry.adoptBinding(tasks[0], binding);
     activeBinding = binding;
     return { task: tasks[0], binding, registry: options.taskObjectRegistry };
   };
   const refreshObjectAnnotations = async () => {
     await adapter.refreshAnnotations(void 0, true);
+  };
+  const trustedBindingFor = async (current) => {
+    const port = new CodexTaskWorkspaceBindingPort(
+      options.registry,
+      current.task,
+      { current: async () => current.task }
+    );
+    const resolved = await port.resolve({
+      selectionGeneration: 1,
+      explicitScope: current.binding.scope,
+      threadRef: codexTaskThreadRef(current.task),
+      routeRef: current.task.routeRef,
+      workspaceRoot: current.binding.workspaceRoot
+    });
+    if (resolved.kind !== "trusted") throw new Error("context_binding_changed");
+    return resolved;
   };
   const upsertCurrentTaskObject = async (input) => {
     const current = await currentTaskBinding();
@@ -8163,6 +8749,31 @@ function createWorkspaceCompanion(options) {
   const listCurrentTaskObjects = async () => {
     const current = await currentTaskBinding();
     return await current.registry.listForTask(current.task, current.binding);
+  };
+  const inventoryCurrentTaskObjects = async () => {
+    const current = await currentTaskBinding();
+    return await current.registry.inventoryForTask(current.task, current.binding);
+  };
+  const archiveGraduatedCurrentTaskObjects = async () => {
+    const current = await currentTaskBinding();
+    const trusted = await trustedBindingFor(current);
+    const [indexed, artifacts, records] = await Promise.all([
+      localIndex.list(trusted),
+      checkContextMilestoneArtifacts(current.binding.workspaceRoot),
+      checkContextRecords(current.binding.workspaceRoot)
+    ]);
+    const checkedPaths = new Set([
+      ...artifacts.valid ? artifacts.artifacts.map((artifact) => artifact.path) : [],
+      ...records.valid ? records.records.map((record8) => record8.path) : []
+    ].map((path) => `file:${path}`));
+    const stableRecords = indexed.filter((record8) => checkedPaths.has(record8.entityId));
+    const result = await current.registry.archiveGraduated(
+      current.task,
+      current.binding,
+      stableRecords
+    );
+    if (result.archivedCount > 0) await refreshObjectAnnotations();
+    return result;
   };
   const stop = () => {
     if (stopPromise !== void 0) return stopPromise;
@@ -8194,6 +8805,8 @@ function createWorkspaceCompanion(options) {
     supersedeCurrentTaskObject,
     retireCurrentTaskObject,
     listCurrentTaskObjects,
+    inventoryCurrentTaskObjects,
+    archiveGraduatedCurrentTaskObjects,
     stop,
     status
   });
@@ -8212,11 +8825,11 @@ function record7(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function packageRoot(start) {
-  let current = resolve6(start);
+  let current = resolve8(start);
   for (let depth = 0; depth < 10; depth += 1) {
-    const developmentLayout = existsSync(join(current, "src"));
-    const packagedLayout = existsSync(join(current, "host", "workspace-companion.mjs"));
-    if (existsSync(join(current, "package.json")) && (developmentLayout || packagedLayout)) {
+    const developmentLayout = existsSync(join3(current, "src"));
+    const packagedLayout = existsSync(join3(current, "host", "workspace-companion.mjs"));
+    if (existsSync(join3(current, "package.json")) && (developmentLayout || packagedLayout)) {
       return current;
     }
     const parent = dirname4(current);
@@ -8227,7 +8840,7 @@ function packageRoot(start) {
 }
 function localStateRoot() {
   const local = process.env.LOCALAPPDATA;
-  return resolve6(local && isAbsolute4(local) ? local : homedir(), "PointableContext");
+  return resolve8(local && isAbsolute4(local) ? local : homedir(), "PointableContext");
 }
 function boundedInteger2(value, name) {
   if (!/^\d+$/u.test(value)) fail(`${name} must be an integer`);
@@ -8239,14 +8852,14 @@ function boundedInteger2(value, name) {
 }
 function parseArguments(argv) {
   const command = argv[0];
-  if (command !== "start" && command !== "status" && command !== "bind" && command !== "unbind" && command !== "stop" && command !== "run" && command !== "object-upsert" && command !== "object-supersede" && command !== "object-retire" && command !== "object-list") {
+  if (command !== "start" && command !== "status" && command !== "bind" && command !== "unbind" && command !== "stop" && command !== "run" && command !== "object-upsert" && command !== "object-supersede" && command !== "object-retire" && command !== "object-archive" && command !== "object-list") {
     return fail(
-      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-list> [options]"
+      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-archive|object-list> [options]"
     );
   }
   const stateRoot = localStateRoot();
-  let stateDir = join(stateRoot, "workspace-companion");
-  let registryPath = join(stateRoot, "task-workspace-bindings.json");
+  let stateDir = join3(stateRoot, "workspace-companion");
+  let registryPath = join3(stateRoot, "task-workspace-bindings.json");
   let endpoint = "http://127.0.0.1:9223";
   let refreshIntervalMs = 2e3;
   let presentationMode = "mental-model";
@@ -8266,10 +8879,10 @@ function parseArguments(argv) {
     index += 1;
     if (argument === "--state-dir") {
       if (!isAbsolute4(value)) fail("--state-dir must be absolute");
-      stateDir = resolve6(value);
+      stateDir = resolve8(value);
     } else if (argument === "--registry") {
       if (!isAbsolute4(value)) fail("--registry must be absolute");
-      registryPath = resolve6(value);
+      registryPath = resolve8(value);
     } else if (argument === "--endpoint") {
       endpoint = value;
     } else if (argument === "--refresh-ms") {
@@ -8281,10 +8894,10 @@ function parseArguments(argv) {
       presentationMode = value;
     } else if (argument === "--workspace-root") {
       if (!isAbsolute4(value)) fail("--workspace-root must be absolute");
-      workspaceRoot = resolve6(value);
+      workspaceRoot = resolve8(value);
     } else if (argument === "--object-file") {
       if (!isAbsolute4(value)) fail("--object-file must be absolute");
-      objectFile = resolve6(value);
+      objectFile = resolve8(value);
     } else if (argument === "--object-key") {
       objectKey3 = value;
     } else if (argument === "--replaces") {
@@ -8319,9 +8932,9 @@ function parseArguments(argv) {
     json
   };
 }
-var statePath = (directory) => join(directory, "state.json");
-var lockPath = (directory) => join(directory, "runtime.lock");
-var logPath = (directory) => join(directory, "companion.log");
+var statePath = (directory) => join3(directory, "state.json");
+var lockPath = (directory) => join3(directory, "runtime.lock");
+var logPath = (directory) => join3(directory, "companion.log");
 function parseState(value) {
   if (!record7(value) || value.schemaVersion !== CONTROL_SCHEMA_VERSION || value.mode !== "live-local-workspace" || !Number.isSafeInteger(value.pid) || Number(value.pid) < 1 || !Number.isSafeInteger(value.port) || Number(value.port) < 1 || Number(value.port) > 65535 || typeof value.token !== "string" || !/^[a-f0-9]{64}$/u.test(value.token) || typeof value.startedAt !== "string" || !Number.isFinite(Date.parse(value.startedAt))) {
     return fail("invalid workspace companion state");
@@ -8375,7 +8988,7 @@ async function writeJsonAtomic(path, value) {
 async function claimLock(directory) {
   await mkdir3(directory, { recursive: true, mode: 448 });
   try {
-    const handle = await open2(lockPath(directory), "wx", 384);
+    const handle = await open4(lockPath(directory), "wx", 384);
     try {
       await handle.writeFile(`${process.pid}
 `, "utf8");
@@ -8427,7 +9040,7 @@ async function readRequestJson(request) {
   return parsed;
 }
 async function readTaskObjectFile(path) {
-  const info = await stat4(path);
+  const info = await stat6(path);
   if (!info.isFile() || info.size > MAX_REQUEST_BYTES) {
     throw new Error("task object input file is invalid or too large");
   }
@@ -8508,7 +9121,7 @@ async function runServer(arguments_) {
   const startedAt = (/* @__PURE__ */ new Date()).toISOString();
   const registry = new CodexTaskWorkspaceBindingRegistry(arguments_.registryPath);
   const taskObjectRegistry = new TaskObjectRegistry(
-    join(arguments_.stateDir, "task-objects.json")
+    join3(arguments_.stateDir, "task-objects.json")
   );
   const companion = createWorkspaceCompanion({
     registry,
@@ -8553,7 +9166,7 @@ async function runServer(arguments_) {
         if (typeof body.workspaceRoot !== "string" || !isAbsolute4(body.workspaceRoot)) {
           throw new Error("workspace_root_invalid");
         }
-        return await companion.bindCurrentTask(resolve6(body.workspaceRoot));
+        return await companion.bindCurrentTask(resolve8(body.workspaceRoot));
       }).then(
         (result) => sendJson(response, 200, { ok: true, ...result }),
         (error) => sendJson(response, 409, {
@@ -8578,13 +9191,23 @@ async function runServer(arguments_) {
       return;
     }
     if (request.method === "GET" && request.url === "/objects") {
-      void companion.listCurrentTaskObjects().then(
-        (objects) => sendJson(response, 200, { ok: true, objects }),
+      void companion.inventoryCurrentTaskObjects().then(
+        (inventory) => sendJson(response, 200, { ok: true, ...inventory }),
         (error) => sendJson(response, 409, {
           ok: false,
           error: error instanceof Error ? error.message : "object_list_failed"
         })
       );
+      return;
+    }
+    if (request.method === "POST" && request.url === "/objects/archive") {
+      void companion.archiveGraduatedCurrentTaskObjects().then(async (result) => {
+        const inventory = await companion.inventoryCurrentTaskObjects();
+        sendJson(response, 200, { ok: true, result, ...inventory });
+      }).catch((error) => sendJson(response, 409, {
+        ok: false,
+        error: error instanceof Error ? error.message : "object_archive_failed"
+      }));
       return;
     }
     if (request.method === "POST" && request.url === "/objects/upsert") {
@@ -8745,6 +9368,12 @@ function print(value, json) {
     );
     return;
   }
+  if (result !== void 0 && (result.kind === "archived" || result.kind === "unchanged") && Number.isSafeInteger(result.archivedCount)) {
+    process.stdout.write(
+      `Task object archive: ${String(result.kind)}; moved=${String(result.archivedCount)}
+`
+    );
+  }
   if (Array.isArray(value.objects)) {
     process.stdout.write(`Current task objects: ${value.objects.length}
 `);
@@ -8754,6 +9383,17 @@ function print(value, json) {
         `- ${String(item.objectKey)} [${String(item.entityType)}] ${String(item.lifecycle)}
 `
       );
+    }
+    const capacity = record7(value.capacity) ? value.capacity : void 0;
+    if (capacity !== void 0) {
+      process.stdout.write(
+        `Capacity: active=${String(capacity.active)}/${String(capacity.activeHardLimit)}; registry=${String(capacity.registryRecords)}/${String(capacity.registryRecordLimit)}; archived=${String(capacity.archivedRecords)}/${String(capacity.archiveRecordLimit)}
+`
+      );
+      if (Array.isArray(capacity.warnings) && capacity.warnings.length > 0) {
+        process.stdout.write(`Warnings: ${capacity.warnings.map(String).join(", ")}
+`);
+      }
     }
     return;
   }
@@ -8802,13 +9442,17 @@ async function main() {
     print(await controlRequest(state, "POST", "/unbind"), arguments_.json);
     return;
   }
-  if (arguments_.command === "object-upsert" || arguments_.command === "object-supersede" || arguments_.command === "object-retire" || arguments_.command === "object-list") {
+  if (arguments_.command === "object-upsert" || arguments_.command === "object-supersede" || arguments_.command === "object-retire" || arguments_.command === "object-archive" || arguments_.command === "object-list") {
     const state = await readState(arguments_.stateDir);
     if (state === void 0 || !processIsAlive(state.pid)) {
       fail("workspace companion is not running");
     }
     if (arguments_.command === "object-list") {
       print(await controlRequest(state, "GET", "/objects"), arguments_.json);
+      return;
+    }
+    if (arguments_.command === "object-archive") {
+      print(await controlRequest(state, "POST", "/objects/archive"), arguments_.json);
       return;
     }
     if (arguments_.command === "object-retire") {

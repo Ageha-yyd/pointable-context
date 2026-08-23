@@ -11,7 +11,7 @@ import type {
   TrustedContextBinding,
 } from "../../contracts.js";
 import { sameContextScope } from "../../context-scope.js";
-import { ContractError } from "../../validation.js";
+import { ContractError, validateContextIndexForRuntime } from "../../validation.js";
 import type { CodexHostTaskContext } from "./host-context.js";
 import {
   codexTaskThreadRef,
@@ -26,9 +26,12 @@ export const TASK_OBJECT_PROVIDER_ID = "agent-task-context";
 export const TASK_OBJECT_ENTITY_PREFIX = "task-object:";
 
 const REGISTRY_SCHEMA_VERSION = 1;
-const MAX_REGISTRY_BYTES = 1024 * 1024;
-const MAX_RECORDS = 1_024;
-const MAX_ACTIVE_PER_BINDING = 256;
+export const TASK_OBJECT_REGISTRY_MAX_BYTES = 1024 * 1024;
+export const TASK_OBJECT_REGISTRY_MAX_RECORDS = 1_024;
+export const TASK_OBJECT_ARCHIVE_MAX_BYTES = 16 * 1024 * 1024;
+export const TASK_OBJECT_ARCHIVE_MAX_RECORDS = 8_192;
+export const TASK_OBJECT_ACTIVE_SOFT_LIMIT = 64;
+export const TASK_OBJECT_ACTIVE_HARD_LIMIT = 256;
 const MAX_ALIASES = 8;
 
 export type TaskObjectType =
@@ -125,6 +128,34 @@ export interface TaskObjectMutationResult {
   kind: "created" | "updated" | "unchanged" | "superseded" | "retired";
   object: TaskObjectSummary;
   replacement?: TaskObjectSummary;
+}
+
+export interface TaskObjectCapacityStatus {
+  active: number;
+  terminal: number;
+  currentTaskRecords: number;
+  registryRecords: number;
+  archivedRecords: number;
+  registryBytes: number;
+  archivedBytes: number;
+  activeSoftLimit: typeof TASK_OBJECT_ACTIVE_SOFT_LIMIT;
+  activeHardLimit: typeof TASK_OBJECT_ACTIVE_HARD_LIMIT;
+  registryRecordLimit: typeof TASK_OBJECT_REGISTRY_MAX_RECORDS;
+  registryByteLimit: typeof TASK_OBJECT_REGISTRY_MAX_BYTES;
+  archiveRecordLimit: typeof TASK_OBJECT_ARCHIVE_MAX_RECORDS;
+  archiveByteLimit: typeof TASK_OBJECT_ARCHIVE_MAX_BYTES;
+  warnings: Array<"active_soft_limit_reached">;
+}
+
+export interface TaskObjectInventory {
+  objects: TaskObjectSummary[];
+  capacity: TaskObjectCapacityStatus;
+}
+
+export interface TaskObjectArchiveResult {
+  kind: "archived" | "unchanged";
+  archivedCount: number;
+  archiveRevision: string;
 }
 
 function objectRecord(value: unknown): value is Record<string, unknown> {
@@ -454,15 +485,19 @@ function parseStored(value: unknown, index: number): StoredTaskObject {
   };
 }
 
-function parseDocument(value: unknown): RegistryDocument {
+function parseRecordsDocument(
+  value: unknown,
+  maximumRecords: number,
+  invalidMessage: string,
+): RegistryDocument {
   if (
     !objectRecord(value) ||
     !exactKeys(value, ["schemaVersion", "records"]) ||
     value.schemaVersion !== REGISTRY_SCHEMA_VERSION ||
     !Array.isArray(value.records) ||
-    value.records.length > MAX_RECORDS
+    value.records.length > maximumRecords
   ) {
-    throw new ContractError("task object registry is invalid");
+    throw new ContractError(invalidMessage);
   }
   const records = value.records.map(parseStored);
   const identities = new Set<string>();
@@ -472,6 +507,40 @@ function parseDocument(value: unknown): RegistryDocument {
     identities.add(identity);
   }
   return { schemaVersion: 1, records };
+}
+
+function parseDocument(value: unknown): RegistryDocument {
+  return parseRecordsDocument(
+    value,
+    TASK_OBJECT_REGISTRY_MAX_RECORDS,
+    "task object registry is invalid",
+  );
+}
+
+function parseArchiveDocument(value: unknown): RegistryDocument {
+  return parseRecordsDocument(
+    value,
+    TASK_OBJECT_ARCHIVE_MAX_RECORDS,
+    "task object archive is invalid",
+  );
+}
+
+function serializedDocument(document: RegistryDocument): string {
+  return `${JSON.stringify(document, null, 2)}\n`;
+}
+
+function documentBytes(document: RegistryDocument): number {
+  return Buffer.byteLength(serializedDocument(document), "utf8");
+}
+
+function archiveRevision(records: readonly StoredTaskObject[]): string {
+  return `task-object-archive:${createHash("sha256")
+    .update(records.map((record) => `${record.entityId}:${record.entityRevision}`).sort().join("\n"), "utf8")
+    .digest("hex")}`;
+}
+
+function normalizedIdentity(value: string): string {
+  return value.normalize("NFKC").toLocaleLowerCase("en-US");
 }
 
 function matchesBinding(record: StoredTaskObject, binding: TrustedContextBinding): boolean {
@@ -490,8 +559,18 @@ function matchesEntry(
   entry: CodexTaskWorkspaceBindingEntry,
 ): boolean {
   return (
+    matchesTaskWorkspace(record, task, entry) &&
+    record.bindingRevision === entry.bindingRevision
+  );
+}
+
+function matchesTaskWorkspace(
+  record: StoredTaskObject,
+  task: CodexHostTaskContext,
+  entry: CodexTaskWorkspaceBindingEntry,
+): boolean {
+  return (
     sameContextScope(record.scope, entry.scope) &&
-    record.bindingRevision === entry.bindingRevision &&
     record.threadRef === codexTaskThreadRef(task) &&
     record.routeRef === task.routeRef &&
     record.workspaceRoot === entry.workspaceRoot
@@ -554,11 +633,23 @@ function facts(record: StoredTaskObject): Record<string, FactValue> {
 export class TaskObjectRegistry implements ContextIndexPort, AuthoritativeProvider, WorkspaceRevisionProbe {
   readonly providerId = TASK_OBJECT_PROVIDER_ID;
   readonly path: string;
+  readonly archivePath: string;
   #mutation: Promise<void> = Promise.resolve();
 
-  constructor(path: string) {
+  constructor(path: string, archivePath?: string) {
     if (!isAbsolute(path)) throw new TypeError("task object registry path must be absolute");
     this.path = resolve(path);
+    const defaultArchive = this.path.endsWith(".json")
+      ? `${this.path.slice(0, -5)}.archive.json`
+      : `${this.path}.archive.json`;
+    const candidateArchive = archivePath ?? defaultArchive;
+    if (!isAbsolute(candidateArchive)) {
+      throw new TypeError("task object archive path must be absolute");
+    }
+    this.archivePath = resolve(candidateArchive);
+    if (this.archivePath === this.path) {
+      throw new TypeError("task object archive path must differ from registry path");
+    }
   }
 
   ownsEntityId(entityId: string): boolean {
@@ -568,7 +659,7 @@ export class TaskObjectRegistry implements ContextIndexPort, AuthoritativeProvid
   async #read(): Promise<RegistryDocument> {
     try {
       const info = await stat(this.path);
-      if (!info.isFile() || info.size > MAX_REGISTRY_BYTES) {
+      if (!info.isFile() || info.size > TASK_OBJECT_REGISTRY_MAX_BYTES) {
         throw new ContractError("task object registry file is invalid");
       }
       const content = await readFile(this.path, "utf8");
@@ -582,15 +673,55 @@ export class TaskObjectRegistry implements ContextIndexPort, AuthoritativeProvid
     }
   }
 
-  async #write(document: RegistryDocument): Promise<void> {
-    const body = `${JSON.stringify(document, null, 2)}\n`;
-    if (Buffer.byteLength(body, "utf8") > MAX_REGISTRY_BYTES) {
-      throw new ContractError("task object registry exceeds its byte budget");
+  async #readArchive(): Promise<RegistryDocument> {
+    try {
+      const info = await stat(this.archivePath);
+      if (!info.isFile() || info.size > TASK_OBJECT_ARCHIVE_MAX_BYTES) {
+        throw new ContractError("task object archive file is invalid");
+      }
+      const content = await readFile(this.archivePath, "utf8");
+      return parseArchiveDocument(JSON.parse(content) as unknown);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return { schemaVersion: 1, records: [] };
+      }
+      if (error instanceof ContractError) throw error;
+      throw new ContractError("task object archive JSON is malformed");
     }
-    await mkdir(dirname(this.path), { recursive: true, mode: 0o700 });
-    const temporary = `${this.path}.${process.pid}.${randomUUID()}.tmp`;
+  }
+
+  async #writeDocument(
+    path: string,
+    document: RegistryDocument,
+    maximumBytes: number,
+    budgetMessage: string,
+  ): Promise<void> {
+    const body = serializedDocument(document);
+    if (Buffer.byteLength(body, "utf8") > maximumBytes) {
+      throw new ContractError(budgetMessage);
+    }
+    await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+    const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
     await writeFile(temporary, body, { encoding: "utf8", mode: 0o600, flag: "wx" });
-    await rename(temporary, this.path);
+    await rename(temporary, path);
+  }
+
+  async #write(document: RegistryDocument): Promise<void> {
+    await this.#writeDocument(
+      this.path,
+      document,
+      TASK_OBJECT_REGISTRY_MAX_BYTES,
+      "task object registry exceeds its byte budget",
+    );
+  }
+
+  async #writeArchive(document: RegistryDocument): Promise<void> {
+    await this.#writeDocument(
+      this.archivePath,
+      document,
+      TASK_OBJECT_ARCHIVE_MAX_BYTES,
+      "task object archive exceeds its byte budget",
+    );
   }
 
   async #mutate<T>(operation: (document: RegistryDocument) => Promise<T>): Promise<T> {
@@ -634,7 +765,7 @@ export class TaskObjectRegistry implements ContextIndexPort, AuthoritativeProvid
       const activeCount = document.records.filter((record) =>
         matchesEntry(record, task, binding) && record.lifecycle === "active" &&
         record.objectKey !== input.objectKey).length;
-      if (activeCount >= MAX_ACTIVE_PER_BINDING) {
+      if (activeCount >= TASK_OBJECT_ACTIVE_HARD_LIMIT) {
         throw new ContractError("active task object capacity is full");
       }
       const now = new Date().toISOString();
@@ -652,7 +783,7 @@ export class TaskObjectRegistry implements ContextIndexPort, AuthoritativeProvid
         entityRevision: nextRevision,
       };
       if (index < 0) {
-        if (document.records.length >= MAX_RECORDS) {
+        if (document.records.length >= TASK_OBJECT_REGISTRY_MAX_RECORDS) {
           throw new ContractError("task object registry is full");
         }
         document.records.push(record);
@@ -690,7 +821,7 @@ export class TaskObjectRegistry implements ContextIndexPort, AuthoritativeProvid
       if (existingReplacement !== undefined) {
         throw new ContractError("replacement objectKey has already been used");
       }
-      if (replacementIndex < 0 && document.records.length >= MAX_RECORDS) {
+      if (replacementIndex < 0 && document.records.length >= TASK_OBJECT_REGISTRY_MAX_RECORDS) {
         throw new ContractError("task object registry is full");
       }
       const now = new Date().toISOString();
@@ -746,14 +877,148 @@ export class TaskObjectRegistry implements ContextIndexPort, AuthoritativeProvid
     });
   }
 
+  #capacityStatus(
+    document: RegistryDocument,
+    archive: RegistryDocument,
+    task: CodexHostTaskContext,
+    binding: CodexTaskWorkspaceBindingEntry,
+  ): TaskObjectCapacityStatus {
+    const current = document.records.filter((record) => matchesEntry(record, task, binding));
+    const active = current.filter((record) => record.lifecycle === "active").length;
+    const warnings: TaskObjectCapacityStatus["warnings"] = active >= TASK_OBJECT_ACTIVE_SOFT_LIMIT
+      ? ["active_soft_limit_reached"]
+      : [];
+    return Object.freeze({
+      active,
+      terminal: current.length - active,
+      currentTaskRecords: current.length,
+      registryRecords: document.records.length,
+      archivedRecords: archive.records.length,
+      registryBytes: documentBytes(document),
+      archivedBytes: documentBytes(archive),
+      activeSoftLimit: TASK_OBJECT_ACTIVE_SOFT_LIMIT,
+      activeHardLimit: TASK_OBJECT_ACTIVE_HARD_LIMIT,
+      registryRecordLimit: TASK_OBJECT_REGISTRY_MAX_RECORDS,
+      registryByteLimit: TASK_OBJECT_REGISTRY_MAX_BYTES,
+      archiveRecordLimit: TASK_OBJECT_ARCHIVE_MAX_RECORDS,
+      archiveByteLimit: TASK_OBJECT_ARCHIVE_MAX_BYTES,
+      warnings: Object.freeze([...warnings]),
+    }) as TaskObjectCapacityStatus;
+  }
+
+  async inventoryForTask(
+    task: CodexHostTaskContext,
+    binding: CodexTaskWorkspaceBindingEntry,
+  ): Promise<TaskObjectInventory> {
+    const [document, archive] = await Promise.all([this.#read(), this.#readArchive()]);
+    const objects = document.records
+      .filter((record) => matchesEntry(record, task, binding))
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+      .map(summary);
+    return Object.freeze({
+      objects: Object.freeze(objects),
+      capacity: this.#capacityStatus(document, archive, task, binding),
+    }) as TaskObjectInventory;
+  }
+
+  async capacityForTask(
+    task: CodexHostTaskContext,
+    binding: CodexTaskWorkspaceBindingEntry,
+  ): Promise<TaskObjectCapacityStatus> {
+    return (await this.inventoryForTask(task, binding)).capacity;
+  }
+
+  /**
+   * Rebind durable task objects to a fresh capability revision only when the
+   * host-vouched task, route, canonical workspace root, and scope are all
+   * unchanged. This makes an explicit same-workspace rebind or unbind/rebind
+   * recoverable without weakening the current binding fence.
+   */
+  async adoptBinding(
+    task: CodexHostTaskContext,
+    binding: CodexTaskWorkspaceBindingEntry,
+  ): Promise<number> {
+    return await this.#mutate(async (document) => {
+      const candidates = document.records.filter((record) =>
+        matchesTaskWorkspace(record, task, binding) &&
+        record.bindingRevision !== binding.bindingRevision);
+      if (candidates.length === 0) return 0;
+      const candidateIds = new Set(candidates.map((record) => record.entityId));
+      document.records = document.records.map((record) =>
+        candidateIds.has(record.entityId)
+          ? { ...copyStored(record), bindingRevision: binding.bindingRevision }
+          : record);
+      await this.#write(document);
+      return candidates.length;
+    });
+  }
+
+  /**
+   * Move only terminal task objects that have exactly one same-type/same-name
+   * stable workspace identity into an audit-only archive. The archive is
+   * written first; a crash can therefore leave a harmless duplicate but can
+   * never delete the only historical copy.
+   */
+  async archiveGraduated(
+    task: CodexHostTaskContext,
+    binding: CodexTaskWorkspaceBindingEntry,
+    rawStableRecords: unknown,
+  ): Promise<TaskObjectArchiveResult> {
+    const stableRecords = validateContextIndexForRuntime(rawStableRecords, binding.scope);
+    return await this.#mutate(async (document) => {
+      const eligible = document.records.filter((record) => {
+        if (record.lifecycle === "active" || !matchesEntry(record, task, binding)) return false;
+        const name = normalizedIdentity(record.canonicalName);
+        return stableRecords.filter((stable) =>
+          !stable.deleted &&
+          stable.authorityRef.provider !== TASK_OBJECT_PROVIDER_ID &&
+          stable.entityType === record.entityType &&
+          normalizedIdentity(stable.canonicalName) === name).length === 1;
+      });
+      const archive = await this.#readArchive();
+      if (eligible.length === 0) {
+        return Object.freeze({
+          kind: "unchanged",
+          archivedCount: 0,
+          archiveRevision: archiveRevision(archive.records),
+        });
+      }
+
+      const archivedByEntityId = new Map(
+        archive.records.map((record) => [record.entityId, record] as const),
+      );
+      for (const record of eligible) {
+        const existing = archivedByEntityId.get(record.entityId);
+        if (existing !== undefined && existing.entityRevision !== record.entityRevision) {
+          throw new ContractError("task object archive contains a conflicting revision");
+        }
+        if (existing === undefined) {
+          const copied = copyStored(record);
+          archive.records.push(copied);
+          archivedByEntityId.set(copied.entityId, copied);
+        }
+      }
+      if (archive.records.length > TASK_OBJECT_ARCHIVE_MAX_RECORDS) {
+        throw new ContractError("task object archive is full");
+      }
+
+      await this.#writeArchive(archive);
+      const eligibleIds = new Set(eligible.map((record) => record.entityId));
+      document.records = document.records.filter((record) => !eligibleIds.has(record.entityId));
+      await this.#write(document);
+      return Object.freeze({
+        kind: "archived",
+        archivedCount: eligible.length,
+        archiveRevision: archiveRevision(archive.records),
+      });
+    });
+  }
+
   async listForTask(
     task: CodexHostTaskContext,
     binding: CodexTaskWorkspaceBindingEntry,
   ): Promise<TaskObjectSummary[]> {
-    return (await this.#read()).records
-      .filter((record) => matchesEntry(record, task, binding))
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-      .map(summary);
+    return (await this.inventoryForTask(task, binding)).objects;
   }
 
   async listActive(binding: TrustedContextBinding, signal?: AbortSignal): Promise<IdentityRecord[]> {

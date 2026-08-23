@@ -59,6 +59,16 @@ function conceptInput(context = "长任务开始产生只存在于当前任务�
   } as const;
 }
 
+function numberedConcept(index: number) {
+  return {
+    ...conceptInput(),
+    objectKey: `CAPACITY-${index}`,
+    canonicalName: `Capacity Object ${index}`,
+    aliases: [],
+    summary: `容量对象 ${index}。`,
+  } as const;
+}
+
 function request(activeTask: CodexHostTaskContext, text: string, overrides = {}): PointableLookupCallbackRequest {
   return {
     operation: "resolve",
@@ -328,6 +338,175 @@ test("workspace lookup renders a task-local object and refreshes the same card a
     if (historical.kind === "detail") {
       assert.equal(historical.detail.facts.find((fact) => fact.label === "生命周期")?.value, "retired");
     }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("task object inventory warns at the 64-active soft limit without blocking writes", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pointable-task-object-capacity-"));
+  const workspace = join(root, "workspace");
+  await mkdir(workspace);
+  const bindingRegistry = new CodexTaskWorkspaceBindingRegistry(join(root, "bindings.json"));
+  const objects = new TaskObjectRegistry(join(root, "task-objects.json"));
+  const activeTask = task("thread-capacity");
+  const entry = await bindingRegistry.bind(activeTask, workspace);
+  try {
+    for (let index = 0; index < 63; index += 1) {
+      await objects.upsert(activeTask, entry, numberedConcept(index));
+    }
+    const before = await objects.inventoryForTask(activeTask, entry);
+    assert.equal(before.capacity.active, 63);
+    assert.deepEqual(before.capacity.warnings, []);
+
+    await objects.upsert(activeTask, entry, numberedConcept(63));
+    const warned = await objects.inventoryForTask(activeTask, entry);
+    assert.equal(warned.objects.length, 64);
+    assert.equal(warned.capacity.active, 64);
+    assert.equal(warned.capacity.activeSoftLimit, 64);
+    assert.equal(warned.capacity.activeHardLimit, 256);
+    assert.deepEqual(warned.capacity.warnings, ["active_soft_limit_reached"]);
+    assert.ok(warned.capacity.registryBytes > 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("same task and workspace adopt task objects across a fresh binding revision", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pointable-task-object-adopt-"));
+  const workspace = join(root, "workspace");
+  await mkdir(workspace);
+  const bindingRegistry = new CodexTaskWorkspaceBindingRegistry(join(root, "bindings.json"));
+  const objects = new TaskObjectRegistry(join(root, "task-objects.json"));
+  const activeTask = task();
+  try {
+    const first = await bindingRegistry.bind(activeTask, workspace);
+    const created = await objects.upsert(activeTask, first, conceptInput());
+    const second = await bindingRegistry.bind(activeTask, workspace);
+    assert.notEqual(second.bindingRevision, first.bindingRevision);
+    assert.deepEqual(await objects.listForTask(activeTask, second), []);
+
+    assert.equal(await objects.adoptBinding(activeTask, second), 1);
+    const adopted = await objects.listForTask(activeTask, second);
+    assert.equal(adopted.length, 1);
+    assert.equal(adopted[0]?.entityId, created.object.entityId);
+    assert.equal(adopted[0]?.entityRevision, created.object.entityRevision);
+    assert.equal(await objects.adoptBinding(activeTask, second), 0);
+
+    const otherWorkspace = join(root, "other-workspace");
+    await mkdir(otherWorkspace);
+    const otherBinding = await bindingRegistry.bind(activeTask, otherWorkspace);
+    assert.equal(await objects.adoptBinding(activeTask, otherBinding), 0);
+    assert.deepEqual(await objects.listForTask(activeTask, otherBinding), []);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("safe archive moves only uniquely graduated terminal objects after preserving an audit copy", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pointable-task-object-archive-"));
+  const workspace = join(root, "workspace");
+  await mkdir(workspace);
+  const bindingRegistry = new CodexTaskWorkspaceBindingRegistry(join(root, "bindings.json"));
+  const objects = new TaskObjectRegistry(join(root, "task-objects.json"));
+  const activeTask = task("thread-archive");
+  const entry = await bindingRegistry.bind(activeTask, workspace);
+  try {
+    const graduated = { ...numberedConcept(1), objectKey: "GRADUATED", canonicalName: "Graduated Object" };
+    const unmatched = { ...numberedConcept(2), objectKey: "UNMATCHED", canonicalName: "Unmatched Object" };
+    const stillActive = { ...numberedConcept(3), objectKey: "ACTIVE", canonicalName: "Active Object" };
+    await objects.upsert(activeTask, entry, graduated);
+    await objects.retire(activeTask, entry, graduated.objectKey);
+    await objects.upsert(activeTask, entry, unmatched);
+    await objects.retire(activeTask, entry, unmatched.objectKey);
+    await objects.upsert(activeTask, entry, stillActive);
+
+    const stable = [graduated, stillActive].map((item) => ({
+      schemaVersion: "1.0" as const,
+      scope: { ...entry.scope },
+      entityId: `concept:${item.objectKey.toLocaleLowerCase("en-US")}`,
+      entityType: "concept",
+      canonicalKey: `docs/concepts/${item.objectKey.toLocaleLowerCase("en-US")}.md`,
+      canonicalName: item.canonicalName,
+      aliases: [],
+      summary: "稳定仓库制品",
+      authorityRef: {
+        provider: "local-filesystem",
+        locator: `docs/concepts/${item.objectKey.toLocaleLowerCase("en-US")}.md`,
+      },
+      indexRevision: "stable:r1",
+      indexedAt: new Date().toISOString(),
+      deleted: false,
+    }));
+
+    const ambiguousStable = [
+      ...stable,
+      {
+        ...stable[0]!,
+        entityId: "concept:graduated-duplicate",
+        canonicalKey: "docs/concepts/graduated-duplicate.md",
+      },
+    ];
+    const ambiguous = await objects.archiveGraduated(activeTask, entry, ambiguousStable);
+    assert.equal(ambiguous.kind, "unchanged");
+    assert.equal(ambiguous.archivedCount, 0);
+
+    const selfClaimed = await objects.archiveGraduated(activeTask, entry, [{
+      ...stable[0]!,
+      authorityRef: {
+        provider: "agent-task-context",
+        locator: "GRADUATED",
+      },
+    }]);
+    assert.equal(selfClaimed.kind, "unchanged");
+    assert.equal(selfClaimed.archivedCount, 0);
+
+    const archived = await objects.archiveGraduated(activeTask, entry, stable);
+    assert.equal(archived.kind, "archived");
+    assert.equal(archived.archivedCount, 1);
+    assert.match(archived.archiveRevision, /^task-object-archive:[a-f0-9]{64}$/u);
+
+    const hot = await objects.listForTask(activeTask, entry);
+    assert.deepEqual(hot.map((item) => item.objectKey).sort(), ["ACTIVE", "UNMATCHED"]);
+    const archive = JSON.parse(await readFile(objects.archivePath, "utf8")) as {
+      records: Array<{ objectKey: string; lifecycle: string }>;
+    };
+    assert.deepEqual(archive.records.map((item) => [item.objectKey, item.lifecycle]), [
+      ["GRADUATED", "retired"],
+    ]);
+    const bindingPort = new CodexTaskWorkspaceBindingPort(
+      bindingRegistry,
+      activeTask,
+      { current: async () => activeTask },
+    );
+    const binding = await bindingPort.resolve({
+      selectionGeneration: 1,
+      explicitScope: entry.scope,
+      threadRef: codexTaskThreadRef(activeTask),
+      routeRef: activeTask.routeRef,
+      workspaceRoot: workspace,
+    });
+    assert.equal(binding.kind, "trusted");
+    if (binding.kind !== "trusted") return;
+    const lookupRecords = await new TaskObjectWorkspaceContextIndex({
+      list: async () => stable,
+    }, objects).list(binding);
+    assert.equal(lookupRecords.filter((item) => item.canonicalName === "Graduated Object").length, 1);
+    assert.equal(
+      lookupRecords.find((item) => item.canonicalName === "Graduated Object")?.authorityRef.provider,
+      "local-filesystem",
+    );
+    const inventory = await objects.inventoryForTask(activeTask, entry);
+    assert.equal(inventory.capacity.active, 1);
+    assert.equal(inventory.capacity.terminal, 1);
+    assert.equal(inventory.capacity.registryRecords, 2);
+    assert.equal(inventory.capacity.archivedRecords, 1);
+
+    const repeated = await objects.archiveGraduated(activeTask, entry, stable);
+    assert.equal(repeated.kind, "unchanged");
+    assert.equal(repeated.archivedCount, 0);
+    const after = JSON.parse(await readFile(objects.archivePath, "utf8")) as { records: unknown[] };
+    assert.equal(after.records.length, 1);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -39,11 +39,12 @@ The Companion may hold a sparse set of high-value objects that appeared during t
 - Use only `concept`, `change`, `decision`, `task`, or `verification`. Do not register ordinary files, every mentioned noun, transient reasoning, raw Chat, TODO fragments, secrets, or model-generated guesses.
 - Treat maintenance as Agent-owned only inside that explicit bounded opt-in. Re-evaluate at stable milestones rather than every Chat Turn; normally introduce no more than one new task-local object per milestone unless the user explicitly names multiple objects. This is not invisible semantic mining and does not require a separate user message for every card.
 - Before creating a task-local object, search the five frozen artifact directories. A valid stable artifact wins and must not be duplicated in the private registry.
-- Run `object-list --json` before mutation. Update an existing active `objectKey` when only its summary or mental model changes. Identity fields—key, type, canonical name, and aliases—are immutable; use `object-supersede` when the identity genuinely changes.
+- Run `object-list --json` before mutation. It reports current-task active/terminal counts, hot-registry and audit-archive usage, and `active_soft_limit_reached` at 64 active objects. That warning does not block a justified update, but it is a mandatory curation signal; 256 active objects remains a hard fail-closed limit. Update an existing active `objectKey` when only its summary or mental model changes. Identity fields—key, type, canonical name, and aliases—are immutable; use `object-supersede` when the identity genuinely changes.
 - Use `object-retire` when the object is no longer decision-relevant. Superseded and retired keys are terminal and cannot be silently reactivated. They leave the automatic Top-3 annotation catalog, but remain read-only resolvable from historical Chat so old references never become unexplained dead text. Their card must expose lifecycle and, for supersession, the replacement key.
+- A fresh bind of the same host task, route, scope, and canonical workspace adopts the existing task objects into the new binding revision without changing their identity or content revision. It must never migrate objects across another task, route, scope, or workspace.
 - Every task-local object is displayed with `freshness=partial` and an explicit temporary-context boundary. Agent declaration is not repository authority, test execution evidence, or completion proof.
 - Registration refreshes only the identity annotation catalog. It does not open a card, read detail, call a model, or create a Chat Turn.
-- Stable milestones that need cross-task reuse must graduate through `$pointable-context-records` with exact workspace evidence. Run the applicable checker first and retire the corresponding task-local object only after the stable artifact reports `valid: true`; if validation fails, preserve the partial object and its explicit boundary. Do not treat this private registry as durable project truth.
+- Stable milestones that need cross-task reuse must graduate through `$pointable-context-records` with exact workspace evidence. Run the applicable checker first and retire the corresponding task-local object only after the stable artifact reports `valid: true`; if validation fails, preserve the partial object and its explicit boundary. After successful graduation, `object-archive --json` may move the terminal duplicate out of the hot Registry only when the current workspace index contains exactly one stable artifact with the same type and canonical name. It writes the local audit copy before removing the hot record. Active, unmatched, and ambiguous records never archive, and archived records never become lookup authority. Do not treat this private registry or archive as durable project truth.
 
 The strict input document has exactly these top-level fields: `schemaVersion`, `objectKey`, `entityType`, `canonicalName`, `aliases`, `summary`, and `mentalModel`. A Concept example is:
 
@@ -96,7 +97,7 @@ $companion = Join-Path $pluginRoot 'host\workspace-companion.mjs'
 4. Run `bind --workspace-root <absolute-path> --json`. Binding must fail unless exactly one Codex task is host-visible.
 5. Read back `status --json`. Report mode, process state, `compatibility.state/code`, target count, active task count, and `activeBinding` root/revision without exposing the control token.
    Treat this as the automatic host-contract layer only. For a build qualification, also run the read-only `pointable-context-compatibility` inspector against the exact Codex package version and current renderer bundle. Do not call a build fully qualified while any manual gate is pending.
-6. If this bounded long task is explicitly using dynamic objects, run `object-list --json`, then apply only the sparse lifecycle mutations justified by the current milestone.
+6. If this bounded long task is explicitly using dynamic objects, run `object-list --json`, inspect its capacity warning, then apply only the sparse lifecycle mutations justified by the current milestone. Run `object-archive --json` only after a stable artifact has passed its checker and the corresponding task-local object is terminal.
 7. Ask the user to click a marked registered object or select an exact visible key/name/path, such as `README.md`, and click `查看上下文`.
 8. Verify that selection alone produces no detail request; the trusted click produces one direct detail or a bounded candidate menu.
 9. For revision qualification, leave one card open, change the selected file, bounded relation, or active task-object mental model, confirm `内容已更新`, then click `刷新内容`. Verify that the same card DOM stays visible at the same position, preserves scroll and disclosure state, displays a finite type-prioritized diff before the P-C model when projected fields changed, keeps an ordinary unrefreshed card quiet, opens no browser, and adds no Chat Turn.
@@ -113,6 +114,7 @@ node $companion object-list --json
 node $companion object-upsert --object-file 'C:\absolute\temporary-object.json' --json
 node $companion object-supersede --replaces 'OLD-OBJECT-KEY' --object-file 'C:\absolute\replacement.json' --json
 node $companion object-retire --object-key 'OBJECT-KEY' --json
+node $companion object-archive --json
 node $companion unbind --json
 node $companion stop --json
 ```

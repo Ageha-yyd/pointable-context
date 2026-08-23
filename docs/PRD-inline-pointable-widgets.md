@@ -1,7 +1,7 @@
 # PRD：Quiet Context Reveal（轻标注 + 选区式上下文速览）
 
-- 版本：v2.23
-- 状态：P-C 微型心智模型继续作为详情默认；当前精确 Codex build 的 v2.22 renderer 已完成自动 4/4 与人工 10/10，包含同卡 revision 刷新连续性。v2.23 不改变 renderer，冻结任务内对象的稀疏选择、两级路由、升级与退役策略，并以当前真实长任务做 dogfood；受控效率实验继续暂缓到功能和跨 build 兼容性收口之后
+- 版本：v2.24
+- 状态：P-C 微型心智模型继续作为详情默认；v2.24 为任务内对象加入容量可见性、安全终态归档和同上下文 rebind 连续性，不改变对象选择或卡片交互语义。当前精确 Codex build 的 v2.22 bundle 已完成自动 4/4 与人工 10/10；v2.24 digest `2c46a836…d1e8` 已重新通过自动 4/4，人工 0/10、十项 pending，不继承旧 bundle 结论。受控效率实验继续暂缓到功能和跨 build 兼容性收口之后
 - 日期：2026-08-24
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
@@ -424,10 +424,10 @@ Concept/Change/Decision 必须使用冻结章节，文件 stem 与 H1 归一化�
 5. Registry 只存于本机 Companion 私有 state directory，不写项目仓库、不进入 Git、不发送网络，也不保存 raw Chat；对象仍按 current task/workspace/binding 做完整过滤；
 6. Identity 进入与文件 Index 组合后的同一 Annotation/Resolver 链；标注刷新只下发 identity-only catalog，不预读 detail、不打开卡片、不调用模型、不产生 Chat Turn；
 7. 用户可信点击后，Provider 现场读取当前 registry revision，详情固定显示 `freshness=partial`、`agent-task-context` 来源和“尚未固化为仓库证据”的边界；Agent 声明不等于 test evidence、完成证明或项目权威事实；
-8. 同一 active identity 内容更新时，已有 revision probe 显示 `内容已更新`，显式刷新复用同一张卡；稳定且需要跨任务复用的对象必须通过现有 records workflow 升级为 evidence-backed workspace artifact。
+8. 同一 active identity 内容更新时，已有 revision probe 显示 `内容已更新`，显式刷新复用同一张卡；稳定且需要跨任务复用的对象必须通过现有 records workflow 升级为 evidence-backed workspace artifact；同一 host task、route、scope 与 canonical workspace 的重新绑定只轮换 binding capability，并把既有对象采用到新 revision，绝不跨任务、route、scope 或 workspace 迁移。
 
 Agent 的对象选择采用显式 opt-in、稳定里程碑触发的两级路由：每次 mutation 前先列出当前任务对象并检查五类冻结制品目录；已有稳定制品优先，已有 active identity 只更新内容，身份变化才 supersede，无后续决策价值则 retire；尚属当前任务、但已具备稳定名称、跨 Turn 价值和完整类型化理解单元的对象进入 task-local partial 层，具有跨任务复用价值且存在 exact workspace evidence 的对象进入 evidence-backed artifact 层。单个稳定里程碑通常最多新增一个 task-local 对象，除非用户明确命名多个对象；只有稳定制品通过适用 checker 后才退役对应临时对象，检查失败时保留 partial 并报告边界。这里的“自动”只表示一次明确授权后由 Agent 在里程碑维护，不表示扫描 Chat、调用语义模型或为每个名词建卡，也不要求用户为每张卡新增 Chat Turn。
-
+Registry 容量采用 active-hot、terminal-audit 策略：`object-list` 在当前任务达到 64 个 active 对象时给出软警告但不阻断有效写入，256 个 active 仍然硬性 fail closed。匹配的 evidence-backed artifact 通过 checker 且 task-local 对象进入终态后，显式 `object-archive` 必须先写入本地审计副本，且只有稳定 Index 中恰好一个同类型、同 canonical name 对象时才能移出热 Registry；active、无匹配或歧义记录绝不归档。Archive 不参与 lookup authority，历史文字改由稳定制品继续解析。
 ## 9. P0 功能需求
 
 ### P0-1 Bounded object annotation
@@ -819,9 +819,12 @@ v2.20 的默认 `runStudyV2NativeTrial` 在其上完成组合：独立 App Serve
 29. “选择任意文字”不得被删除，但只在已登记对象中做确定性匹配；真正开放式语义问题仍由 Codex Chat 处理，Pointable Context 不重复调用模型。
 30. 任务内动态对象只能由当前 Host-bound task 的显式动作稀疏登记；active identity 只更新内容，身份变化必须 supersede，无后续价值则 retire，所有详情固定为 partial，稳定事实必须另行升级为 evidence-backed artifact。终态对象退出自动 Top-3 标注但必须保留历史只读查询，避免旧 Chat 引用变成不可理解的死链接；卡片显式显示 lifecycle 与 replacement。
 31. 对象维护只在一次明确 opt-in 后由 Agent 于稳定里程碑执行：稳定制品优先、临时对象默认每里程碑最多新增一个，升级必须先通过 evidence checker 再退役临时版本；该自动化不是 Chat 语义挖掘，也不要求用户逐卡发起对话。
+32. 当前任务达到 64 个 active 对象时只提示治理风险，256 个仍硬拒绝；仅 checker-valid 稳定制品唯一接管后的终态 task-local 对象可显式归档，写审计副本必须先于热记录移除，active、无匹配和歧义对象不得归档，archive 不成为查询权威。
+33. Task object 的持久身份属于 host task + route + scope + canonical workspace，不属于某次 binding capability；同一上下文重新绑定时采用到新 revision，任何上下文字段变化都拒绝迁移。
 
 ## 18. 变更记录
 
+- v2.24：为 Task Object Registry 增加容量可见性、安全终态归档和同上下文 rebind 连续性。`object-list` 同时返回 current-task active/terminal、热 Registry、审计 Archive 的条目与字节使用量；64 active 是不阻断写入的治理软警告，256 active 继续 fail closed。显式 `object-archive` 只处理 checker-valid 稳定制品已唯一同类型/同名接管的 terminal 对象，先原子写本地 audit copy，再移出 hot Registry；active、unmatched、ambiguous 均保留。Archive 不进入 Context Index，历史 Chat 通过稳定制品继续查询。同一 host task/route/scope/canonical workspace 重新绑定时既有对象采用到新 capability revision，跨上下文绝不迁移。该变更不构成人效证据；当前 digest `2c46a836…d1e8` 已通过自动 4/4，但人工十项全部 pending，不继承 v2.22 资格。
 - v2.23：冻结 Object Curation Policy。对象层改为 opt-in、稳定里程碑触发的两级路由：已有稳定制品优先；task-local partial 用于当前任务内已经明确但证据尚未稳定的对象；跨任务复用且具备 exact evidence 的对象进入 evidence-backed artifact。默认每个里程碑最多新增一个临时对象，升级必须先通过适用 checker，再退役临时版本；检查失败则保留 partial。该策略由 Agent 在授权任务内维护，不扫描 Chat、不调用语义模型、不要求用户逐卡新增 Chat Turn。本版不改变 renderer，v2.22 exact-build 自动 4/4 与人工 10/10 资格继续有效。
 - v2.22：新增 Task-local Dynamic Object Lifecycle v1，覆盖长任务中“已明确但尚不适合落盘”的 Concept/Change/Decision/Task/Verification。Companion 只允许当前 host-vouched、已绑定 workspace 的任务通过 strict JSON 显式登记；active identity 可更新内容，身份变化必须 supersede，obsolete 对象 retire，终态不可复活。真实演练发现终态对象若从 Index 完全移除会让历史 Chat 成为死链接，因此终态现只退出自动 Top-3 标注，仍可确定性只读查询，并显式呈现 lifecycle/replacement。私有 Registry 与文件 Index 组合并复用现有 Resolver、Provider、selection fallback 和 revision refresh；详情固定标记 `partial`、`agent-task-context` 与临时边界。登记只刷新 identity catalog，不读取详情、不调用模型、不创建 Chat Turn。卡片正文 selection 现被固定为本地阅读/复制动作，不关闭原卡、不产生二次查询入口或 Chat Turn；真实 Edge 与当前 Codex Chat Lane 人工验收均已通过。定向与全链路自动回归已覆盖出现、更新、替代、退役、历史查询、任务隔离、同卡刷新和卡内文字选择；workspace companion digest 因而变化，v2.21 的 exact-build 10/10 没有继承，当前 v2.22 digest 已用独立证据重新完成自动 4/4 与人工 10/10。
 - v2.21：把默认交互从纯选区改为“轻标注直达 + 选区 fallback”。Host 在显式 task/workspace binding 后只读完整验证过的 identity index，排除删除、歧义和过短 term，按 Task/Decision/Change/Verification/Concept/Module/Document/Configuration/File 排序并下发不含详情的 task-fenced catalog；Renderer 使用 CSS Custom Highlight，每消息最多 3 个对象且只标首次出现，可信点击复用既有 fenced resolve/detail 链路。没有被标注的已登记对象仍可由任意选区做 exact key/name/path/alias 查询。相关定向测试和真实 Edge headless 双路径交互已通过；新 renderer 尚待当前 Codex Desktop exact-build 人工复验，不能沿用 v2.20 digest 的 10/10。

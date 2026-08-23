@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -7,18 +8,21 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v2.23 freezes dual zero-turn interaction plus two-tier object curation", async () => {
-  const [prd, readme, mainSkill, workspaceSkill, recordsSkill, curationDecision, coverage] = await Promise.all([
+test("v2.24 freezes bounded task-object capacity plus safe terminal archive", async () => {
+  const [prd, readme, mainSkill, workspaceSkill, recordsSkill, curationDecision, capacityDecision, coverage, compatibility, bundle] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
     text("skills/pointable-context/SKILL.md"),
     text("skills/pointable-context-workspace/SKILL.md"),
     text("skills/pointable-context-records/SKILL.md"),
     text("docs/decisions/object-curation-policy.md"),
+    text("docs/decisions/task-object-capacity.md"),
     text("docs/context-coverage.json"),
+    text("docs/compatibility/codex-desktop-current.json"),
+    readFile(resolve("host/workspace-companion.mjs")),
   ]);
 
-  assert.match(prd, /版本：v2\.23/u);
+  assert.match(prd, /版本：v2\.24/u);
   assert.match(prd, /`annotated_click`/u);
   assert.match(prd, /`selection_lookup`/u);
   assert.match(prd, /每条消息最多标 3 个高价值对象/u);
@@ -38,6 +42,12 @@ test("v2.23 freezes dual zero-turn interaction plus two-tier object curation", a
   assert.match(prd, /稳定里程碑触发的两级路由/u);
   assert.match(prd, /单个稳定里程碑通常最多新增一个 task-local 对象/u);
   assert.match(prd, /只有稳定制品通过适用 checker 后才退役对应临时对象/u);
+  assert.match(prd, /达到 64 个 active 对象时给出软警告但不阻断有效写入/u);
+  assert.match(prd, /256 个 active 仍然硬性 fail closed/u);
+  assert.match(prd, /active、无匹配或歧义记录绝不归档/u);
+  assert.match(prd, /Archive 不参与 lookup authority/u);
+  assert.match(prd, /绝不跨任务、route、scope 或 workspace 迁移/u);
+  assert.match(prd, /人工 0\/10、十项 pending/u);
 
   assert.match(readme, /bounded identity-only catalog/u);
   assert.match(readme, /Any registered object omitted by that Top-3 remains reachable/u);
@@ -46,6 +56,10 @@ test("v2.23 freezes dual zero-turn interaction plus two-tier object curation", a
   assert.match(readme, /current Codex Chat Lane/u);
   assert.match(readme, /private task-object registry/u);
   assert.match(readme, /Superseded and retired keys remain terminal/u);
+  assert.match(readme, /non-blocking curation warning at 64 active current-task objects/u);
+  assert.match(readme, /Active, unmatched, and ambiguous records are never archived/u);
+  assert.match(readme, /Records are never adopted across another task, route, scope, or workspace/u);
+  assert.match(readme, /automatic host-contract gates pass 4\/4, while all ten manual interaction gates remain pending/u);
 
   assert.match(mainSkill, /two zero-turn entries/u);
   assert.match(mainSkill, /Any registered object not marked remains reachable/u);
@@ -58,11 +72,33 @@ test("v2.23 freezes dual zero-turn interaction plus two-tier object curation", a
   assert.match(workspaceSkill, /freshness=partial/u);
   assert.match(workspaceSkill, /normally introduce no more than one new task-local object per milestone/u);
   assert.match(workspaceSkill, /A valid stable artifact wins/u);
+  assert.match(workspaceSkill, /active_soft_limit_reached/u);
+  assert.match(workspaceSkill, /object-archive --json/u);
+  assert.match(workspaceSkill, /Active, unmatched, and ambiguous records never archive/u);
+  assert.match(workspaceSkill, /must never migrate objects across another task, route, scope, or workspace/u);
   assert.match(recordsSkill, /Normally create no more than one explanatory artifact/u);
   assert.match(recordsSkill, /Two-tier object curation/u);
   assert.match(recordsSkill, /Retire the corresponding task-local object only after the stable artifact reports `valid: true`/u);
+  assert.match(recordsSkill, /Archive is maintenance, not graduation evidence/u);
   assert.match(curationDecision, /Agent 在明确授权的有界任务中只于稳定里程碑维护对象/u);
+  assert.match(capacityDecision, /热 Registry 在每个当前任务达到 64 个 active 对象时给出软警告/u);
+  assert.match(capacityDecision, /Archive 不参与查询/u);
   assert.match(coverage, /"id": "object-curation-policy"/u);
+  assert.match(coverage, /"id": "task-object-capacity"/u);
+
+  const current = JSON.parse(compatibility) as {
+    implementation?: { productVersion?: string; rendererBundleSha256?: string };
+    automatic?: { state?: string };
+    manualChecks?: Array<{ result?: string }>;
+  };
+  assert.equal(current.implementation?.productVersion, "v2.24");
+  assert.equal(
+    current.implementation?.rendererBundleSha256,
+    createHash("sha256").update(bundle).digest("hex"),
+  );
+  assert.equal(current.automatic?.state, "qualified");
+  assert.equal(current.manualChecks?.length, 10);
+  assert.ok(current.manualChecks?.every((check) => check.result === "pending"));
 });
 
 test("plugin defaults enable Quiet Mode instead of proactively rendering capsules", async () => {

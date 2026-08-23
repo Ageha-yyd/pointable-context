@@ -157,13 +157,15 @@ test("repository milestone artifacts pass without being modified", async () => {
     "docs/decisions/native-chat-lane.md",
     "docs/decisions/native-trial-fail-closed.md",
     "docs/decisions/object-curation-policy.md",
+    "docs/decisions/task-object-capacity.md",
   ];
   const before = await Promise.all(paths.map((path) => readFile(path, "utf8")));
   const result = await checkContextMilestoneArtifacts(resolve("."));
   assert.equal(result.valid, true, JSON.stringify(result.issues));
-  assert.equal(result.candidateCount, 7);
-  assert.equal(result.artifacts.length, 7);
+  assert.equal(result.candidateCount, 8);
+  assert.equal(result.artifacts.length, 8);
   assert.ok(result.artifacts.some((artifact) => artifact.identity === "object-curation-policy"));
+  assert.ok(result.artifacts.some((artifact) => artifact.identity === "task-object-capacity"));
   assert.deepEqual(await Promise.all(paths.map((path) => readFile(path, "utf8"))), before);
 });
 

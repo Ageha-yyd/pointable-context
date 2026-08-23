@@ -42,6 +42,7 @@ At each stable milestone:
 4. If the identity is stable and useful beyond the current turn but remains task-bound or lacks exact workspace evidence, route it to the task-local partial layer through `$pointable-context-workspace`.
 5. If the identity has cross-task reuse value and exact workspace evidence, create or update the appropriate evidence-backed artifact below.
 6. Run the applicable checker before graduation. Retire the corresponding task-local object only after the stable artifact reports `valid: true`; on failure, keep the partial object active and report the bounded issue.
+7. After successful validation and retirement, the workspace Companion may run `object-archive --json`. Archive is maintenance, not graduation evidence: it must first preserve a local audit copy and may remove only a terminal object uniquely matched by type and canonical name to the validated stable artifact. Active, unmatched, or ambiguous objects remain in the hot Registry; archive failure must leave the hot record recoverable.
 
 Normally introduce no more than one new task-local object per stable milestone unless the user explicitly names multiple objects. This limit does not block updates, supersession, retirement, or a separately justified Task/Verification record. Never scan Chat, call a semantic model, register every noun, or create an extra Chat Turn merely to maintain the object layer.
 

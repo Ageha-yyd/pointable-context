@@ -11,8 +11,12 @@ import {
   LocalWorkspaceContextIndex,
   LocalWorkspaceRevisionProbe,
 } from "../../adapters/local-workspace.js";
+import { checkContextMilestoneArtifacts } from "../../records/context-artifact-check.js";
+import { checkContextRecords } from "../../records/context-record-check.js";
 import {
+  CodexTaskWorkspaceBindingPort,
   CodexTaskWorkspaceBindingRegistry,
+  codexTaskThreadRef,
   type CodexTaskWorkspaceBindingEntry,
 } from "./task-workspace-binding.js";
 import { createWorkspaceLookupCallback } from "./workspace-lookup.js";
@@ -23,6 +27,8 @@ import {
   RoutedWorkspaceRevisionProbe,
   TaskObjectWorkspaceContextIndex,
   TaskObjectRegistry,
+  type TaskObjectArchiveResult,
+  type TaskObjectInventory,
   type TaskObjectMutationResult,
   type TaskObjectSummary,
 } from "./task-object-registry.js";
@@ -99,6 +105,8 @@ export interface WorkspaceCompanion {
   ): Promise<TaskObjectMutationResult>;
   retireCurrentTaskObject(objectKey: string): Promise<TaskObjectMutationResult>;
   listCurrentTaskObjects(): Promise<TaskObjectSummary[]>;
+  inventoryCurrentTaskObjects(): Promise<TaskObjectInventory>;
+  archiveGraduatedCurrentTaskObjects(): Promise<TaskObjectArchiveResult>;
   stop(): Promise<WorkspaceCompanionStatus>;
   status(): WorkspaceCompanionStatus;
 }
@@ -398,6 +406,7 @@ export function createWorkspaceCompanion(
     if (tasks.length !== 1) throw new Error("active_codex_task_ambiguous");
     const replaced = (await options.registry.find(tasks[0]!)) !== undefined;
     const entry = await options.registry.bind(tasks[0]!, workspaceRoot);
+    await options.taskObjectRegistry?.adoptBinding(tasks[0]!, entry);
     activeBinding = entry;
     await adapter.refreshAnnotations(undefined, true);
     return Object.freeze({ binding: entry, replaced });
@@ -428,12 +437,32 @@ export function createWorkspaceCompanion(
     if (tasks.length !== 1) throw new Error("active_codex_task_ambiguous");
     const binding = await options.registry.find(tasks[0]!);
     if (binding === undefined) throw new Error("context_binding_missing");
+    await options.taskObjectRegistry.adoptBinding(tasks[0]!, binding);
     activeBinding = binding;
     return { task: tasks[0]!, binding, registry: options.taskObjectRegistry };
   };
 
   const refreshObjectAnnotations = async (): Promise<void> => {
     await adapter.refreshAnnotations(undefined, true);
+  };
+
+  const trustedBindingFor = async (
+    current: Awaited<ReturnType<typeof currentTaskBinding>>,
+  ) => {
+    const port = new CodexTaskWorkspaceBindingPort(
+      options.registry,
+      current.task,
+      { current: async () => current.task },
+    );
+    const resolved = await port.resolve({
+      selectionGeneration: 1,
+      explicitScope: current.binding.scope,
+      threadRef: codexTaskThreadRef(current.task),
+      routeRef: current.task.routeRef,
+      workspaceRoot: current.binding.workspaceRoot,
+    });
+    if (resolved.kind !== "trusted") throw new Error("context_binding_changed");
+    return resolved;
   };
 
   const upsertCurrentTaskObject = async (input: unknown): Promise<TaskObjectMutationResult> => {
@@ -472,6 +501,33 @@ export function createWorkspaceCompanion(
     return await current.registry.listForTask(current.task, current.binding);
   };
 
+  const inventoryCurrentTaskObjects = async (): Promise<TaskObjectInventory> => {
+    const current = await currentTaskBinding();
+    return await current.registry.inventoryForTask(current.task, current.binding);
+  };
+
+  const archiveGraduatedCurrentTaskObjects = async (): Promise<TaskObjectArchiveResult> => {
+    const current = await currentTaskBinding();
+    const trusted = await trustedBindingFor(current);
+    const [indexed, artifacts, records] = await Promise.all([
+      localIndex.list(trusted),
+      checkContextMilestoneArtifacts(current.binding.workspaceRoot),
+      checkContextRecords(current.binding.workspaceRoot),
+    ]);
+    const checkedPaths = new Set([
+      ...(artifacts.valid ? artifacts.artifacts.map((artifact) => artifact.path) : []),
+      ...(records.valid ? records.records.map((record) => record.path) : []),
+    ].map((path) => `file:${path}`));
+    const stableRecords = indexed.filter((record) => checkedPaths.has(record.entityId));
+    const result = await current.registry.archiveGraduated(
+      current.task,
+      current.binding,
+      stableRecords,
+    );
+    if (result.archivedCount > 0) await refreshObjectAnnotations();
+    return result;
+  };
+
   const stop = (): Promise<WorkspaceCompanionStatus> => {
     if (stopPromise !== undefined) return stopPromise;
     if (state === "stopped") return Promise.resolve(status());
@@ -503,6 +559,8 @@ export function createWorkspaceCompanion(
     supersedeCurrentTaskObject,
     retireCurrentTaskObject,
     listCurrentTaskObjects,
+    inventoryCurrentTaskObjects,
+    archiveGraduatedCurrentTaskObjects,
     stop,
     status,
   });

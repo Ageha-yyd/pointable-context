@@ -42,6 +42,7 @@ interface ParsedArguments {
     | "object-upsert"
     | "object-supersede"
     | "object-retire"
+    | "object-archive"
     | "object-list";
   stateDir: string;
   registryPath: string;
@@ -107,10 +108,11 @@ function parseArguments(argv: string[]): ParsedArguments {
     command !== "object-upsert" &&
     command !== "object-supersede" &&
     command !== "object-retire" &&
+    command !== "object-archive" &&
     command !== "object-list"
   ) {
     return fail(
-      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-list> [options]",
+      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-archive|object-list> [options]",
     );
   }
   const stateRoot = localStateRoot();
@@ -347,7 +349,8 @@ async function controlRequest(
     | "/objects"
     | "/objects/upsert"
     | "/objects/supersede"
-    | "/objects/retire",
+    | "/objects/retire"
+    | "/objects/archive",
   body?: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const encoded = body === undefined ? undefined : Buffer.from(JSON.stringify(body), "utf8");
@@ -502,13 +505,23 @@ async function runServer(arguments_: ParsedArguments): Promise<void> {
       return;
     }
     if (request.method === "GET" && request.url === "/objects") {
-      void companion.listCurrentTaskObjects().then(
-        (objects) => sendJson(response, 200, { ok: true, objects }),
+      void companion.inventoryCurrentTaskObjects().then(
+        (inventory) => sendJson(response, 200, { ok: true, ...inventory }),
         (error: unknown) => sendJson(response, 409, {
           ok: false,
           error: error instanceof Error ? error.message : "object_list_failed",
         }),
       );
+      return;
+    }
+    if (request.method === "POST" && request.url === "/objects/archive") {
+      void companion.archiveGraduatedCurrentTaskObjects().then(async (result) => {
+        const inventory = await companion.inventoryCurrentTaskObjects();
+        sendJson(response, 200, { ok: true, result, ...inventory });
+      }).catch((error: unknown) => sendJson(response, 409, {
+        ok: false,
+        error: error instanceof Error ? error.message : "object_archive_failed",
+      }));
       return;
     }
     if (request.method === "POST" && request.url === "/objects/upsert") {
@@ -669,6 +682,15 @@ function print(value: Record<string, unknown>, json: boolean): void {
     );
     return;
   }
+  if (
+    result !== undefined &&
+    (result.kind === "archived" || result.kind === "unchanged") &&
+    Number.isSafeInteger(result.archivedCount)
+  ) {
+    process.stdout.write(
+      `Task object archive: ${String(result.kind)}; moved=${String(result.archivedCount)}\n`,
+    );
+  }
   if (Array.isArray(value.objects)) {
     process.stdout.write(`Current task objects: ${value.objects.length}\n`);
     for (const item of value.objects) {
@@ -676,6 +698,17 @@ function print(value: Record<string, unknown>, json: boolean): void {
       process.stdout.write(
         `- ${String(item.objectKey)} [${String(item.entityType)}] ${String(item.lifecycle)}\n`,
       );
+    }
+    const capacity = record(value.capacity) ? value.capacity : undefined;
+    if (capacity !== undefined) {
+      process.stdout.write(
+        `Capacity: active=${String(capacity.active)}/${String(capacity.activeHardLimit)}; ` +
+        `registry=${String(capacity.registryRecords)}/${String(capacity.registryRecordLimit)}; ` +
+        `archived=${String(capacity.archivedRecords)}/${String(capacity.archiveRecordLimit)}\n`,
+      );
+      if (Array.isArray(capacity.warnings) && capacity.warnings.length > 0) {
+        process.stdout.write(`Warnings: ${capacity.warnings.map(String).join(", ")}\n`);
+      }
     }
     return;
   }
@@ -738,6 +771,7 @@ async function main(): Promise<void> {
     arguments_.command === "object-upsert" ||
     arguments_.command === "object-supersede" ||
     arguments_.command === "object-retire" ||
+    arguments_.command === "object-archive" ||
     arguments_.command === "object-list"
   ) {
     const state = await readState(arguments_.stateDir);
@@ -746,6 +780,10 @@ async function main(): Promise<void> {
     }
     if (arguments_.command === "object-list") {
       print(await controlRequest(state, "GET", "/objects"), arguments_.json);
+      return;
+    }
+    if (arguments_.command === "object-archive") {
+      print(await controlRequest(state, "POST", "/objects/archive"), arguments_.json);
       return;
     }
     if (arguments_.command === "object-retire") {
