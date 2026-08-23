@@ -30,6 +30,21 @@ Qualifying milestones include a stable concept introduced by the completed work,
 
 Do not record intermediate reasoning, routine file edits, planned tests, ordinary TODOs, repeated progress narration, implicit concepts, or facts that are already easier to read from the selected source file itself.
 
+## Two-tier object curation
+
+When the user has opted the bounded task into Pointable Context maintenance, treat object maintenance as an Agent-owned milestone workflow, not as semantic background mining and not as a requirement for the user to request every card separately.
+
+At each stable milestone:
+
+1. List the current task-local objects and search all five frozen artifact directories before writing anything.
+2. If a valid stable artifact already represents the identity, use or update it; never create a task-local duplicate.
+3. If the same task-local identity is active, update its content. Supersede only when the identity changes, and retire it when it no longer affects a later decision, resume, or handoff.
+4. If the identity is stable and useful beyond the current turn but remains task-bound or lacks exact workspace evidence, route it to the task-local partial layer through `$pointable-context-workspace`.
+5. If the identity has cross-task reuse value and exact workspace evidence, create or update the appropriate evidence-backed artifact below.
+6. Run the applicable checker before graduation. Retire the corresponding task-local object only after the stable artifact reports `valid: true`; on failure, keep the partial object active and report the bounded issue.
+
+Normally introduce no more than one new task-local object per stable milestone unless the user explicitly names multiple objects. This limit does not block updates, supersession, retirement, or a separately justified Task/Verification record. Never scan Chat, call a semantic model, register every noun, or create an extra Chat Turn merely to maintain the object layer.
+
 ## Explanatory milestone artifacts
 
 Use an explanatory artifact only when the stable identity is likely to appear in later Chat and cannot already be understood from a normal file/module card. The normalized file stem must equal the H1 identity so the visible term and deterministic lookup name cannot drift.

@@ -7,16 +7,18 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v2.22 freezes dual zero-turn interaction plus task-local object lifecycle", async () => {
-  const [prd, readme, mainSkill, workspaceSkill, recordsSkill] = await Promise.all([
+test("v2.23 freezes dual zero-turn interaction plus two-tier object curation", async () => {
+  const [prd, readme, mainSkill, workspaceSkill, recordsSkill, curationDecision, coverage] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
     text("skills/pointable-context/SKILL.md"),
     text("skills/pointable-context-workspace/SKILL.md"),
     text("skills/pointable-context-records/SKILL.md"),
+    text("docs/decisions/object-curation-policy.md"),
+    text("docs/context-coverage.json"),
   ]);
 
-  assert.match(prd, /版本：v2\.22/u);
+  assert.match(prd, /版本：v2\.23/u);
   assert.match(prd, /`annotated_click`/u);
   assert.match(prd, /`selection_lookup`/u);
   assert.match(prd, /每条消息最多标 3 个高价值对象/u);
@@ -33,6 +35,9 @@ test("v2.22 freezes dual zero-turn interaction plus task-local object lifecycle"
   assert.match(prd, /身份改变必须一次性 `supersede`/u);
   assert.match(prd, /`freshness=partial`/u);
   assert.match(prd, /登记只刷新 identity catalog，不读取详情或创建 Chat Turn/u);
+  assert.match(prd, /稳定里程碑触发的两级路由/u);
+  assert.match(prd, /单个稳定里程碑通常最多新增一个 task-local 对象/u);
+  assert.match(prd, /只有稳定制品通过适用 checker 后才退役对应临时对象/u);
 
   assert.match(readme, /bounded identity-only catalog/u);
   assert.match(readme, /Any registered object omitted by that Top-3 remains reachable/u);
@@ -51,7 +56,13 @@ test("v2.22 freezes dual zero-turn interaction plus task-local object lifecycle"
   assert.match(workspaceSkill, /Task-local dynamic Object lifecycle/u);
   assert.match(workspaceSkill, /object-supersede/u);
   assert.match(workspaceSkill, /freshness=partial/u);
+  assert.match(workspaceSkill, /normally introduce no more than one new task-local object per milestone/u);
+  assert.match(workspaceSkill, /A valid stable artifact wins/u);
   assert.match(recordsSkill, /Normally create no more than one explanatory artifact/u);
+  assert.match(recordsSkill, /Two-tier object curation/u);
+  assert.match(recordsSkill, /Retire the corresponding task-local object only after the stable artifact reports `valid: true`/u);
+  assert.match(curationDecision, /Agent 在明确授权的有界任务中只于稳定里程碑维护对象/u);
+  assert.match(coverage, /"id": "object-curation-policy"/u);
 });
 
 test("plugin defaults enable Quiet Mode instead of proactively rendering capsules", async () => {

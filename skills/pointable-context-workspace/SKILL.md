@@ -37,11 +37,13 @@ The Companion may hold a sparse set of high-value objects that appeared during t
 
 - Register an object only after the user has enabled this workspace companion and the object has a stable selectable name, is likely to matter after the current turn, and can answer one complete type-specific comprehension unit.
 - Use only `concept`, `change`, `decision`, `task`, or `verification`. Do not register ordinary files, every mentioned noun, transient reasoning, raw Chat, TODO fragments, secrets, or model-generated guesses.
+- Treat maintenance as Agent-owned only inside that explicit bounded opt-in. Re-evaluate at stable milestones rather than every Chat Turn; normally introduce no more than one new task-local object per milestone unless the user explicitly names multiple objects. This is not invisible semantic mining and does not require a separate user message for every card.
+- Before creating a task-local object, search the five frozen artifact directories. A valid stable artifact wins and must not be duplicated in the private registry.
 - Run `object-list --json` before mutation. Update an existing active `objectKey` when only its summary or mental model changes. Identity fields—key, type, canonical name, and aliases—are immutable; use `object-supersede` when the identity genuinely changes.
 - Use `object-retire` when the object is no longer decision-relevant. Superseded and retired keys are terminal and cannot be silently reactivated. They leave the automatic Top-3 annotation catalog, but remain read-only resolvable from historical Chat so old references never become unexplained dead text. Their card must expose lifecycle and, for supersession, the replacement key.
 - Every task-local object is displayed with `freshness=partial` and an explicit temporary-context boundary. Agent declaration is not repository authority, test execution evidence, or completion proof.
 - Registration refreshes only the identity annotation catalog. It does not open a card, read detail, call a model, or create a Chat Turn.
-- Stable milestones that need cross-task reuse must graduate through `$pointable-context-records` with exact workspace evidence; do not treat this private registry as durable project truth.
+- Stable milestones that need cross-task reuse must graduate through `$pointable-context-records` with exact workspace evidence. Run the applicable checker first and retire the corresponding task-local object only after the stable artifact reports `valid: true`; if validation fails, preserve the partial object and its explicit boundary. Do not treat this private registry as durable project truth.
 
 The strict input document has exactly these top-level fields: `schemaVersion`, `objectKey`, `entityType`, `canonicalName`, `aliases`, `summary`, and `mentalModel`. A Concept example is:
 

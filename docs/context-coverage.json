@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "taskId": "pointable-context-long-task-productization",
-  "declaredAt": "2026-08-20T00:00:00+08:00",
+  "declaredAt": "2026-08-24T00:00:00+08:00",
   "expected": [
     {
       "id": "local-workspace-provider",
@@ -22,6 +22,11 @@
       "id": "native-chat-lane-decision",
       "kind": "decision",
       "key": "docs/decisions/native-chat-lane.md"
+    },
+    {
+      "id": "object-curation-policy",
+      "kind": "decision",
+      "key": "docs/decisions/object-curation-policy.md"
     },
     {
       "id": "work-result-context-task",
