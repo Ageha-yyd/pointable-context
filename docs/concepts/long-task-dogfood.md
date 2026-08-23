@@ -21,8 +21,8 @@ P-C 微型心智模型、动态刷新和当前精确 Codex build 已完成资格
 
 ## 证据
 
-> 开展长周期 dogfood，重点观察延迟重返、跨会话恢复、状态漂移和任务交接；当前显式 Coverage 随 Artifact Check 与首个原生理解验收扩展到七个期望对象；
+> 开展长周期 dogfood，重点观察延迟重返、跨会话恢复、状态漂移和任务交接；当前显式 Coverage 已扩展到 10 个期望对象并实测 10/10 available，另有 1 个当前任务 partial Task 用于策展校准；
 
 ## 来源
 
-docs/PRD-inline-pointable-widgets.md:784
+docs/PRD-inline-pointable-widgets.md:785

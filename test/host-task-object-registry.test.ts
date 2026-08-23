@@ -447,6 +447,35 @@ test("safe archive moves only uniquely graduated terminal objects after preservi
         canonicalKey: "docs/concepts/graduated-duplicate.md",
       },
     ];
+    const ambiguousAudit = await objects.auditCuration(activeTask, entry, ambiguousStable);
+    assert.deepEqual({
+      currentTaskRecords: ambiguousAudit.currentTaskRecords,
+      activePartials: ambiguousAudit.activePartials,
+      activeStableOverlaps: ambiguousAudit.activeStableOverlaps,
+      activeAmbiguousOverlaps: ambiguousAudit.activeAmbiguousOverlaps,
+      terminalUnmatched: ambiguousAudit.terminalUnmatched,
+      terminalArchiveReady: ambiguousAudit.terminalArchiveReady,
+      terminalAmbiguous: ambiguousAudit.terminalAmbiguous,
+      omissionMeasurement: ambiguousAudit.omissionMeasurement,
+    }, {
+      currentTaskRecords: 3,
+      activePartials: 0,
+      activeStableOverlaps: 1,
+      activeAmbiguousOverlaps: 0,
+      terminalUnmatched: 1,
+      terminalArchiveReady: 0,
+      terminalAmbiguous: 1,
+      omissionMeasurement: "explicit_milestone_review_required",
+    });
+    assert.equal(ambiguousAudit.stableOverlapRate, 2 / 3);
+    assert.deepEqual(
+      ambiguousAudit.items.map((item) => [item.objectKey, item.state, item.stableMatchCount]).sort(),
+      [
+        ["ACTIVE", "active_stable_overlap", 1],
+        ["GRADUATED", "terminal_ambiguous", 2],
+        ["UNMATCHED", "terminal_unmatched", 0],
+      ],
+    );
     const ambiguous = await objects.archiveGraduated(activeTask, entry, ambiguousStable);
     assert.equal(ambiguous.kind, "unchanged");
     assert.equal(ambiguous.archivedCount, 0);
@@ -460,6 +489,12 @@ test("safe archive moves only uniquely graduated terminal objects after preservi
     }]);
     assert.equal(selfClaimed.kind, "unchanged");
     assert.equal(selfClaimed.archivedCount, 0);
+
+    const stableAudit = await objects.auditCuration(activeTask, entry, stable);
+    assert.equal(stableAudit.activeStableOverlaps, 1);
+    assert.equal(stableAudit.terminalArchiveReady, 1);
+    assert.equal(stableAudit.terminalUnmatched, 1);
+    assert.equal(stableAudit.terminalAmbiguous, 0);
 
     const archived = await objects.archiveGraduated(activeTask, entry, stable);
     assert.equal(archived.kind, "archived");

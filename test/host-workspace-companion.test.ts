@@ -269,6 +269,12 @@ test("workspace companion manages task objects only for the current bound task",
 ## 来源
 evidence.txt:1
 `, "utf8");
+    const audit = await companion.auditCurrentTaskObjects();
+    assert.equal(audit.currentTaskRecords, 2);
+    assert.equal(audit.terminalArchiveReady, 1);
+    assert.equal(audit.terminalUnmatched, 1);
+    assert.equal(audit.stableOverlapRate, 0.5);
+    assert.equal(audit.omissionMeasurement, "explicit_milestone_review_required");
     const archive = await companion.archiveGraduatedCurrentTaskObjects();
     assert.equal(archive.kind, "archived");
     assert.equal(archive.archivedCount, 1);
@@ -276,6 +282,10 @@ evidence.txt:1
     assert.equal(afterArchive.capacity.terminal, 1);
     assert.equal(afterArchive.capacity.archivedRecords, 1);
     assert.equal(afterArchive.objects[0]?.objectKey, "COMPANION-LIFECYCLE");
+    const afterAudit = await companion.auditCurrentTaskObjects();
+    assert.equal(afterAudit.currentTaskRecords, 1);
+    assert.equal(afterAudit.terminalArchiveReady, 0);
+    assert.equal(afterAudit.terminalUnmatched, 1);
   } finally {
     await companion.stop();
     await rm(root, { recursive: true, force: true });

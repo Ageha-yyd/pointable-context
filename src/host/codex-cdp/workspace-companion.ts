@@ -28,6 +28,7 @@ import {
   TaskObjectWorkspaceContextIndex,
   TaskObjectRegistry,
   type TaskObjectArchiveResult,
+  type TaskObjectCurationAudit,
   type TaskObjectInventory,
   type TaskObjectMutationResult,
   type TaskObjectSummary,
@@ -106,6 +107,7 @@ export interface WorkspaceCompanion {
   retireCurrentTaskObject(objectKey: string): Promise<TaskObjectMutationResult>;
   listCurrentTaskObjects(): Promise<TaskObjectSummary[]>;
   inventoryCurrentTaskObjects(): Promise<TaskObjectInventory>;
+  auditCurrentTaskObjects(): Promise<TaskObjectCurationAudit>;
   archiveGraduatedCurrentTaskObjects(): Promise<TaskObjectArchiveResult>;
   stop(): Promise<WorkspaceCompanionStatus>;
   status(): WorkspaceCompanionStatus;
@@ -506,8 +508,9 @@ export function createWorkspaceCompanion(
     return await current.registry.inventoryForTask(current.task, current.binding);
   };
 
-  const archiveGraduatedCurrentTaskObjects = async (): Promise<TaskObjectArchiveResult> => {
-    const current = await currentTaskBinding();
+  const checkedStableRecords = async (
+    current: Awaited<ReturnType<typeof currentTaskBinding>>,
+  ) => {
     const trusted = await trustedBindingFor(current);
     const [indexed, artifacts, records] = await Promise.all([
       localIndex.list(trusted),
@@ -518,11 +521,24 @@ export function createWorkspaceCompanion(
       ...(artifacts.valid ? artifacts.artifacts.map((artifact) => artifact.path) : []),
       ...(records.valid ? records.records.map((record) => record.path) : []),
     ].map((path) => `file:${path}`));
-    const stableRecords = indexed.filter((record) => checkedPaths.has(record.entityId));
+    return indexed.filter((record) => checkedPaths.has(record.entityId));
+  };
+
+  const auditCurrentTaskObjects = async (): Promise<TaskObjectCurationAudit> => {
+    const current = await currentTaskBinding();
+    return await current.registry.auditCuration(
+      current.task,
+      current.binding,
+      await checkedStableRecords(current),
+    );
+  };
+
+  const archiveGraduatedCurrentTaskObjects = async (): Promise<TaskObjectArchiveResult> => {
+    const current = await currentTaskBinding();
     const result = await current.registry.archiveGraduated(
       current.task,
       current.binding,
-      stableRecords,
+      await checkedStableRecords(current),
     );
     if (result.archivedCount > 0) await refreshObjectAnnotations();
     return result;
@@ -560,6 +576,7 @@ export function createWorkspaceCompanion(
     retireCurrentTaskObject,
     listCurrentTaskObjects,
     inventoryCurrentTaskObjects,
+    auditCurrentTaskObjects,
     archiveGraduatedCurrentTaskObjects,
     stop,
     status,

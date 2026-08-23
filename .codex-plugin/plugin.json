@@ -1,6 +1,6 @@
 {
   "name": "pointable-context",
-  "version": "0.1.0+codex.20260823181846",
+  "version": "0.1.0+codex.20260823183647",
   "description": "Zero-turn development context reveal from quiet object marks or text selection in the native Codex Chat Lane.",
   "author": {
     "name": "Local developer"
@@ -34,6 +34,7 @@
       "Record this stable concept, change, or decision for Pointable Context with exact workspace evidence.",
       "Maintain sparse Pointable Context milestone artifacts for this bounded long task.",
       "Maintain sparse task-local Pointable Context objects for this bounded long task without mining ordinary Chat.",
+      "Audit current task-object curation against validated stable artifacts without scanning Chat.",
       "Audit declared Pointable Context coverage for this bounded long task without reading Chat history.",
       "Validate the frozen Pointable Context study pack before a pilot session.",
       "Coordinate my assigned formative study session by opening each frozen native task without answering it.",

@@ -7979,6 +7979,10 @@ function archiveRevision(records) {
 function normalizedIdentity(value) {
   return value.normalize("NFKC").toLocaleLowerCase("en-US");
 }
+function stableMatchesFor(record8, stableRecords) {
+  const name = normalizedIdentity(record8.canonicalName);
+  return stableRecords.filter((stable) => !stable.deleted && stable.authorityRef.provider !== TASK_OBJECT_PROVIDER_ID && stable.entityType === record8.entityType && normalizedIdentity(stable.canonicalName) === name);
+}
 function matchesBinding(record8, binding) {
   return sameContextScope(record8.scope, binding.scope) && record8.bindingRevision === binding.bindingRevision && record8.threadRef === binding.threadRef && record8.routeRef === binding.routeRef && record8.workspaceRoot === binding.workspaceRoot;
 }
@@ -8269,6 +8273,36 @@ var TaskObjectRegistry = class {
   async capacityForTask(task, binding) {
     return (await this.inventoryForTask(task, binding)).capacity;
   }
+  async auditCuration(task, binding, rawStableRecords) {
+    const stableRecords = validateContextIndexForRuntime(rawStableRecords, binding.scope);
+    const current = (await this.#read()).records.filter((record8) => matchesEntry(record8, task, binding)).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    const items = current.map((record8) => {
+      const stableMatchCount = stableMatchesFor(record8, stableRecords).length;
+      const state = record8.lifecycle === "active" ? stableMatchCount === 0 ? "active_partial" : stableMatchCount === 1 ? "active_stable_overlap" : "active_ambiguous_overlap" : stableMatchCount === 0 ? "terminal_unmatched" : stableMatchCount === 1 ? "terminal_archive_ready" : "terminal_ambiguous";
+      return Object.freeze({
+        objectKey: record8.objectKey,
+        entityType: record8.entityType,
+        canonicalName: record8.canonicalName,
+        lifecycle: record8.lifecycle,
+        state,
+        stableMatchCount
+      });
+    });
+    const count = (state) => items.filter((item) => item.state === state).length;
+    const stableOverlaps = items.filter((item) => item.stableMatchCount > 0).length;
+    return Object.freeze({
+      currentTaskRecords: items.length,
+      activePartials: count("active_partial"),
+      activeStableOverlaps: count("active_stable_overlap"),
+      activeAmbiguousOverlaps: count("active_ambiguous_overlap"),
+      terminalUnmatched: count("terminal_unmatched"),
+      terminalArchiveReady: count("terminal_archive_ready"),
+      terminalAmbiguous: count("terminal_ambiguous"),
+      stableOverlapRate: items.length === 0 ? 0 : stableOverlaps / items.length,
+      omissionMeasurement: "explicit_milestone_review_required",
+      items: Object.freeze(items)
+    });
+  }
   /**
    * Rebind durable task objects to a fresh capability revision only when the
    * host-vouched task, route, canonical workspace root, and scope are all
@@ -8296,8 +8330,7 @@ var TaskObjectRegistry = class {
     return await this.#mutate(async (document2) => {
       const eligible = document2.records.filter((record8) => {
         if (record8.lifecycle === "active" || !matchesEntry(record8, task, binding)) return false;
-        const name = normalizedIdentity(record8.canonicalName);
-        return stableRecords.filter((stable) => !stable.deleted && stable.authorityRef.provider !== TASK_OBJECT_PROVIDER_ID && stable.entityType === record8.entityType && normalizedIdentity(stable.canonicalName) === name).length === 1;
+        return stableMatchesFor(record8, stableRecords).length === 1;
       });
       const archive = await this.#readArchive();
       if (eligible.length === 0) {
@@ -8776,8 +8809,7 @@ function createWorkspaceCompanion(options) {
     const current = await currentTaskBinding();
     return await current.registry.inventoryForTask(current.task, current.binding);
   };
-  const archiveGraduatedCurrentTaskObjects = async () => {
-    const current = await currentTaskBinding();
+  const checkedStableRecords = async (current) => {
     const trusted = await trustedBindingFor(current);
     const [indexed, artifacts, records] = await Promise.all([
       localIndex.list(trusted),
@@ -8788,11 +8820,22 @@ function createWorkspaceCompanion(options) {
       ...artifacts.valid ? artifacts.artifacts.map((artifact) => artifact.path) : [],
       ...records.valid ? records.records.map((record8) => record8.path) : []
     ].map((path) => `file:${path}`));
-    const stableRecords = indexed.filter((record8) => checkedPaths.has(record8.entityId));
+    return indexed.filter((record8) => checkedPaths.has(record8.entityId));
+  };
+  const auditCurrentTaskObjects = async () => {
+    const current = await currentTaskBinding();
+    return await current.registry.auditCuration(
+      current.task,
+      current.binding,
+      await checkedStableRecords(current)
+    );
+  };
+  const archiveGraduatedCurrentTaskObjects = async () => {
+    const current = await currentTaskBinding();
     const result = await current.registry.archiveGraduated(
       current.task,
       current.binding,
-      stableRecords
+      await checkedStableRecords(current)
     );
     if (result.archivedCount > 0) await refreshObjectAnnotations();
     return result;
@@ -8828,6 +8871,7 @@ function createWorkspaceCompanion(options) {
     retireCurrentTaskObject,
     listCurrentTaskObjects,
     inventoryCurrentTaskObjects,
+    auditCurrentTaskObjects,
     archiveGraduatedCurrentTaskObjects,
     stop,
     status
@@ -8874,9 +8918,9 @@ function boundedInteger2(value, name) {
 }
 function parseArguments(argv) {
   const command = argv[0];
-  if (command !== "start" && command !== "status" && command !== "bind" && command !== "unbind" && command !== "stop" && command !== "run" && command !== "object-upsert" && command !== "object-supersede" && command !== "object-retire" && command !== "object-archive" && command !== "object-list") {
+  if (command !== "start" && command !== "status" && command !== "bind" && command !== "unbind" && command !== "stop" && command !== "run" && command !== "object-upsert" && command !== "object-supersede" && command !== "object-retire" && command !== "object-audit" && command !== "object-archive" && command !== "object-list") {
     return fail(
-      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-archive|object-list> [options]"
+      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-audit|object-archive|object-list> [options]"
     );
   }
   const stateRoot = localStateRoot();
@@ -9222,6 +9266,16 @@ async function runServer(arguments_) {
       );
       return;
     }
+    if (request.method === "GET" && request.url === "/objects/audit") {
+      void companion.auditCurrentTaskObjects().then(
+        (audit) => sendJson(response, 200, { ok: true, audit }),
+        (error) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "object_audit_failed"
+        })
+      );
+      return;
+    }
     if (request.method === "POST" && request.url === "/objects/archive") {
       void companion.archiveGraduatedCurrentTaskObjects().then(async (result) => {
         const inventory = await companion.inventoryCurrentTaskObjects();
@@ -9390,6 +9444,15 @@ function print(value, json) {
     );
     return;
   }
+  if (record7(value.audit) && typeof value.audit.currentTaskRecords === "number") {
+    const audit = value.audit;
+    process.stdout.write(
+      `Curation audit: active partial=${String(audit.activePartials)}; stable overlap=${String(Number(audit.activeStableOverlaps) + Number(audit.activeAmbiguousOverlaps))}; archive ready=${String(audit.terminalArchiveReady)}; terminal unresolved=${String(Number(audit.terminalUnmatched) + Number(audit.terminalAmbiguous))}
+`
+    );
+    process.stdout.write("Omission measurement requires an explicit milestone review\n");
+    return;
+  }
   if (result !== void 0 && (result.kind === "archived" || result.kind === "unchanged") && Number.isSafeInteger(result.archivedCount)) {
     process.stdout.write(
       `Task object archive: ${String(result.kind)}; moved=${String(result.archivedCount)}
@@ -9464,13 +9527,17 @@ async function main() {
     print(await controlRequest(state, "POST", "/unbind"), arguments_.json);
     return;
   }
-  if (arguments_.command === "object-upsert" || arguments_.command === "object-supersede" || arguments_.command === "object-retire" || arguments_.command === "object-archive" || arguments_.command === "object-list") {
+  if (arguments_.command === "object-upsert" || arguments_.command === "object-supersede" || arguments_.command === "object-retire" || arguments_.command === "object-audit" || arguments_.command === "object-archive" || arguments_.command === "object-list") {
     const state = await readState(arguments_.stateDir);
     if (state === void 0 || !processIsAlive(state.pid)) {
       fail("workspace companion is not running");
     }
     if (arguments_.command === "object-list") {
       print(await controlRequest(state, "GET", "/objects"), arguments_.json);
+      return;
+    }
+    if (arguments_.command === "object-audit") {
+      print(await controlRequest(state, "GET", "/objects/audit"), arguments_.json);
       return;
     }
     if (arguments_.command === "object-archive") {

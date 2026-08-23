@@ -99,7 +99,7 @@ $companion = Join-Path $pluginRoot 'host\workspace-companion.mjs'
 4. Run `bind --workspace-root <absolute-path> --json`. Binding must fail unless exactly one Codex task is host-visible.
 5. Read back `status --json`. Report mode, process state, `compatibility.state/code`, target count, active task count, and `activeBinding` root/revision without exposing the control token.
    Treat this as the automatic host-contract layer only. For a build qualification, also run the read-only `pointable-context-compatibility` inspector against the exact Codex package version and current renderer bundle. Do not call a build fully qualified while any manual gate is pending.
-6. If this bounded long task is explicitly using dynamic objects, run `object-list --json`, inspect its capacity warning, then apply only the sparse lifecycle mutations justified by the current milestone. Run `object-archive --json` only after a stable artifact has passed its checker and the corresponding task-local object is terminal.
+6. If this bounded long task is explicitly using dynamic objects, run `object-list --json`, inspect its capacity warning, then apply only the sparse lifecycle mutations justified by the current milestone. At a stable milestone, run read-only `object-audit --json` to distinguish active partials, stable overlaps, terminal archive candidates, unmatched terminal records, and ambiguous matches. The audit must report that omission measurement requires explicit milestone review; it must not infer missing objects from Chat. Run `object-archive --json` only after a stable artifact has passed its checker and the corresponding task-local object is terminal.
 7. Ask the user to click a marked registered object or select an exact visible key/name/path, such as `README.md`, and click `查看上下文`.
 8. Verify that selection alone produces no detail request; the trusted click produces one direct detail or a bounded candidate menu.
 9. For revision qualification, leave one card open, change the selected file, bounded relation, or active task-object mental model, confirm `内容已更新`, then click `刷新内容`. Verify that the same card DOM stays visible at the same position, preserves scroll and disclosure state, displays a finite type-prioritized diff before the P-C model when projected fields changed, keeps an ordinary unrefreshed card quiet, opens no browser, and adds no Chat Turn.
@@ -116,6 +116,7 @@ node $companion object-list --json
 node $companion object-upsert --object-file 'C:\absolute\temporary-object.json' --json
 node $companion object-supersede --replaces 'OLD-OBJECT-KEY' --object-file 'C:\absolute\replacement.json' --json
 node $companion object-retire --object-key 'OBJECT-KEY' --json
+node $companion object-audit --json
 node $companion object-archive --json
 node $companion unbind --json
 node $companion stop --json

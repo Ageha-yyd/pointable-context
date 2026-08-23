@@ -11,7 +11,7 @@ const execFileAsync = promisify(execFile);
 const entrypoint = resolve("dist/src/host/codex-cdp/workspace-companion-cli.js");
 
 async function runCli(
-  command: "start" | "status" | "stop" | "object-list" | "object-archive",
+  command: "start" | "status" | "stop" | "object-list" | "object-audit" | "object-archive",
   stateDir: string,
   registry: string,
   endpoint: string,
@@ -64,6 +64,10 @@ test("detached workspace companion supports lifecycle without guessing an active
     assert.equal(compatibility.code, "qualified_target_missing");
     await assert.rejects(
       () => runCli("object-list", stateDir, registry, endpoint),
+      /active_codex_task_unavailable/u,
+    );
+    await assert.rejects(
+      () => runCli("object-audit", stateDir, registry, endpoint),
       /active_codex_task_unavailable/u,
     );
     await assert.rejects(

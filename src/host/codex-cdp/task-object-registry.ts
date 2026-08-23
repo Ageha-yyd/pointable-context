@@ -152,6 +152,36 @@ export interface TaskObjectInventory {
   capacity: TaskObjectCapacityStatus;
 }
 
+export type TaskObjectCurationState =
+  | "active_partial"
+  | "active_stable_overlap"
+  | "active_ambiguous_overlap"
+  | "terminal_unmatched"
+  | "terminal_archive_ready"
+  | "terminal_ambiguous";
+
+export interface TaskObjectCurationItem {
+  objectKey: string;
+  entityType: TaskObjectType;
+  canonicalName: string;
+  lifecycle: TaskObjectLifecycle;
+  state: TaskObjectCurationState;
+  stableMatchCount: number;
+}
+
+export interface TaskObjectCurationAudit {
+  currentTaskRecords: number;
+  activePartials: number;
+  activeStableOverlaps: number;
+  activeAmbiguousOverlaps: number;
+  terminalUnmatched: number;
+  terminalArchiveReady: number;
+  terminalAmbiguous: number;
+  stableOverlapRate: number;
+  omissionMeasurement: "explicit_milestone_review_required";
+  items: TaskObjectCurationItem[];
+}
+
 export interface TaskObjectArchiveResult {
   kind: "archived" | "unchanged";
   archivedCount: number;
@@ -543,6 +573,18 @@ function normalizedIdentity(value: string): string {
   return value.normalize("NFKC").toLocaleLowerCase("en-US");
 }
 
+function stableMatchesFor(
+  record: StoredTaskObject,
+  stableRecords: readonly IdentityRecord[],
+): IdentityRecord[] {
+  const name = normalizedIdentity(record.canonicalName);
+  return stableRecords.filter((stable) =>
+    !stable.deleted &&
+    stable.authorityRef.provider !== TASK_OBJECT_PROVIDER_ID &&
+    stable.entityType === record.entityType &&
+    normalizedIdentity(stable.canonicalName) === name);
+}
+
 function matchesBinding(record: StoredTaskObject, binding: TrustedContextBinding): boolean {
   return (
     sameContextScope(record.scope, binding.scope) &&
@@ -928,6 +970,54 @@ export class TaskObjectRegistry implements ContextIndexPort, AuthoritativeProvid
     return (await this.inventoryForTask(task, binding)).capacity;
   }
 
+  async auditCuration(
+    task: CodexHostTaskContext,
+    binding: CodexTaskWorkspaceBindingEntry,
+    rawStableRecords: unknown,
+  ): Promise<TaskObjectCurationAudit> {
+    const stableRecords = validateContextIndexForRuntime(rawStableRecords, binding.scope);
+    const current = (await this.#read()).records
+      .filter((record) => matchesEntry(record, task, binding))
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    const items = current.map((record): TaskObjectCurationItem => {
+      const stableMatchCount = stableMatchesFor(record, stableRecords).length;
+      const state: TaskObjectCurationState = record.lifecycle === "active"
+        ? stableMatchCount === 0
+          ? "active_partial"
+          : stableMatchCount === 1
+            ? "active_stable_overlap"
+            : "active_ambiguous_overlap"
+        : stableMatchCount === 0
+          ? "terminal_unmatched"
+          : stableMatchCount === 1
+            ? "terminal_archive_ready"
+            : "terminal_ambiguous";
+      return Object.freeze({
+        objectKey: record.objectKey,
+        entityType: record.entityType,
+        canonicalName: record.canonicalName,
+        lifecycle: record.lifecycle,
+        state,
+        stableMatchCount,
+      });
+    });
+    const count = (state: TaskObjectCurationState): number =>
+      items.filter((item) => item.state === state).length;
+    const stableOverlaps = items.filter((item) => item.stableMatchCount > 0).length;
+    return Object.freeze({
+      currentTaskRecords: items.length,
+      activePartials: count("active_partial"),
+      activeStableOverlaps: count("active_stable_overlap"),
+      activeAmbiguousOverlaps: count("active_ambiguous_overlap"),
+      terminalUnmatched: count("terminal_unmatched"),
+      terminalArchiveReady: count("terminal_archive_ready"),
+      terminalAmbiguous: count("terminal_ambiguous"),
+      stableOverlapRate: items.length === 0 ? 0 : stableOverlaps / items.length,
+      omissionMeasurement: "explicit_milestone_review_required",
+      items: Object.freeze(items),
+    }) as TaskObjectCurationAudit;
+  }
+
   /**
    * Rebind durable task objects to a fresh capability revision only when the
    * host-vouched task, route, canonical workspace root, and scope are all
@@ -968,12 +1058,7 @@ export class TaskObjectRegistry implements ContextIndexPort, AuthoritativeProvid
     return await this.#mutate(async (document) => {
       const eligible = document.records.filter((record) => {
         if (record.lifecycle === "active" || !matchesEntry(record, task, binding)) return false;
-        const name = normalizedIdentity(record.canonicalName);
-        return stableRecords.filter((stable) =>
-          !stable.deleted &&
-          stable.authorityRef.provider !== TASK_OBJECT_PROVIDER_ID &&
-          stable.entityType === record.entityType &&
-          normalizedIdentity(stable.canonicalName) === name).length === 1;
+        return stableMatchesFor(record, stableRecords).length === 1;
       });
       const archive = await this.#readArchive();
       if (eligible.length === 0) {

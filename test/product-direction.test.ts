@@ -8,7 +8,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v2.26 pins deliberately moved cards and allocates annotation capacity fairly across objects", async () => {
+test("v2.27 audits task-object curation without inheriting v2.26 manual qualification", async () => {
   const [prd, readme, mainSkill, workspaceSkill, recordsSkill, curationDecision, capacityDecision, coverage, compatibility, bundle] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -22,7 +22,7 @@ test("v2.26 pins deliberately moved cards and allocates annotation capacity fair
     readFile(resolve("host/workspace-companion.mjs")),
   ]);
 
-  assert.match(prd, /版本：v2\.26/u);
+  assert.match(prd, /版本：v2\.27/u);
   assert.match(prd, /`annotated_click`/u);
   assert.match(prd, /`selection_lookup`/u);
   assert.match(prd, /每条消息最多标 3 个高价值对象/u);
@@ -49,7 +49,7 @@ test("v2.26 pins deliberately moved cards and allocates annotation capacity fair
   assert.match(prd, /绝不跨任务、route、scope 或 workspace 迁移/u);
   assert.match(prd, /显式固定的临时阅读面板/u);
   assert.match(prd, /每个具备唯一 term 的对象一个主入口/u);
-  assert.match(prd, /自动门禁 4\/4 与人工门禁 10\/10/u);
+  assert.match(prd, /自动门禁 4\/4.*人工门禁.*pending/u);
 
   assert.match(readme, /bounded identity-only catalog/u);
   assert.match(readme, /Any registered object omitted by that Top-3 remains reachable/u);
@@ -62,7 +62,7 @@ test("v2.26 pins deliberately moved cards and allocates annotation capacity fair
   assert.match(readme, /Active, unmatched, and ambiguous records are never archived/u);
   assert.match(readme, /Records are never adopted across another task, route, scope, or workspace/u);
   assert.match(readme, /one primary annotation term per unambiguous object before aliases/u);
-  assert.match(readme, /all ten evidence-bound manual gates on exact Codex package/u);
+  assert.match(readme, /current v2\.27 bundle.*all ten evidence-bound manual gates remain pending/u);
 
   assert.match(mainSkill, /two zero-turn entries/u);
   assert.match(mainSkill, /Any registered object not marked remains reachable/u);
@@ -77,6 +77,8 @@ test("v2.26 pins deliberately moved cards and allocates annotation capacity fair
   assert.match(workspaceSkill, /A valid stable artifact wins/u);
   assert.match(workspaceSkill, /active_soft_limit_reached/u);
   assert.match(workspaceSkill, /object-archive --json/u);
+  assert.match(workspaceSkill, /object-audit --json/u);
+  assert.match(workspaceSkill, /omission measurement requires explicit milestone review/iu);
   assert.match(workspaceSkill, /Active, unmatched, and ambiguous records never archive/u);
   assert.match(workspaceSkill, /must never migrate objects across another task, route, scope, or workspace/u);
   assert.match(workspaceSkill, /moved card is explicitly pinned/u);
@@ -96,14 +98,14 @@ test("v2.26 pins deliberately moved cards and allocates annotation capacity fair
     automatic?: { state?: string };
     manualChecks?: Array<{ result?: string }>;
   };
-  assert.equal(current.implementation?.productVersion, "v2.26");
+  assert.equal(current.implementation?.productVersion, "v2.27");
   assert.equal(
     current.implementation?.rendererBundleSha256,
     createHash("sha256").update(bundle).digest("hex"),
   );
   assert.equal(current.automatic?.state, "qualified");
   assert.equal(current.manualChecks?.length, 10);
-  assert.ok(current.manualChecks?.every((check) => check.result === "pass"));
+  assert.ok(current.manualChecks?.every((check) => check.result === "pending"));
 });
 
 test("plugin defaults enable Quiet Mode instead of proactively rendering capsules", async () => {

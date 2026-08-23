@@ -18,4 +18,4 @@
 
 ## 来源
 
-src/host/codex-cdp/workspace-companion-cli.ts:123
+src/host/codex-cdp/workspace-companion-cli.ts:125
