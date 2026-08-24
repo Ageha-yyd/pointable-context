@@ -171,10 +171,14 @@ test("repository work-result records pass the read-only checker", async () => {
     "docs/verifications/study-v2-environment-bootstrap.md",
     "utf8",
   );
+  const beforeTestExecutionVerification = await readFile(
+    "docs/verifications/test-execution-runner.md",
+    "utf8",
+  );
   const result = await checkContextRecords(resolve("."));
   assert.equal(result.valid, true, JSON.stringify(result.issues));
-  assert.equal(result.records.length, 6);
-  assert.equal(result.candidateCount, 6);
+  assert.equal(result.records.length, 7);
+  assert.equal(result.candidateCount, 7);
   assert.equal(await readFile("docs/tasks/work-result-context.md", "utf8"), beforeTask);
   assert.equal(
     await readFile("docs/tasks/study-v2-native-runner.md", "utf8"),
@@ -195,6 +199,10 @@ test("repository work-result records pass the read-only checker", async () => {
   assert.equal(
     await readFile("docs/verifications/study-v2-environment-bootstrap.md", "utf8"),
     beforeStudyBootstrapVerification,
+  );
+  assert.equal(
+    await readFile("docs/verifications/test-execution-runner.md", "utf8"),
+    beforeTestExecutionVerification,
   );
 });
 

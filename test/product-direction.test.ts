@@ -8,7 +8,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v2.28 reviews explicit milestone needs without inheriting v2.26 manual qualification", async () => {
+test("v2.29 records real test execution without inheriting renderer manual qualification", async () => {
   const [prd, readme, mainSkill, workspaceSkill, recordsSkill, curationDecision, capacityDecision, coverage, compatibility, bundle] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -22,7 +22,7 @@ test("v2.28 reviews explicit milestone needs without inheriting v2.26 manual qua
     readFile(resolve("host/workspace-companion.mjs")),
   ]);
 
-  assert.match(prd, /版本：v2\.28/u);
+  assert.match(prd, /版本：v2\.29/u);
   assert.match(prd, /`annotated_click`/u);
   assert.match(prd, /`selection_lookup`/u);
   assert.match(prd, /每条消息最多标 3 个高价值对象/u);
@@ -51,7 +51,9 @@ test("v2.28 reviews explicit milestone needs without inheriting v2.26 manual qua
   assert.match(prd, /每个具备唯一 term 的对象一个主入口/u);
   assert.match(prd, /Explicit Milestone Object Review/u);
   assert.match(prd, /不得扫描 Chat、读取详情、自动补对象/u);
-  assert.match(prd, /人工十项合并到功能冻结后的单次 Release Candidate 验收/u);
+  assert.match(prd, /人工十项仍集中到功能冻结后的单次 Release Candidate 验收/u);
+  assert.match(prd, /Reliable Test Execution Event/u);
+  assert.match(prd, /timeout\/cancel\/output overflow\/revision drift/u);
 
   assert.match(readme, /bounded identity-only catalog/u);
   assert.match(readme, /Any registered object omitted by that Top-3 remains reachable/u);
@@ -66,7 +68,7 @@ test("v2.28 reviews explicit milestone needs without inheriting v2.26 manual qua
   assert.match(readme, /one primary annotation term per unambiguous object before aliases/u);
   assert.match(
     readme,
-    /current v2\.28 bundle.*ten evidence-bound manual gates are intentionally consolidated into the later feature-freeze Release Candidate/u,
+    /current v2\.29 product slice.*ten evidence-bound manual gates remain consolidated into the later feature-freeze Release Candidate/u,
   );
   assert.match(readme, /object-review --review-file/u);
   assert.match(readme, /available, missing, ambiguous, and type-mismatch/u);
@@ -96,18 +98,20 @@ test("v2.28 reviews explicit milestone needs without inheriting v2.26 manual qua
   assert.match(recordsSkill, /Retire the corresponding task-local object only after the stable artifact reports `valid: true`/u);
   assert.match(recordsSkill, /Archive is maintenance, not graduation evidence/u);
   assert.match(recordsSkill, /workspace companion's `object-review`/u);
+  assert.match(recordsSkill, /references\/test-execution\.md/u);
   assert.match(curationDecision, /Agent 在明确授权的有界任务中只于稳定里程碑维护对象/u);
   assert.match(capacityDecision, /热 Registry 在每个当前任务达到 64 个 active 对象时给出软警告/u);
   assert.match(capacityDecision, /Archive 不参与查询/u);
   assert.match(coverage, /"id": "object-curation-policy"/u);
   assert.match(coverage, /"id": "task-object-capacity"/u);
+  assert.match(coverage, /"id": "test-execution-runner"/u);
 
   const current = JSON.parse(compatibility) as {
     implementation?: { productVersion?: string; rendererBundleSha256?: string };
     automatic?: { state?: string };
     manualChecks?: Array<{ result?: string }>;
   };
-  assert.equal(current.implementation?.productVersion, "v2.28");
+  assert.equal(current.implementation?.productVersion, "v2.29");
   assert.equal(
     current.implementation?.rendererBundleSha256,
     createHash("sha256").update(bundle).digest("hex"),

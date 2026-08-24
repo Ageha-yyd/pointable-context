@@ -18,4 +18,4 @@ Agent 会在容量成为故障前收到治理信号；归档先保存本地审�
 
 ## 来源
 
-docs/PRD-inline-pointable-widgets.md:430
+docs/PRD-inline-pointable-widgets.md:440

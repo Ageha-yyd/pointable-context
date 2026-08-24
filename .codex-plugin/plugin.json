@@ -1,6 +1,6 @@
 {
   "name": "pointable-context",
-  "version": "0.1.0+codex.20260823185857",
+  "version": "0.1.0+codex.20260824012240",
   "description": "Zero-turn development context reveal from quiet object marks or text selection in the native Codex Chat Lane.",
   "author": {
     "name": "Local developer"
@@ -31,6 +31,7 @@
       "Inspect the exact Codex Desktop build qualification record without treating automatic gates as manual acceptance.",
       "Record the current stable task status for Pointable Context with exact workspace evidence.",
       "Record this observed verification result for Pointable Context, including its remaining gap.",
+      "Run one explicitly requested test command through the restricted Pointable Context execution recorder and create a revision-bound Verification.",
       "Record this stable concept, change, or decision for Pointable Context with exact workspace evidence.",
       "Maintain sparse Pointable Context milestone artifacts for this bounded long task.",
       "Maintain sparse task-local Pointable Context objects for this bounded long task without mining ordinary Chat.",

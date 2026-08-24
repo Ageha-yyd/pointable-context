@@ -52,6 +52,11 @@
       "id": "native-card-type-coverage",
       "kind": "verification",
       "key": "docs/verifications/native-card-type-coverage.md"
+    },
+    {
+      "id": "test-execution-runner",
+      "kind": "verification",
+      "key": "docs/verifications/test-execution-runner.md"
     }
   ]
 }

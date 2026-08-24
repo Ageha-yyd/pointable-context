@@ -86,6 +86,8 @@ Use `docs/verifications/<stable-name>.md` only after an actual command, review, 
 
 Write `执行时间` as ISO 8601 with an explicit timezone. Identify the verified commit or bounded dirty-worktree snapshot honestly. Record PASS, FAIL, partial, or inconclusive as observed; every positive result must still name the boundary it did not prove. Copy one bounded result line into a workspace evidence file when the original output is ephemeral, then cite that exact relative path and line.
 
+When the requested evidence is an actual test or validation command, read [references/test-execution.md](references/test-execution.md) and use the bundled restricted runner. It is the preferred path for a new immutable execution record because it observes the real process exit and revision instead of asking the Agent to transcribe console prose. Do not invoke it for routine tests or infer a request to persist every run.
+
 ## Hard boundaries
 
 - Never infer task completion from Chat prose, a commit, file existence, or TODO removal.

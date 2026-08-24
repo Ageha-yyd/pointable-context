@@ -18,4 +18,4 @@ Agent 在明确授权的有界任务中只于稳定里程碑维护对象：稳�
 
 ## 来源
 
-docs/PRD-inline-pointable-widgets.md:429
+docs/PRD-inline-pointable-widgets.md:439
