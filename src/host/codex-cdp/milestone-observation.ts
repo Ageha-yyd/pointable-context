@@ -418,7 +418,8 @@ function registrySnapshotSha256(audit: TaskObjectCurationAudit): string {
 
 function candidatePathIsInside(root: string, candidate: string): boolean {
   const value = relative(root, candidate);
-  return value === "" || (!value.startsWith(`..${sep}`) && value !== "..");
+  return !isAbsolute(value) &&
+    (value === "" || (!value.startsWith(`..${sep}`) && value !== ".."));
 }
 
 export class MilestoneObservationLedger {

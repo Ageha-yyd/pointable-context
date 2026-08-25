@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, parse } from "node:path";
 import test from "node:test";
 import type { CodexHostTaskContext } from "../src/host/codex-cdp/host-context.js";
 import {
@@ -134,6 +134,27 @@ test("private milestone ledger stores only digests and bounded aggregate signals
     const isolated = await ledger.summary(anotherTask, anotherBinding);
     assert.equal(isolated.eventCount, 0);
     assert.equal(isolated.latestEventSha256, null);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("private milestone ledger accepts state on a different Windows volume", {
+  skip: process.platform !== "win32" || parse(process.cwd()).root === parse(tmpdir()).root,
+}, async () => {
+  const root = await mkdtemp(join(tmpdir(), "pointable-milestone-cross-volume-"));
+  const activeTask = task("thread-cross-volume-private-state");
+  const bindings = new CodexTaskWorkspaceBindingRegistry(join(root, "bindings.json"));
+  const binding = await bindings.bind(activeTask, process.cwd());
+  const objects = new TaskObjectRegistry(join(root, "task-objects.json"));
+  await objects.upsert(activeTask, binding, conceptInput());
+  const ledgerPath = join(root, "private", "milestones.json");
+  const ledger = new MilestoneObservationLedger(ledgerPath);
+  try {
+    const input = await observationInput(objects, activeTask, binding, "CROSS-VOLUME-PRIVATE");
+    const event = await ledger.record(input);
+    assert.match(event.eventSha256, /^[a-f0-9]{64}$/u);
+    assert.equal((await ledger.summary(activeTask, binding)).eventCount, 1);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

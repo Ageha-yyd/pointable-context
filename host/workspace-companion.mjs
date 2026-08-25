@@ -7883,7 +7883,7 @@ function registrySnapshotSha256(audit) {
 }
 function candidatePathIsInside(root, candidate) {
   const value = relative4(root, candidate);
-  return value === "" || !value.startsWith(`..${sep4}`) && value !== "..";
+  return !isAbsolute3(value) && (value === "" || !value.startsWith(`..${sep4}`) && value !== "..");
 }
 var MilestoneObservationLedger = class {
   path;

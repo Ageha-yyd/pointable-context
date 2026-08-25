@@ -6,21 +6,21 @@
     "packageVersion": "26.818.5229.0",
     "executableVersion": "151.0.7922.170",
     "architecture": "x64",
-    "capturedAt": "2026-08-25T21:00:48+08:00"
+    "capturedAt": "2026-08-25T21:15:58+08:00"
   },
   "implementation": {
     "productVersion": "v2.30",
-    "rendererBundleSha256": "b659f8941f3ce7501ed951af5ec83dbbeabae9eb4a8ed63494182fe4a01a6209"
+    "rendererBundleSha256": "7b208c61e013d265f3b1b17a64389a8050e9cb98bb2b43f5cfe89b9f8e63db28"
   },
   "automatic": {
-    "checkedAt": "2026-08-25T13:05:18.608Z",
-    "state": "unavailable",
-    "code": "target_list_unavailable",
+    "checkedAt": "2026-08-25T13:15:58.448Z",
+    "state": "qualified",
+    "code": "qualified_current_runtime",
     "gates": {
-      "exactMainTarget": "unavailable",
-      "mainFrame": "unavailable",
-      "mainExecutionContext": "unavailable",
-      "rendererLifecycle": "unavailable"
+      "exactMainTarget": "pass",
+      "mainFrame": "pass",
+      "mainExecutionContext": "pass",
+      "rendererLifecycle": "pass"
     }
   },
   "manualChecks": [

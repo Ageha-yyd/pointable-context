@@ -73,7 +73,7 @@ test("v2.30 adds private multi-milestone observation without widening renderer a
   assert.match(readme, /one primary annotation term per unambiguous object before aliases/u);
   assert.match(
     readme,
-    /current v2\.30 product slice.*automatic gate is truthfully `unavailable` and all ten manual gates remain pending/u,
+    /current v2\.30 product slice.*automatic Host gates pass 4\/4.*all ten manual interaction gates remain pending/u,
   );
   assert.match(readme, /object-review --review-file/u);
   assert.match(readme, /available, missing, ambiguous, and type-mismatch/u);
@@ -130,7 +130,7 @@ test("v2.30 adds private multi-milestone observation without widening renderer a
     current.implementation?.rendererBundleSha256,
     createHash("sha256").update(bundle).digest("hex"),
   );
-  assert.equal(current.automatic?.state, "unavailable");
+  assert.equal(current.automatic?.state, "qualified");
   assert.equal(current.manualChecks?.length, 10);
   assert.ok(current.manualChecks?.every((check) => check.result === "pending"));
 });
