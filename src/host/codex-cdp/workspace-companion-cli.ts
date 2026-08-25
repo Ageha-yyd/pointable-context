@@ -15,6 +15,7 @@ import {
 } from "./workspace-companion.js";
 import type { PointablePresentationMode } from "./protocol.js";
 import { TaskObjectRegistry } from "./task-object-registry.js";
+import { MilestoneObservationLedger } from "./milestone-observation.js";
 
 const CONTROL_SCHEMA_VERSION = 1;
 const CONTROL_TIMEOUT_MS = 3_000;
@@ -45,7 +46,9 @@ interface ParsedArguments {
     | "object-audit"
     | "object-review"
     | "object-archive"
-    | "object-list";
+    | "object-list"
+    | "milestone-observe"
+    | "milestone-summary";
   stateDir: string;
   registryPath: string;
   endpoint: string;
@@ -114,10 +117,12 @@ function parseArguments(argv: string[]): ParsedArguments {
     command !== "object-audit" &&
     command !== "object-review" &&
     command !== "object-archive" &&
-    command !== "object-list"
+    command !== "object-list" &&
+    command !== "milestone-observe" &&
+    command !== "milestone-summary"
   ) {
     return fail(
-      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-audit|object-review|object-archive|object-list> [options]",
+      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-audit|object-review|object-archive|object-list|milestone-observe|milestone-summary> [options]",
     );
   }
   const stateRoot = localStateRoot();
@@ -179,8 +184,8 @@ function parseArguments(argv: string[]): ParsedArguments {
   if ((command === "object-upsert" || command === "object-supersede") && objectFile === undefined) {
     fail(`${command} requires --object-file <absolute-path>`);
   }
-  if (command === "object-review" && reviewFile === undefined) {
-    fail("object-review requires --review-file <absolute-path>");
+  if ((command === "object-review" || command === "milestone-observe") && reviewFile === undefined) {
+    fail(`${command} requires --review-file <absolute-path>`);
   }
   if (command === "object-supersede" && replaces === undefined) {
     fail("object-supersede requires --replaces <object-key>");
@@ -365,7 +370,9 @@ async function controlRequest(
     | "/objects/retire"
     | "/objects/audit"
     | "/objects/review"
-    | "/objects/archive",
+    | "/objects/archive"
+    | "/milestones/observe"
+    | "/milestones/summary",
   body?: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const encoded = body === undefined ? undefined : Buffer.from(JSON.stringify(body), "utf8");
@@ -447,9 +454,13 @@ async function runServer(arguments_: ParsedArguments): Promise<void> {
   const taskObjectRegistry = new TaskObjectRegistry(
     join(arguments_.stateDir, "task-objects.json"),
   );
+  const milestoneObservationLedger = new MilestoneObservationLedger(
+    join(arguments_.stateDir, "milestone-observations.json"),
+  );
   const companion: WorkspaceCompanion = createWorkspaceCompanion({
     registry,
     taskObjectRegistry,
+    milestoneObservationLedger,
     endpoint: arguments_.endpoint,
     refreshIntervalMs: arguments_.refreshIntervalMs,
     presentationMode: arguments_.presentationMode,
@@ -546,6 +557,27 @@ async function runServer(arguments_: ParsedArguments): Promise<void> {
         (error: unknown) => sendJson(response, 409, {
           ok: false,
           error: error instanceof Error ? error.message : "object_review_failed",
+        }),
+      );
+      return;
+    }
+    if (request.method === "POST" && request.url === "/milestones/observe") {
+      void readRequestJson(request).then(async (body) =>
+        await companion.observeCurrentTaskMilestone(body.review)).then(
+        (event) => sendJson(response, 200, { ok: true, event }),
+        (error: unknown) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "milestone_observation_failed",
+        }),
+      );
+      return;
+    }
+    if (request.method === "GET" && request.url === "/milestones/summary") {
+      void companion.summarizeCurrentTaskMilestones().then(
+        (summary) => sendJson(response, 200, { ok: true, summary }),
+        (error: unknown) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "milestone_summary_failed",
         }),
       );
       return;
@@ -719,6 +751,31 @@ function print(value: Record<string, unknown>, json: boolean): void {
     return;
   }
   if (
+    record(value.event) &&
+    typeof value.event.milestoneSha256 === "string"
+  ) {
+    const event = value.event;
+    const review = record(event.review) ? event.review : {};
+    process.stdout.write(
+      `Private milestone observation ${String(event.milestoneSha256).slice(0, 12)}: ` +
+      `available=${String(review.available)}; missing=${String(review.missing)}; ` +
+      `ambiguous=${String(review.ambiguous)}; type-mismatch=${String(review.typeMismatch)}\n`,
+    );
+    return;
+  }
+  if (
+    record(value.summary) &&
+    value.summary.measurement === "private_milestone_observation"
+  ) {
+    const summary = value.summary;
+    process.stdout.write(
+      `Milestone summary: events=${String(summary.eventCount)}; ` +
+      `milestones=${String(summary.milestoneCount)}; available=${String(summary.available)}; ` +
+      `missing=${String(summary.missing)}; failures=${String(Number(summary.ambiguous) + Number(summary.typeMismatch))}\n`,
+    );
+    return;
+  }
+  if (
     record(value.audit) &&
     typeof value.audit.currentTaskRecords === "number"
   ) {
@@ -824,7 +881,9 @@ async function main(): Promise<void> {
     arguments_.command === "object-audit" ||
     arguments_.command === "object-review" ||
     arguments_.command === "object-archive" ||
-    arguments_.command === "object-list"
+    arguments_.command === "object-list" ||
+    arguments_.command === "milestone-observe" ||
+    arguments_.command === "milestone-summary"
   ) {
     const state = await readState(arguments_.stateDir);
     if (state === undefined || !processIsAlive(state.pid)) {
@@ -841,6 +900,15 @@ async function main(): Promise<void> {
     if (arguments_.command === "object-review") {
       const review = await readJsonInputFile(arguments_.reviewFile!);
       print(await controlRequest(state, "POST", "/objects/review", { review }), arguments_.json);
+      return;
+    }
+    if (arguments_.command === "milestone-observe") {
+      const review = await readJsonInputFile(arguments_.reviewFile!);
+      print(await controlRequest(state, "POST", "/milestones/observe", { review }), arguments_.json);
+      return;
+    }
+    if (arguments_.command === "milestone-summary") {
+      print(await controlRequest(state, "GET", "/milestones/summary"), arguments_.json);
       return;
     }
     if (arguments_.command === "object-archive") {

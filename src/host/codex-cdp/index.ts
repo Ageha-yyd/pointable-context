@@ -49,6 +49,15 @@ export {
   type WorkspaceLookupCallbackOptions,
 } from "./workspace-lookup.js";
 export {
+  MILESTONE_OBSERVATION_MAX_BYTES,
+  MILESTONE_OBSERVATION_MAX_EVENTS,
+  MilestoneObservationLedger,
+  milestoneObservationContextSha256,
+  type MilestoneObservationEvent,
+  type MilestoneObservationInput,
+  type MilestoneObservationSummary,
+} from "./milestone-observation.js";
+export {
   createWorkspaceCompanion,
   type CodexDesktopCompatibilityGate,
   type CodexDesktopCompatibilityStatus,

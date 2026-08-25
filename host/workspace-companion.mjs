@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 // src/host/codex-cdp/workspace-companion-cli.ts
-import { randomBytes as randomBytes4, randomUUID as randomUUID5, timingSafeEqual as timingSafeEqual2 } from "node:crypto";
+import { randomBytes as randomBytes4, randomUUID as randomUUID6, timingSafeEqual as timingSafeEqual2 } from "node:crypto";
 import { closeSync, existsSync, openSync } from "node:fs";
-import { mkdir as mkdir3, open as open4, readFile as readFile3, rename as rename3, rm, stat as stat6, writeFile as writeFile3 } from "node:fs/promises";
+import { mkdir as mkdir4, open as open5, readFile as readFile4, rename as rename4, rm as rm2, stat as stat7, writeFile as writeFile3 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname as dirname4, isAbsolute as isAbsolute4, join as join3, resolve as resolve8 } from "node:path";
+import { dirname as dirname5, isAbsolute as isAbsolute5, join as join3, resolve as resolve9 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer, request as httpRequest } from "node:http";
 import { spawn } from "node:child_process";
@@ -334,7 +334,7 @@ function validateIdentityRecordForRuntime(raw) {
   if (schemaVersion !== "1.0") {
     throw new ContractError("identity.schemaVersion must be 1.0");
   }
-  const record8 = {
+  const record9 = {
     schemaVersion,
     scope: contextScopeValue(value.scope, "identity.scope"),
     entityId: semanticStringValue(value.entityId, "identity.entityId"),
@@ -351,31 +351,31 @@ function validateIdentityRecordForRuntime(raw) {
     deleted: booleanValue(value.deleted, "identity.deleted")
   };
   if (value.canonicalKey !== void 0) {
-    record8.canonicalKey = semanticStringValue(value.canonicalKey, "identity.canonicalKey");
+    record9.canonicalKey = semanticStringValue(value.canonicalKey, "identity.canonicalKey");
   }
-  assertUtf8Budget(record8, MAX_IDENTITY_BUDGET_BYTES, "identity");
-  return record8;
+  assertUtf8Budget(record9, MAX_IDENTITY_BUDGET_BYTES, "identity");
+  return record9;
 }
-function searchableIdentityTerms(record8) {
-  const terms = [record8.entityId, record8.canonicalName, ...record8.aliases];
-  if (record8.canonicalKey !== void 0) {
-    terms.push(record8.canonicalKey);
+function searchableIdentityTerms(record9) {
+  const terms = [record9.entityId, record9.canonicalName, ...record9.aliases];
+  if (record9.canonicalKey !== void 0) {
+    terms.push(record9.canonicalKey);
   }
   return terms;
 }
-function addContextIndexBudget(state, record8, selection, normalizedSelection) {
-  state.aliases += record8.aliases.length;
+function addContextIndexBudget(state, record9, selection, normalizedSelection) {
+  state.aliases += record9.aliases.length;
   if (state.aliases > CONTEXT_INDEX_LIMITS.aliases) {
     throw new ContractError("context index exceeds the aggregate alias bound");
   }
-  state.utf8Bytes += Buffer2.byteLength(JSON.stringify(record8), "utf8") + 1;
+  state.utf8Bytes += Buffer2.byteLength(JSON.stringify(record9), "utf8") + 1;
   if (state.utf8Bytes > CONTEXT_INDEX_LIMITS.utf8Bytes) {
     throw new ContractError("context index exceeds the aggregate UTF-8 bound");
   }
   if (selection === void 0 || normalizedSelection === void 0) {
     return;
   }
-  for (const term of searchableIdentityTerms(record8)) {
+  for (const term of searchableIdentityTerms(record9)) {
     const normalizedTerm2 = normalizeText(term);
     state.resolutionWorkUnits += selection.length + term.length + 1 + normalizedSelection.length + normalizedTerm2.length + 1;
     if (state.resolutionWorkUnits > CONTEXT_INDEX_LIMITS.resolutionWorkUnits) {
@@ -407,24 +407,24 @@ function validateContextIndex(rawRecords, expectedScope, parser, selection) {
   const entityIds = /* @__PURE__ */ new Set();
   const canonicalKeys = /* @__PURE__ */ new Set();
   for (let index = 0; index < rawRecords.length; index += 1) {
-    const record8 = parser(rawRecords[index], expectedScope);
-    if (!sameContextScope(record8.scope, expectedScope)) {
+    const record9 = parser(rawRecords[index], expectedScope);
+    if (!sameContextScope(record9.scope, expectedScope)) {
       throw new ContractError("context index contains a cross-scope record");
     }
-    const entityId = normalizeText(record8.entityId);
+    const entityId = normalizeText(record9.entityId);
     if (entityIds.has(entityId)) {
       throw new ContractError("context index contains a duplicate entity identity");
     }
     entityIds.add(entityId);
-    if (record8.canonicalKey !== void 0) {
-      const canonicalKey = normalizeText(record8.canonicalKey);
+    if (record9.canonicalKey !== void 0) {
+      const canonicalKey = normalizeText(record9.canonicalKey);
       if (canonicalKeys.has(canonicalKey)) {
         throw new ContractError("context index contains a duplicate canonical key");
       }
       canonicalKeys.add(canonicalKey);
     }
-    addContextIndexBudget(state, record8, selection, normalizedSelection);
-    records.push(record8);
+    addContextIndexBudget(state, record9, selection, normalizedSelection);
+    records.push(record9);
   }
   return records;
 }
@@ -449,11 +449,11 @@ function assertContextIndexResolutionBudget(records, selection) {
     resolutionWorkUnits: 0
   };
   const normalizedSelection = normalizeText(selection);
-  for (const record8 of records) {
-    if (!Array.isArray(record8.aliases)) {
+  for (const record9 of records) {
+    if (!Array.isArray(record9.aliases)) {
       throw new ContractError("context index aliases must be an array");
     }
-    addContextIndexBudget(state, record8, selection, normalizedSelection);
+    addContextIndexBudget(state, record9, selection, normalizedSelection);
   }
 }
 function parseSourceRef(raw, index, style) {
@@ -3039,7 +3039,7 @@ async function readBoundedResponseText(response, maximumBytes, signal) {
 }
 function awaitWithAbort(promise, signal) {
   if (signal.aborted) return Promise.reject(signal.reason);
-  return new Promise((resolve9, reject) => {
+  return new Promise((resolve10, reject) => {
     const aborted = () => {
       cleanup();
       reject(signal.reason);
@@ -3049,7 +3049,7 @@ function awaitWithAbort(promise, signal) {
     promise.then(
       (value) => {
         cleanup();
-        resolve9(value);
+        resolve10(value);
       },
       (error) => {
         cleanup();
@@ -3202,7 +3202,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
   } catch {
     throw new CdpTransportError("cdp_connect_failed", "CDP websocket failed");
   }
-  await new Promise((resolve9, reject) => {
+  await new Promise((resolve10, reject) => {
     const timer = setTimeout(() => {
       cleanup();
       socket.close();
@@ -3216,7 +3216,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
     };
     const opened = () => {
       cleanup();
-      resolve9();
+      resolve10();
     };
     const failed = () => {
       cleanup();
@@ -3339,7 +3339,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
         closeForProtocolError(error, 1009);
         return Promise.reject(error);
       }
-      return new Promise((resolve9, reject) => {
+      return new Promise((resolve10, reject) => {
         const timer = setTimeout(() => {
           pending.delete(id);
           reject(
@@ -3349,7 +3349,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
             )
           );
         }, timeoutMs);
-        pending.set(id, { resolve: resolve9, reject, timer });
+        pending.set(id, { resolve: resolve10, reject, timer });
         try {
           socket.send(serialized);
         } catch (error) {
@@ -3502,7 +3502,7 @@ function lookupError(code, message, retryable) {
   return { kind: "error", code, message, retryable };
 }
 function boundedLookup(callback, timeoutMs, controller) {
-  return new Promise((resolve9, reject) => {
+  return new Promise((resolve10, reject) => {
     let settled = false;
     const timer = setTimeout(() => {
       if (settled) return;
@@ -3515,7 +3515,7 @@ function boundedLookup(callback, timeoutMs, controller) {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        resolve9(value);
+        resolve10(value);
       },
       (error) => {
         if (settled) return;
@@ -3530,7 +3530,7 @@ function waitForMainContext(attachment, signal, timeoutMs = 2e3) {
   if (attachment.mainExecutionContextId !== void 0) {
     return Promise.resolve(attachment.mainExecutionContextId);
   }
-  return new Promise((resolve9, reject) => {
+  return new Promise((resolve10, reject) => {
     let settled = false;
     let timer;
     const cleanup = () => {
@@ -3542,7 +3542,7 @@ function waitForMainContext(attachment, signal, timeoutMs = 2e3) {
       if (settled) return;
       settled = true;
       cleanup();
-      resolve9(contextId);
+      resolve10(contextId);
     };
     const aborted = () => {
       if (settled) return;
@@ -3566,7 +3566,7 @@ function connectWithAbort(connectionPromise, signal) {
     connectionPromise.then((connection) => connection.close(), () => void 0);
     return Promise.reject(signal.reason);
   }
-  return new Promise((resolve9, reject) => {
+  return new Promise((resolve10, reject) => {
     let settled = false;
     const aborted = () => {
       if (settled) return;
@@ -3583,7 +3583,7 @@ function connectWithAbort(connectionPromise, signal) {
         }
         settled = true;
         signal.removeEventListener("abort", aborted);
-        resolve9(connection);
+        resolve10(connection);
       },
       (error) => {
         if (settled) return;
@@ -6199,19 +6199,19 @@ import {
 import { performance as performance2 } from "node:perf_hooks";
 
 // src/resolver.ts
-function toCandidate(record8, attempt) {
+function toCandidate(record9, attempt) {
   const match = {
-    scope: copyContextScope(record8.scope),
-    entityId: record8.entityId,
-    entityType: record8.entityType,
-    label: record8.canonicalName,
-    summary: record8.summary,
+    scope: copyContextScope(record9.scope),
+    entityId: record9.entityId,
+    entityType: record9.entityType,
+    label: record9.canonicalName,
+    summary: record9.summary,
     matchKind: attempt.kind,
-    indexRevision: record8.indexRevision,
-    indexedAt: record8.indexedAt,
+    indexRevision: record9.indexRevision,
+    indexedAt: record9.indexedAt,
     detailFreshness: "unknown"
   };
-  return { match, record: record8 };
+  return { match, record: record9 };
 }
 function deduplicateAndSort(candidates2) {
   const byEntity = /* @__PURE__ */ new Map();
@@ -6222,8 +6222,8 @@ function deduplicateAndSort(candidates2) {
     (left, right) => left.record.entityId.localeCompare(right.record.entityId, "en")
   );
 }
-function exactIdMatch(selection, record8) {
-  const keys = [record8.canonicalKey, record8.entityId].filter(
+function exactIdMatch(selection, record9) {
+  const keys = [record9.canonicalKey, record9.entityId].filter(
     (value) => Boolean(value)
   );
   for (const key of keys) {
@@ -6234,12 +6234,12 @@ function exactIdMatch(selection, record8) {
   }
   return void 0;
 }
-function exactNameMatch(selection, record8) {
-  const matchedText = findLiteralPhrase(selection, record8.canonicalName);
+function exactNameMatch(selection, record9) {
+  const matchedText = findLiteralPhrase(selection, record9.canonicalName);
   return matchedText ? { kind: "exact_name", matchedText } : void 0;
 }
-function exactAliasMatch(selection, record8) {
-  for (const alias of record8.aliases) {
+function exactAliasMatch(selection, record9) {
+  for (const alias of record9.aliases) {
     const matchedText = findLiteralPhrase(selection, alias);
     if (matchedText) {
       return { kind: "exact_alias", matchedText };
@@ -6247,12 +6247,12 @@ function exactAliasMatch(selection, record8) {
   }
   return void 0;
 }
-function normalizedMatch(normalizedSelection, record8) {
+function normalizedMatch(normalizedSelection, record9) {
   const values = [
-    record8.canonicalKey,
-    record8.entityId,
-    record8.canonicalName,
-    ...record8.aliases
+    record9.canonicalKey,
+    record9.entityId,
+    record9.canonicalName,
+    ...record9.aliases
   ].filter((value) => Boolean(value));
   for (const value of values) {
     const normalizedValue = normalizeText(value);
@@ -6296,20 +6296,20 @@ function route(candidates2) {
 function resolveSelection(scope, selection, records) {
   assertContextIndexResolutionBudget(records, selection);
   const scoped = records.filter(
-    (record8) => sameContextScope(record8.scope, scope) && !record8.deleted
+    (record9) => sameContextScope(record9.scope, scope) && !record9.deleted
   );
   const normalizedSelection = normalizeText(selection);
   const layers = [
     exactIdMatch,
     exactNameMatch,
     exactAliasMatch,
-    (_selection, record8) => normalizedMatch(normalizedSelection, record8)
+    (_selection, record9) => normalizedMatch(normalizedSelection, record9)
   ];
   for (const matchLayer of layers) {
     const candidates2 = deduplicateAndSort(
-      scoped.flatMap((record8) => {
-        const attempt = matchLayer(selection, record8);
-        return attempt ? [toCandidate(record8, attempt)] : [];
+      scoped.flatMap((record9) => {
+        const attempt = matchLayer(selection, record9);
+        return attempt ? [toCandidate(record9, attempt)] : [];
       })
     );
     if (candidates2.length > 0) {
@@ -6513,7 +6513,7 @@ function interruptionOutcome(error) {
   return void 0;
 }
 function runBounded(operationName, operation, callerSignal, timeoutMs) {
-  return new Promise((resolve9, reject) => {
+  return new Promise((resolve10, reject) => {
     const controller = new AbortController();
     const deadlineAt = performance2.now() + timeoutMs;
     let settled = false;
@@ -6530,7 +6530,7 @@ function runBounded(operationName, operation, callerSignal, timeoutMs) {
       }
       settled = true;
       cleanup();
-      resolve9(value);
+      resolve10(value);
     };
     const settleFailure = (error) => {
       if (settled) return;
@@ -6872,11 +6872,11 @@ var LookupService = class {
     if (!/^[A-Za-z0-9:_-]{8,128}$/u.test(intent.activationNonce)) {
       return blocked("invalid_activation");
     }
-    const record8 = this.#activations.get(intent.activationNonce);
-    if (!record8 || record8.activatedAt !== intent.activatedAt) {
+    const record9 = this.#activations.get(intent.activationNonce);
+    if (!record9 || record9.activatedAt !== intent.activatedAt) {
       return blocked("invalid_activation");
     }
-    if (record8.state === "consumed") {
+    if (record9.state === "consumed") {
       return blocked("replayed_activation");
     }
     const presented = this.#activationDigest(
@@ -6884,15 +6884,15 @@ var LookupService = class {
       hostContext,
       intent.chosenEntityId
     );
-    if (presented.length !== record8.digest.length || !timingSafeEqual(presented, record8.digest)) {
+    if (presented.length !== record9.digest.length || !timingSafeEqual(presented, record9.digest)) {
       return blocked("invalid_activation");
     }
-    record8.state = "consumed";
+    record9.state = "consumed";
     return void 0;
   }
   #pruneActivations(now) {
-    for (const [nonce, record8] of this.#activations) {
-      if (now - record8.activatedAt > this.#nonceTtlMs) {
+    for (const [nonce, record9] of this.#activations) {
+      if (now - record9.activatedAt > this.#nonceTtlMs) {
         this.#activations.delete(nonce);
       }
     }
@@ -7541,14 +7541,14 @@ function normalizedTerm(value) {
 function usableTerm(value) {
   return value === value.trim() && value.length >= 3 && value.length <= 256 && !/[\p{Cc}\p{Cf}]/u.test(value);
 }
-function objectKey(record8) {
-  return createHash8("sha256").update(record8.scope.kind, "utf8").update("\0", "utf8").update(record8.scope.namespace, "utf8").update("\0", "utf8").update(record8.scope.id, "utf8").update("\0", "utf8").update(record8.entityId, "utf8").digest("hex");
+function objectKey(record9) {
+  return createHash8("sha256").update(record9.scope.kind, "utf8").update("\0", "utf8").update(record9.scope.namespace, "utf8").update("\0", "utf8").update(record9.scope.id, "utf8").update("\0", "utf8").update(record9.entityId, "utf8").digest("hex");
 }
-function recordTerms(record8) {
+function recordTerms(record9) {
   const values = [
-    { term: record8.canonicalName, bonus: 4 },
-    ...record8.canonicalKey === void 0 ? [] : [{ term: record8.canonicalKey, bonus: 2 }],
-    ...record8.aliases.map((term) => ({ term, bonus: 0 }))
+    { term: record9.canonicalName, bonus: 4 },
+    ...record9.canonicalKey === void 0 ? [] : [{ term: record9.canonicalKey, bonus: 2 }],
+    ...record9.aliases.map((term) => ({ term, bonus: 0 }))
   ];
   const seen = /* @__PURE__ */ new Set();
   return values.filter(({ term }) => {
@@ -7564,18 +7564,18 @@ function buildWorkspaceAnnotationCatalog(records, bindingRevision, contextFinger
     throw new RangeError("maxAnnotations must be an integer from 1 to 256");
   }
   const byTerm = /* @__PURE__ */ new Map();
-  for (const record8 of records) {
-    if (record8.deleted) continue;
-    for (const term of recordTerms(record8)) {
+  for (const record9 of records) {
+    if (record9.deleted) continue;
+    for (const term of recordTerms(record9)) {
       const normalized = normalizedTerm(term.term);
       const bucket = byTerm.get(normalized) ?? [];
-      bucket.push({ record: record8, term: term.term, bonus: term.bonus });
+      bucket.push({ record: record9, term: term.term, bonus: term.bonus });
       byTerm.set(normalized, bucket);
     }
   }
   const entries = [];
   for (const bucket of byTerm.values()) {
-    const objectIds = new Set(bucket.map(({ record: record8 }) => record8.entityId));
+    const objectIds = new Set(bucket.map(({ record: record9 }) => record9.entityId));
     if (objectIds.size !== 1) continue;
     const candidate = bucket[0];
     if (candidate === void 0) continue;
@@ -7662,10 +7662,439 @@ function createWorkspaceAnnotationProvider(options) {
   };
 }
 
-// src/host/codex-cdp/task-object-registry.ts
+// src/host/codex-cdp/milestone-observation.ts
 import { createHash as createHash9, randomUUID as randomUUID4 } from "node:crypto";
-import { mkdir as mkdir2, readFile as readFile2, rename as rename2, stat as stat5, writeFile as writeFile2 } from "node:fs/promises";
-import { dirname as dirname3, isAbsolute as isAbsolute3, resolve as resolve7 } from "node:path";
+import { lstat, mkdir as mkdir2, open as open4, readFile as readFile2, realpath as realpath5, rename as rename2, rm, stat as stat5 } from "node:fs/promises";
+import { basename as basename6, dirname as dirname3, isAbsolute as isAbsolute3, relative as relative4, resolve as resolve7, sep as sep4 } from "node:path";
+var MILESTONE_OBSERVATION_MAX_EVENTS = 512;
+var MILESTONE_OBSERVATION_MAX_BYTES = 4 * 1024 * 1024;
+var MAX_RECURRING_NEEDS = 32;
+function record7(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function exactKeys3(value, expected) {
+  const actual = Object.keys(value).sort();
+  const sortedExpected = [...expected].sort();
+  return actual.length === expected.length && actual.every((key, index) => key === sortedExpected[index]);
+}
+function sha2563(value) {
+  return createHash9("sha256").update(value, "utf8").digest("hex");
+}
+function isSha256(value) {
+  return typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
+}
+function integer(value, maximum = Number.MAX_SAFE_INTEGER) {
+  return Number.isSafeInteger(value) && Number(value) >= 0 && Number(value) <= maximum;
+}
+function rate(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
+}
+function isIsoTime(value) {
+  return typeof value === "string" && value.length <= 64 && Number.isFinite(Date.parse(value));
+}
+var entityTypes = /* @__PURE__ */ new Set([
+  "concept",
+  "change",
+  "decision",
+  "task",
+  "verification",
+  "module",
+  "document",
+  "configuration",
+  "file"
+]);
+var needKinds = /* @__PURE__ */ new Set([
+  "understand",
+  "resume",
+  "handoff",
+  "decision",
+  "status",
+  "verification"
+]);
+var needStates = /* @__PURE__ */ new Set([
+  "available",
+  "missing",
+  "ambiguous",
+  "type_mismatch"
+]);
+function parseNeed(value) {
+  if (!record7(value) || !exactKeys3(value, [
+    "termSha256",
+    "expectedEntityType",
+    "needKind",
+    "state",
+    "matchCount",
+    "candidateTypes",
+    "source"
+  ]) || !isSha256(value.termSha256) || !entityTypes.has(value.expectedEntityType) || !needKinds.has(value.needKind) || !needStates.has(value.state) || !integer(value.matchCount, 2048) || !Array.isArray(value.candidateTypes) || value.candidateTypes.length > 9 || !value.candidateTypes.every((item) => typeof item === "string" && item.length <= 32) || value.source !== null && value.source !== "workspace" && value.source !== "task_local") {
+    throw new Error("milestone_observation_event_invalid");
+  }
+  return Object.freeze({
+    termSha256: value.termSha256,
+    expectedEntityType: value.expectedEntityType,
+    needKind: value.needKind,
+    state: value.state,
+    matchCount: value.matchCount,
+    candidateTypes: Object.freeze([...value.candidateTypes]),
+    source: value.source
+  });
+}
+function parseReview(value) {
+  const keys = [
+    "needCount",
+    "available",
+    "missing",
+    "ambiguous",
+    "typeMismatch",
+    "availabilityRate",
+    "omissionRate",
+    "resolutionFailureRate"
+  ];
+  if (!record7(value) || !exactKeys3(value, keys) || !integer(value.needCount, 32) || !integer(value.available, 32) || !integer(value.missing, 32) || !integer(value.ambiguous, 32) || !integer(value.typeMismatch, 32) || !rate(value.availabilityRate) || !rate(value.omissionRate) || !rate(value.resolutionFailureRate) || Number(value.available) + Number(value.missing) + Number(value.ambiguous) + Number(value.typeMismatch) !== Number(value.needCount)) {
+    throw new Error("milestone_observation_event_invalid");
+  }
+  return Object.freeze({ ...value });
+}
+function parseCuration(value) {
+  const countKeys = [
+    "currentTaskRecords",
+    "activePartials",
+    "activeStableOverlaps",
+    "activeAmbiguousOverlaps",
+    "terminalUnmatched",
+    "terminalArchiveReady",
+    "terminalAmbiguous"
+  ];
+  if (!record7(value) || !exactKeys3(value, [...countKeys, "stableOverlapRate", "registrySnapshotSha256"]) || !countKeys.every((key) => integer(value[key], 1024)) || !rate(value.stableOverlapRate) || !isSha256(value.registrySnapshotSha256)) {
+    throw new Error("milestone_observation_event_invalid");
+  }
+  return Object.freeze({ ...value });
+}
+function parseCapacity(value) {
+  const keys = [
+    "active",
+    "terminal",
+    "currentTaskRecords",
+    "registryRecords",
+    "archivedRecords",
+    "warnings"
+  ];
+  if (!record7(value) || !exactKeys3(value, keys) || !integer(value.active, 256) || !integer(value.terminal, 1024) || !integer(value.currentTaskRecords, 1024) || !integer(value.registryRecords, 1024) || !integer(value.archivedRecords, 8192) || Number(value.active) + Number(value.terminal) !== Number(value.currentTaskRecords) || !Array.isArray(value.warnings) || value.warnings.length > 1 || !value.warnings.every((item) => item === "active_soft_limit_reached")) {
+    throw new Error("milestone_observation_event_invalid");
+  }
+  return Object.freeze({
+    ...value,
+    warnings: Object.freeze([...value.warnings])
+  });
+}
+function unsignedEvent(event) {
+  return {
+    schemaVersion: 1,
+    eventId: event.eventId,
+    observedAt: event.observedAt,
+    milestoneSha256: event.milestoneSha256,
+    contextSha256: event.contextSha256,
+    bindingSha256: event.bindingSha256,
+    indexSnapshot: event.indexSnapshot,
+    review: event.review,
+    needs: event.needs,
+    curation: event.curation,
+    capacity: event.capacity,
+    previousEventSha256: event.previousEventSha256
+  };
+}
+function parseEvent(value) {
+  const keys = [
+    "schemaVersion",
+    "eventId",
+    "observedAt",
+    "milestoneSha256",
+    "contextSha256",
+    "bindingSha256",
+    "indexSnapshot",
+    "review",
+    "needs",
+    "curation",
+    "capacity",
+    "previousEventSha256",
+    "eventSha256"
+  ];
+  if (!record7(value) || !exactKeys3(value, keys) || value.schemaVersion !== 1 || typeof value.eventId !== "string" || !/^[a-f0-9-]{36}$/u.test(value.eventId) || !isIsoTime(value.observedAt) || !isSha256(value.milestoneSha256) || !isSha256(value.contextSha256) || !isSha256(value.bindingSha256) || typeof value.indexSnapshot !== "string" || !/^context-index:[a-f0-9]{64}$/u.test(value.indexSnapshot) || !Array.isArray(value.needs) || value.needs.length < 1 || value.needs.length > 32 || value.previousEventSha256 !== null && !isSha256(value.previousEventSha256) || !isSha256(value.eventSha256)) {
+    throw new Error("milestone_observation_event_invalid");
+  }
+  const event = Object.freeze({
+    schemaVersion: 1,
+    eventId: value.eventId,
+    observedAt: value.observedAt,
+    milestoneSha256: value.milestoneSha256,
+    contextSha256: value.contextSha256,
+    bindingSha256: value.bindingSha256,
+    indexSnapshot: value.indexSnapshot,
+    review: parseReview(value.review),
+    needs: Object.freeze(value.needs.map(parseNeed)),
+    curation: parseCuration(value.curation),
+    capacity: parseCapacity(value.capacity),
+    previousEventSha256: value.previousEventSha256,
+    eventSha256: value.eventSha256
+  });
+  if (event.needs.length !== event.review.needCount) {
+    throw new Error("milestone_observation_event_invalid");
+  }
+  if (sha2563(JSON.stringify(unsignedEvent(event))) !== event.eventSha256) {
+    throw new Error("milestone_observation_digest_invalid");
+  }
+  return event;
+}
+function parseDocument2(value) {
+  if (!record7(value) || !exactKeys3(value, ["schemaVersion", "events"]) || value.schemaVersion !== 1 || !Array.isArray(value.events) || value.events.length > MILESTONE_OBSERVATION_MAX_EVENTS) {
+    throw new Error("milestone_observation_ledger_invalid");
+  }
+  const events = value.events.map(parseEvent);
+  if (new Set(events.map((event) => event.eventId)).size !== events.length) {
+    throw new Error("milestone_observation_ledger_invalid");
+  }
+  for (let index = 0; index < events.length; index += 1) {
+    const expected = index === 0 ? null : events[index - 1].eventSha256;
+    if (events[index].previousEventSha256 !== expected) {
+      throw new Error("milestone_observation_chain_invalid");
+    }
+  }
+  return { schemaVersion: 1, events };
+}
+function milestoneObservationContextSha256(task, binding) {
+  return sha2563(JSON.stringify({
+    host: task.host,
+    threadRef: codexTaskThreadRef(task),
+    routeRef: task.routeRef,
+    contextFingerprint: task.contextFingerprint,
+    scope: binding.scope,
+    workspaceRoot: binding.workspaceRoot,
+    providerId: binding.providerId
+  }));
+}
+function registrySnapshotSha256(audit) {
+  return sha2563(JSON.stringify(audit.items.map((item) => ({
+    objectKey: item.objectKey,
+    entityType: item.entityType,
+    lifecycle: item.lifecycle,
+    state: item.state,
+    stableMatchCount: item.stableMatchCount
+  })).sort((left, right) => left.objectKey.localeCompare(right.objectKey))));
+}
+function candidatePathIsInside(root, candidate) {
+  const value = relative4(root, candidate);
+  return value === "" || !value.startsWith(`..${sep4}`) && value !== "..";
+}
+var MilestoneObservationLedger = class {
+  path;
+  #mutation = Promise.resolve();
+  constructor(path) {
+    if (!isAbsolute3(path)) throw new TypeError("milestone observation path must be absolute");
+    this.path = resolve7(path);
+  }
+  async #privatePath(workspaceRoot) {
+    await mkdir2(dirname3(this.path), { recursive: true, mode: 448 });
+    const [workspace, parent] = await Promise.all([
+      realpath5(workspaceRoot),
+      realpath5(dirname3(this.path))
+    ]);
+    const candidate = resolve7(parent, basename6(this.path));
+    if (candidatePathIsInside(workspace, candidate)) {
+      throw new Error("milestone_observation_ledger_must_be_private");
+    }
+    const existing = await lstat(candidate).catch((error) => {
+      if (error.code === "ENOENT") return void 0;
+      throw error;
+    });
+    if (existing?.isSymbolicLink()) throw new Error("milestone_observation_ledger_symlink_rejected");
+    return candidate;
+  }
+  async #read(path) {
+    const info = await stat5(path).catch((error) => {
+      if (error.code === "ENOENT") return void 0;
+      throw error;
+    });
+    if (info === void 0) return { schemaVersion: 1, events: [] };
+    if (!info.isFile() || info.size > MILESTONE_OBSERVATION_MAX_BYTES) {
+      throw new Error("milestone_observation_ledger_invalid");
+    }
+    try {
+      return parseDocument2(JSON.parse(await readFile2(path, "utf8")));
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("milestone_observation_")) throw error;
+      throw new Error("milestone_observation_ledger_invalid");
+    }
+  }
+  async #write(path, document2) {
+    const body = `${JSON.stringify(document2, null, 2)}
+`;
+    if (Buffer.byteLength(body, "utf8") > MILESTONE_OBSERVATION_MAX_BYTES) {
+      throw new Error("milestone_observation_ledger_full");
+    }
+    const temporary = `${path}.${process.pid}.${randomUUID4()}.tmp`;
+    const handle = await open4(temporary, "wx", 384);
+    try {
+      await handle.writeFile(body, "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    try {
+      await rename2(temporary, path);
+    } catch (error) {
+      await rm(temporary, { force: true }).catch(() => void 0);
+      throw error;
+    }
+  }
+  async #exclusive(operation) {
+    const previous = this.#mutation;
+    let release;
+    this.#mutation = new Promise((resolveMutation) => {
+      release = resolveMutation;
+    });
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
+  }
+  async record(input) {
+    return await this.#exclusive(async () => {
+      const path = await this.#privatePath(input.binding.workspaceRoot);
+      const document2 = await this.#read(path);
+      if (document2.events.length >= MILESTONE_OBSERVATION_MAX_EVENTS) {
+        throw new Error("milestone_observation_ledger_full");
+      }
+      const previousEventSha256 = document2.events.at(-1)?.eventSha256 ?? null;
+      const review = Object.freeze({
+        needCount: input.review.needCount,
+        available: input.review.available,
+        missing: input.review.missing,
+        ambiguous: input.review.ambiguous,
+        typeMismatch: input.review.typeMismatch,
+        availabilityRate: input.review.availabilityRate,
+        omissionRate: input.review.omissionRate,
+        resolutionFailureRate: input.review.resolutionFailureRate
+      });
+      const needs = input.review.items.map((item) => Object.freeze({
+        termSha256: sha2563(item.term.normalize("NFKC").trim().toLocaleLowerCase("en-US")),
+        expectedEntityType: item.expectedEntityType,
+        needKind: item.needKind,
+        state: item.state,
+        matchCount: item.matchCount,
+        candidateTypes: Object.freeze([...item.candidateTypes]),
+        source: item.source ?? null
+      }));
+      const curation = Object.freeze({
+        currentTaskRecords: input.audit.currentTaskRecords,
+        activePartials: input.audit.activePartials,
+        activeStableOverlaps: input.audit.activeStableOverlaps,
+        activeAmbiguousOverlaps: input.audit.activeAmbiguousOverlaps,
+        terminalUnmatched: input.audit.terminalUnmatched,
+        terminalArchiveReady: input.audit.terminalArchiveReady,
+        terminalAmbiguous: input.audit.terminalAmbiguous,
+        stableOverlapRate: input.audit.stableOverlapRate,
+        registrySnapshotSha256: registrySnapshotSha256(input.audit)
+      });
+      const capacity = Object.freeze({
+        active: input.inventory.capacity.active,
+        terminal: input.inventory.capacity.terminal,
+        currentTaskRecords: input.inventory.capacity.currentTaskRecords,
+        registryRecords: input.inventory.capacity.registryRecords,
+        archivedRecords: input.inventory.capacity.archivedRecords,
+        warnings: Object.freeze([...input.inventory.capacity.warnings])
+      });
+      const unsigned = {
+        schemaVersion: 1,
+        eventId: randomUUID4(),
+        observedAt: input.review.observedAt,
+        milestoneSha256: sha2563(input.review.milestoneKey),
+        contextSha256: milestoneObservationContextSha256(input.task, input.binding),
+        bindingSha256: sha2563(input.binding.bindingRevision),
+        indexSnapshot: input.review.indexSnapshot,
+        review,
+        needs: Object.freeze(needs),
+        curation,
+        capacity,
+        previousEventSha256
+      };
+      const event = Object.freeze({
+        ...unsigned,
+        eventSha256: sha2563(JSON.stringify(unsigned))
+      });
+      parseEvent(event);
+      document2.events.push(event);
+      await this.#write(path, document2);
+      return event;
+    });
+  }
+  async summary(task, binding) {
+    return await this.#exclusive(async () => {
+      const path = await this.#privatePath(binding.workspaceRoot);
+      const contextSha256 = milestoneObservationContextSha256(task, binding);
+      const events = (await this.#read(path)).events.filter(
+        (event) => event.contextSha256 === contextSha256
+      );
+      const recurring = /* @__PURE__ */ new Map();
+      let available = 0;
+      let missing = 0;
+      let ambiguous = 0;
+      let typeMismatch = 0;
+      let taskLocalAvailable = 0;
+      let workspaceAvailable = 0;
+      for (const event of events) {
+        available += event.review.available;
+        missing += event.review.missing;
+        ambiguous += event.review.ambiguous;
+        typeMismatch += event.review.typeMismatch;
+        for (const need of event.needs) {
+          if (need.state === "available" && need.source === "task_local") taskLocalAvailable += 1;
+          if (need.state === "available" && need.source === "workspace") workspaceAvailable += 1;
+          const current = recurring.get(need.termSha256) ?? {
+            termSha256: need.termSha256,
+            observations: 0,
+            available: 0,
+            missing: 0,
+            ambiguous: 0,
+            typeMismatch: 0
+          };
+          current.observations += 1;
+          if (need.state === "available") current.available += 1;
+          if (need.state === "missing") current.missing += 1;
+          if (need.state === "ambiguous") current.ambiguous += 1;
+          if (need.state === "type_mismatch") current.typeMismatch += 1;
+          recurring.set(need.termSha256, current);
+        }
+      }
+      const recurringNeeds = [...recurring.values()].filter((item) => item.observations > 1).sort((left, right) => right.observations - left.observations || left.termSha256.localeCompare(right.termSha256)).slice(0, MAX_RECURRING_NEEDS).map((item) => Object.freeze({ ...item }));
+      const first = events[0];
+      const latest = events.at(-1);
+      return Object.freeze({
+        schemaVersion: 1,
+        measurement: "private_milestone_observation",
+        eventCount: events.length,
+        milestoneCount: new Set(events.map((event) => event.milestoneSha256)).size,
+        firstObservedAt: first?.observedAt ?? null,
+        lastObservedAt: latest?.observedAt ?? null,
+        available,
+        missing,
+        ambiguous,
+        typeMismatch,
+        taskLocalAvailable,
+        workspaceAvailable,
+        latestCuration: latest?.curation ?? null,
+        recurringNeeds: Object.freeze(recurringNeeds),
+        latestEventSha256: latest?.eventSha256 ?? null
+      });
+    });
+  }
+};
+
+// src/host/codex-cdp/task-object-registry.ts
+import { createHash as createHash10, randomUUID as randomUUID5 } from "node:crypto";
+import { mkdir as mkdir3, readFile as readFile3, rename as rename3, stat as stat6, writeFile as writeFile2 } from "node:fs/promises";
+import { dirname as dirname4, isAbsolute as isAbsolute4, resolve as resolve8 } from "node:path";
 var TASK_OBJECT_PROVIDER_ID = "agent-task-context";
 var TASK_OBJECT_ENTITY_PREFIX = "task-object:";
 var REGISTRY_SCHEMA_VERSION2 = 1;
@@ -7680,7 +8109,7 @@ var MAX_CURATION_REVIEW_NEEDS = 32;
 function objectRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-function exactKeys3(value, expected) {
+function exactKeys4(value, expected) {
   return Reflect.ownKeys(value).every((key) => typeof key === "string") && Object.keys(value).sort().join("\0") === [...expected].sort().join("\0");
 }
 function boundedText5(value, name, minimum = 1, maximum = 1024) {
@@ -7720,12 +8149,12 @@ function curationNeedKind(value) {
   return value;
 }
 function parseTaskObjectCurationReviewInput(value) {
-  if (!objectRecord(value) || !exactKeys3(value, ["schemaVersion", "milestoneKey", "needs"]) || value.schemaVersion !== 1 || !Array.isArray(value.needs) || value.needs.length < 1 || value.needs.length > MAX_CURATION_REVIEW_NEEDS) {
+  if (!objectRecord(value) || !exactKeys4(value, ["schemaVersion", "milestoneKey", "needs"]) || value.schemaVersion !== 1 || !Array.isArray(value.needs) || value.needs.length < 1 || value.needs.length > MAX_CURATION_REVIEW_NEEDS) {
     throw new ContractError("task object curation review input is invalid");
   }
   const seen = /* @__PURE__ */ new Set();
   const needs = value.needs.map((rawNeed, index) => {
-    if (!objectRecord(rawNeed) || !exactKeys3(rawNeed, ["term", "expectedEntityType", "needKind"])) {
+    if (!objectRecord(rawNeed) || !exactKeys4(rawNeed, ["term", "expectedEntityType", "needKind"])) {
       throw new ContractError(`needs[${index}] is invalid`);
     }
     const term = boundedText5(rawNeed.term, `needs[${index}].term`, 2, 256);
@@ -7763,7 +8192,7 @@ function mentalModel(value, entityType) {
   }
   const text = (key) => boundedText5(value[key], `mentalModel.${key}`);
   if (entityType === "concept") {
-    if (!exactKeys3(value, ["kind", "meaning", "context", "boundary", "sequence", "evidence"])) {
+    if (!exactKeys4(value, ["kind", "meaning", "context", "boundary", "sequence", "evidence"])) {
       throw new ContractError("concept mentalModel fields are invalid");
     }
     if (!Array.isArray(value.sequence) || value.sequence.length < 2 || value.sequence.length > 4) {
@@ -7783,7 +8212,7 @@ function mentalModel(value, entityType) {
     };
   }
   if (entityType === "change") {
-    if (!exactKeys3(value, ["kind", "before", "after", "impact", "evidence"])) {
+    if (!exactKeys4(value, ["kind", "before", "after", "impact", "evidence"])) {
       throw new ContractError("change mentalModel fields are invalid");
     }
     return {
@@ -7795,7 +8224,7 @@ function mentalModel(value, entityType) {
     };
   }
   if (entityType === "decision") {
-    if (!exactKeys3(value, ["kind", "problem", "choice", "consequence", "evidence"])) {
+    if (!exactKeys4(value, ["kind", "problem", "choice", "consequence", "evidence"])) {
       throw new ContractError("decision mentalModel fields are invalid");
     }
     return {
@@ -7807,7 +8236,7 @@ function mentalModel(value, entityType) {
     };
   }
   if (entityType === "task") {
-    if (!exactKeys3(value, ["kind", "goal", "status", "completed", "next", "blocker", "evidence"])) {
+    if (!exactKeys4(value, ["kind", "goal", "status", "completed", "next", "blocker", "evidence"])) {
       throw new ContractError("task mentalModel fields are invalid");
     }
     return {
@@ -7820,7 +8249,7 @@ function mentalModel(value, entityType) {
       evidence: text("evidence")
     };
   }
-  if (!exactKeys3(value, ["kind", "claim", "result", "gap", "evidence"])) {
+  if (!exactKeys4(value, ["kind", "claim", "result", "gap", "evidence"])) {
     throw new ContractError("verification mentalModel fields are invalid");
   }
   return {
@@ -7832,7 +8261,7 @@ function mentalModel(value, entityType) {
   };
 }
 function parseTaskObjectInput(value) {
-  if (!objectRecord(value) || !exactKeys3(value, [
+  if (!objectRecord(value) || !exactKeys4(value, [
     "schemaVersion",
     "objectKey",
     "entityType",
@@ -7867,11 +8296,11 @@ function scopeKey2(scope) {
   return `${scope.kind}\0${scope.namespace}\0${scope.id}`;
 }
 function entityIdFor(binding, task, key) {
-  const digest = createHash9("sha256").update(scopeKey2(binding.scope), "utf8").update("\0", "utf8").update(codexTaskThreadRef(task), "utf8").update("\0", "utf8").update(key, "utf8").digest("hex");
+  const digest = createHash10("sha256").update(scopeKey2(binding.scope), "utf8").update("\0", "utf8").update(codexTaskThreadRef(task), "utf8").update("\0", "utf8").update(key, "utf8").digest("hex");
   return `${TASK_OBJECT_ENTITY_PREFIX}${digest}`;
 }
 function revisionFor(input, lifecycle, replacement) {
-  return `task-object:${createHash9("sha256").update(JSON.stringify({ input, lifecycle, replacement: replacement ?? null }), "utf8").digest("hex")}`;
+  return `task-object:${createHash10("sha256").update(JSON.stringify({ input, lifecycle, replacement: replacement ?? null }), "utf8").digest("hex")}`;
 }
 function sameObjectIdentity(left, right) {
   return left.objectKey === right.objectKey && left.entityType === right.entityType && left.canonicalName === right.canonicalName && left.aliases.length === right.aliases.length && left.aliases.every((alias, index) => alias === right.aliases[index]);
@@ -7886,39 +8315,39 @@ function copyInput(input) {
     }
   };
 }
-function copyStored(record8) {
+function copyStored(record9) {
   return {
-    ...copyInput(record8),
-    scope: { ...record8.scope },
-    threadRef: record8.threadRef,
-    routeRef: record8.routeRef,
-    workspaceRoot: record8.workspaceRoot,
-    bindingRevision: record8.bindingRevision,
-    entityId: record8.entityId,
-    lifecycle: record8.lifecycle,
-    ...record8.replacedByObjectKey === void 0 ? {} : { replacedByObjectKey: record8.replacedByObjectKey },
-    createdAt: record8.createdAt,
-    updatedAt: record8.updatedAt,
-    entityRevision: record8.entityRevision
+    ...copyInput(record9),
+    scope: { ...record9.scope },
+    threadRef: record9.threadRef,
+    routeRef: record9.routeRef,
+    workspaceRoot: record9.workspaceRoot,
+    bindingRevision: record9.bindingRevision,
+    entityId: record9.entityId,
+    lifecycle: record9.lifecycle,
+    ...record9.replacedByObjectKey === void 0 ? {} : { replacedByObjectKey: record9.replacedByObjectKey },
+    createdAt: record9.createdAt,
+    updatedAt: record9.updatedAt,
+    entityRevision: record9.entityRevision
   };
 }
-function summary(record8) {
+function summary(record9) {
   return Object.freeze({
-    objectKey: record8.objectKey,
-    entityId: record8.entityId,
-    entityType: record8.entityType,
-    canonicalName: record8.canonicalName,
-    summary: record8.summary,
-    lifecycle: record8.lifecycle,
-    ...record8.replacedByObjectKey === void 0 ? {} : { replacedByObjectKey: record8.replacedByObjectKey },
-    updatedAt: record8.updatedAt,
-    entityRevision: record8.entityRevision
+    objectKey: record9.objectKey,
+    entityId: record9.entityId,
+    entityType: record9.entityType,
+    canonicalName: record9.canonicalName,
+    summary: record9.summary,
+    lifecycle: record9.lifecycle,
+    ...record9.replacedByObjectKey === void 0 ? {} : { replacedByObjectKey: record9.replacedByObjectKey },
+    updatedAt: record9.updatedAt,
+    entityRevision: record9.entityRevision
   });
 }
 function parseStored(value, index) {
   if (!objectRecord(value)) throw new ContractError(`task object record ${index} is invalid`);
   const optionalReplacement = value.replacedByObjectKey === void 0 ? [] : ["replacedByObjectKey"];
-  if (!exactKeys3(value, [
+  if (!exactKeys4(value, [
     "schemaVersion",
     "objectKey",
     "entityType",
@@ -7949,7 +8378,7 @@ function parseStored(value, index) {
     summary: value.summary,
     mentalModel: value.mentalModel
   });
-  if (!objectRecord(value.scope) || !exactKeys3(value.scope, ["kind", "namespace", "id"]) || value.scope.kind !== "workspace" || typeof value.scope.namespace !== "string" || typeof value.scope.id !== "string" || typeof value.workspaceRoot !== "string" || !isAbsolute3(value.workspaceRoot) || typeof value.bindingRevision !== "string" || !/^[a-f0-9]{64}$/u.test(value.bindingRevision) || typeof value.entityId !== "string" || !new RegExp(`^${TASK_OBJECT_ENTITY_PREFIX}[a-f0-9]{64}$`, "u").test(value.entityId) || value.lifecycle !== "active" && value.lifecycle !== "superseded" && value.lifecycle !== "retired" || typeof value.entityRevision !== "string" || !/^task-object:[a-f0-9]{64}$/u.test(value.entityRevision)) {
+  if (!objectRecord(value.scope) || !exactKeys4(value.scope, ["kind", "namespace", "id"]) || value.scope.kind !== "workspace" || typeof value.scope.namespace !== "string" || typeof value.scope.id !== "string" || typeof value.workspaceRoot !== "string" || !isAbsolute4(value.workspaceRoot) || typeof value.bindingRevision !== "string" || !/^[a-f0-9]{64}$/u.test(value.bindingRevision) || typeof value.entityId !== "string" || !new RegExp(`^${TASK_OBJECT_ENTITY_PREFIX}[a-f0-9]{64}$`, "u").test(value.entityId) || value.lifecycle !== "active" && value.lifecycle !== "superseded" && value.lifecycle !== "retired" || typeof value.entityRevision !== "string" || !/^task-object:[a-f0-9]{64}$/u.test(value.entityRevision)) {
     throw new ContractError(`task object record ${index} authority fields are invalid`);
   }
   const replacedByObjectKey = value.replacedByObjectKey === void 0 ? void 0 : objectKey2(value.replacedByObjectKey);
@@ -7965,7 +8394,7 @@ function parseStored(value, index) {
     },
     threadRef: boundedText5(value.threadRef, `records[${index}].threadRef`, 1, 768),
     routeRef: boundedText5(value.routeRef, `records[${index}].routeRef`, 1, 2048),
-    workspaceRoot: resolve7(value.workspaceRoot),
+    workspaceRoot: resolve8(value.workspaceRoot),
     bindingRevision: value.bindingRevision,
     entityId: value.entityId,
     lifecycle: value.lifecycle,
@@ -7976,19 +8405,19 @@ function parseStored(value, index) {
   };
 }
 function parseRecordsDocument(value, maximumRecords, invalidMessage) {
-  if (!objectRecord(value) || !exactKeys3(value, ["schemaVersion", "records"]) || value.schemaVersion !== REGISTRY_SCHEMA_VERSION2 || !Array.isArray(value.records) || value.records.length > maximumRecords) {
+  if (!objectRecord(value) || !exactKeys4(value, ["schemaVersion", "records"]) || value.schemaVersion !== REGISTRY_SCHEMA_VERSION2 || !Array.isArray(value.records) || value.records.length > maximumRecords) {
     throw new ContractError(invalidMessage);
   }
   const records = value.records.map(parseStored);
   const identities = /* @__PURE__ */ new Set();
-  for (const record8 of records) {
-    const identity2 = `${record8.threadRef}\0${record8.bindingRevision}\0${record8.objectKey}`;
+  for (const record9 of records) {
+    const identity2 = `${record9.threadRef}\0${record9.bindingRevision}\0${record9.objectKey}`;
     if (identities.has(identity2)) throw new ContractError("task object registry has duplicate identities");
     identities.add(identity2);
   }
   return { schemaVersion: 1, records };
 }
-function parseDocument2(value) {
+function parseDocument3(value) {
   return parseRecordsDocument(
     value,
     TASK_OBJECT_REGISTRY_MAX_RECORDS,
@@ -8010,76 +8439,76 @@ function documentBytes(document2) {
   return Buffer.byteLength(serializedDocument(document2), "utf8");
 }
 function archiveRevision(records) {
-  return `task-object-archive:${createHash9("sha256").update(records.map((record8) => `${record8.entityId}:${record8.entityRevision}`).sort().join("\n"), "utf8").digest("hex")}`;
+  return `task-object-archive:${createHash10("sha256").update(records.map((record9) => `${record9.entityId}:${record9.entityRevision}`).sort().join("\n"), "utf8").digest("hex")}`;
 }
 function contextIndexSnapshot(records) {
-  return `context-index:${createHash9("sha256").update(
-    records.filter((record8) => !record8.deleted).map((record8) => `${record8.entityId}\0${record8.entityType}\0${record8.indexRevision}`).sort().join("\n"),
+  return `context-index:${createHash10("sha256").update(
+    records.filter((record9) => !record9.deleted).map((record9) => `${record9.entityId}\0${record9.entityType}\0${record9.indexRevision}`).sort().join("\n"),
     "utf8"
   ).digest("hex")}`;
 }
 function normalizedIdentity(value) {
   return value.normalize("NFKC").toLocaleLowerCase("en-US");
 }
-function stableMatchesFor(record8, stableRecords) {
-  const name = normalizedIdentity(record8.canonicalName);
-  return stableRecords.filter((stable) => !stable.deleted && stable.authorityRef.provider !== TASK_OBJECT_PROVIDER_ID && stable.entityType === record8.entityType && normalizedIdentity(stable.canonicalName) === name);
+function stableMatchesFor(record9, stableRecords) {
+  const name = normalizedIdentity(record9.canonicalName);
+  return stableRecords.filter((stable) => !stable.deleted && stable.authorityRef.provider !== TASK_OBJECT_PROVIDER_ID && stable.entityType === record9.entityType && normalizedIdentity(stable.canonicalName) === name);
 }
-function matchesBinding(record8, binding) {
-  return sameContextScope(record8.scope, binding.scope) && record8.bindingRevision === binding.bindingRevision && record8.threadRef === binding.threadRef && record8.routeRef === binding.routeRef && record8.workspaceRoot === binding.workspaceRoot;
+function matchesBinding(record9, binding) {
+  return sameContextScope(record9.scope, binding.scope) && record9.bindingRevision === binding.bindingRevision && record9.threadRef === binding.threadRef && record9.routeRef === binding.routeRef && record9.workspaceRoot === binding.workspaceRoot;
 }
-function matchesEntry(record8, task, entry) {
-  return matchesTaskWorkspace(record8, task, entry) && record8.bindingRevision === entry.bindingRevision;
+function matchesEntry(record9, task, entry) {
+  return matchesTaskWorkspace(record9, task, entry) && record9.bindingRevision === entry.bindingRevision;
 }
-function matchesTaskWorkspace(record8, task, entry) {
-  return sameContextScope(record8.scope, entry.scope) && record8.threadRef === codexTaskThreadRef(task) && record8.routeRef === task.routeRef && record8.workspaceRoot === entry.workspaceRoot;
+function matchesTaskWorkspace(record9, task, entry) {
+  return sameContextScope(record9.scope, entry.scope) && record9.threadRef === codexTaskThreadRef(task) && record9.routeRef === task.routeRef && record9.workspaceRoot === entry.workspaceRoot;
 }
-function facts(record8) {
+function facts(record9) {
   const common = {
-    "\u751F\u547D\u5468\u671F": record8.lifecycle,
-    ...record8.replacedByObjectKey === void 0 ? {} : { "\u66FF\u4EE3\u5BF9\u8C61": record8.replacedByObjectKey },
+    "\u751F\u547D\u5468\u671F": record9.lifecycle,
+    ...record9.replacedByObjectKey === void 0 ? {} : { "\u66FF\u4EE3\u5BF9\u8C61": record9.replacedByObjectKey },
     "\u4FE1\u606F\u8FB9\u754C": "\u5F53\u524D Codex \u4EFB\u52A1\u5185\u7531 Agent \u663E\u5F0F\u767B\u8BB0\u7684\u4E34\u65F6\u4E0A\u4E0B\u6587\uFF1B\u5C1A\u672A\u56FA\u5316\u4E3A\u4ED3\u5E93\u8BC1\u636E",
-    "\u66F4\u65B0\u65F6\u95F4": record8.updatedAt,
-    "\u8BC1\u636E": record8.mentalModel.evidence
+    "\u66F4\u65B0\u65F6\u95F4": record9.updatedAt,
+    "\u8BC1\u636E": record9.mentalModel.evidence
   };
-  switch (record8.mentalModel.kind) {
+  switch (record9.mentalModel.kind) {
     case "concept":
       return {
-        "\u5B83\u662F\u4EC0\u4E48\u610F\u601D": record8.mentalModel.meaning,
-        "\u4E3A\u4EC0\u4E48\u73B0\u5728\u51FA\u73B0": record8.mentalModel.context,
-        "\u5B83\u4E0D\u662F\u4EC0\u4E48": record8.mentalModel.boundary,
-        "\u6240\u5904\u6D41\u7A0B": [...record8.mentalModel.sequence],
+        "\u5B83\u662F\u4EC0\u4E48\u610F\u601D": record9.mentalModel.meaning,
+        "\u4E3A\u4EC0\u4E48\u73B0\u5728\u51FA\u73B0": record9.mentalModel.context,
+        "\u5B83\u4E0D\u662F\u4EC0\u4E48": record9.mentalModel.boundary,
+        "\u6240\u5904\u6D41\u7A0B": [...record9.mentalModel.sequence],
         ...common
       };
     case "change":
       return {
-        "\u539F\u6765\u600E\u6837": record8.mentalModel.before,
-        "\u73B0\u5728\u600E\u6837": record8.mentalModel.after,
-        "\u5F71\u54CD\u4EC0\u4E48": record8.mentalModel.impact,
+        "\u539F\u6765\u600E\u6837": record9.mentalModel.before,
+        "\u73B0\u5728\u600E\u6837": record9.mentalModel.after,
+        "\u5F71\u54CD\u4EC0\u4E48": record9.mentalModel.impact,
         ...common
       };
     case "decision":
       return {
-        "\u4E3A\u4EC0\u4E48\u9700\u8981\u51B3\u5B9A": record8.mentalModel.problem,
-        "\u9009\u62E9\u4E86\u4EC0\u4E48": record8.mentalModel.choice,
-        "\u540E\u679C\u662F\u4EC0\u4E48": record8.mentalModel.consequence,
+        "\u4E3A\u4EC0\u4E48\u9700\u8981\u51B3\u5B9A": record9.mentalModel.problem,
+        "\u9009\u62E9\u4E86\u4EC0\u4E48": record9.mentalModel.choice,
+        "\u540E\u679C\u662F\u4EC0\u4E48": record9.mentalModel.consequence,
         ...common
       };
     case "task":
       return {
-        "\u76EE\u6807": record8.mentalModel.goal,
-        "\u5F53\u524D\u72B6\u6001": record8.mentalModel.status,
-        "\u5DF2\u5B8C\u6210": record8.mentalModel.completed,
-        "\u4E0B\u4E00\u6B65": record8.mentalModel.next,
-        "\u963B\u585E": record8.mentalModel.blocker,
+        "\u76EE\u6807": record9.mentalModel.goal,
+        "\u5F53\u524D\u72B6\u6001": record9.mentalModel.status,
+        "\u5DF2\u5B8C\u6210": record9.mentalModel.completed,
+        "\u4E0B\u4E00\u6B65": record9.mentalModel.next,
+        "\u963B\u585E": record9.mentalModel.blocker,
         ...common
       };
     case "verification":
       return {
-        "\u8981\u8BC1\u660E\u4EC0\u4E48": record8.mentalModel.claim,
-        "\u7ED3\u679C": record8.mentalModel.result,
-        "\u5C1A\u672A\u8BC1\u660E": record8.mentalModel.gap,
-        "\u6267\u884C\u65F6\u95F4": record8.updatedAt,
+        "\u8981\u8BC1\u660E\u4EC0\u4E48": record9.mentalModel.claim,
+        "\u7ED3\u679C": record9.mentalModel.result,
+        "\u5C1A\u672A\u8BC1\u660E": record9.mentalModel.gap,
+        "\u6267\u884C\u65F6\u95F4": record9.updatedAt,
         ...common
       };
   }
@@ -8090,14 +8519,14 @@ var TaskObjectRegistry = class {
   archivePath;
   #mutation = Promise.resolve();
   constructor(path, archivePath) {
-    if (!isAbsolute3(path)) throw new TypeError("task object registry path must be absolute");
-    this.path = resolve7(path);
+    if (!isAbsolute4(path)) throw new TypeError("task object registry path must be absolute");
+    this.path = resolve8(path);
     const defaultArchive = this.path.endsWith(".json") ? `${this.path.slice(0, -5)}.archive.json` : `${this.path}.archive.json`;
     const candidateArchive = archivePath ?? defaultArchive;
-    if (!isAbsolute3(candidateArchive)) {
+    if (!isAbsolute4(candidateArchive)) {
       throw new TypeError("task object archive path must be absolute");
     }
-    this.archivePath = resolve7(candidateArchive);
+    this.archivePath = resolve8(candidateArchive);
     if (this.archivePath === this.path) {
       throw new TypeError("task object archive path must differ from registry path");
     }
@@ -8107,12 +8536,12 @@ var TaskObjectRegistry = class {
   }
   async #read() {
     try {
-      const info = await stat5(this.path);
+      const info = await stat6(this.path);
       if (!info.isFile() || info.size > TASK_OBJECT_REGISTRY_MAX_BYTES) {
         throw new ContractError("task object registry file is invalid");
       }
-      const content = await readFile2(this.path, "utf8");
-      return parseDocument2(JSON.parse(content));
+      const content = await readFile3(this.path, "utf8");
+      return parseDocument3(JSON.parse(content));
     } catch (error) {
       if (error.code === "ENOENT") {
         return { schemaVersion: 1, records: [] };
@@ -8123,11 +8552,11 @@ var TaskObjectRegistry = class {
   }
   async #readArchive() {
     try {
-      const info = await stat5(this.archivePath);
+      const info = await stat6(this.archivePath);
       if (!info.isFile() || info.size > TASK_OBJECT_ARCHIVE_MAX_BYTES) {
         throw new ContractError("task object archive file is invalid");
       }
-      const content = await readFile2(this.archivePath, "utf8");
+      const content = await readFile3(this.archivePath, "utf8");
       return parseArchiveDocument(JSON.parse(content));
     } catch (error) {
       if (error.code === "ENOENT") {
@@ -8142,10 +8571,10 @@ var TaskObjectRegistry = class {
     if (Buffer.byteLength(body, "utf8") > maximumBytes) {
       throw new ContractError(budgetMessage);
     }
-    await mkdir2(dirname3(path), { recursive: true, mode: 448 });
-    const temporary = `${path}.${process.pid}.${randomUUID4()}.tmp`;
+    await mkdir3(dirname4(path), { recursive: true, mode: 448 });
+    const temporary = `${path}.${process.pid}.${randomUUID5()}.tmp`;
     await writeFile2(temporary, body, { encoding: "utf8", mode: 384, flag: "wx" });
-    await rename2(temporary, path);
+    await rename3(temporary, path);
   }
   async #write(document2) {
     await this.#writeDocument(
@@ -8179,7 +8608,7 @@ var TaskObjectRegistry = class {
   async upsert(task, binding, rawInput) {
     const input = parseTaskObjectInput(rawInput);
     return await this.#mutate(async (document2) => {
-      const index = document2.records.findIndex((record9) => matchesEntry(record9, task, binding) && record9.objectKey === input.objectKey);
+      const index = document2.records.findIndex((record10) => matchesEntry(record10, task, binding) && record10.objectKey === input.objectKey);
       const existing = index < 0 ? void 0 : document2.records[index];
       if (existing !== void 0 && existing.lifecycle !== "active") {
         throw new ContractError("retired or superseded objectKey cannot be reactivated");
@@ -8191,12 +8620,12 @@ var TaskObjectRegistry = class {
       if (existing !== void 0 && existing.lifecycle === "active" && existing.entityRevision === nextRevision) {
         return { kind: "unchanged", object: summary(existing) };
       }
-      const activeCount = document2.records.filter((record9) => matchesEntry(record9, task, binding) && record9.lifecycle === "active" && record9.objectKey !== input.objectKey).length;
+      const activeCount = document2.records.filter((record10) => matchesEntry(record10, task, binding) && record10.lifecycle === "active" && record10.objectKey !== input.objectKey).length;
       if (activeCount >= TASK_OBJECT_ACTIVE_HARD_LIMIT) {
         throw new ContractError("active task object capacity is full");
       }
       const now = (/* @__PURE__ */ new Date()).toISOString();
-      const record8 = {
+      const record9 = {
         ...copyInput(input),
         scope: { ...binding.scope },
         threadRef: codexTaskThreadRef(task),
@@ -8213,12 +8642,12 @@ var TaskObjectRegistry = class {
         if (document2.records.length >= TASK_OBJECT_REGISTRY_MAX_RECORDS) {
           throw new ContractError("task object registry is full");
         }
-        document2.records.push(record8);
+        document2.records.push(record9);
       } else {
-        document2.records[index] = record8;
+        document2.records[index] = record9;
       }
       await this.#write(document2);
-      return { kind: existing === void 0 ? "created" : "updated", object: summary(record8) };
+      return { kind: existing === void 0 ? "created" : "updated", object: summary(record9) };
     });
   }
   async supersede(task, binding, replacedObjectKey, rawReplacement) {
@@ -8228,10 +8657,10 @@ var TaskObjectRegistry = class {
       throw new ContractError("replacement objectKey must differ from the superseded object");
     }
     return await this.#mutate(async (document2) => {
-      const oldIndex = document2.records.findIndex((record8) => matchesEntry(record8, task, binding) && record8.objectKey === replacedKey && record8.lifecycle === "active");
+      const oldIndex = document2.records.findIndex((record9) => matchesEntry(record9, task, binding) && record9.objectKey === replacedKey && record9.lifecycle === "active");
       const old = oldIndex < 0 ? void 0 : document2.records[oldIndex];
       if (old === void 0) throw new ContractError("active task object to supersede was not found");
-      const replacementIndex = document2.records.findIndex((record8) => matchesEntry(record8, task, binding) && record8.objectKey === replacement.objectKey);
+      const replacementIndex = document2.records.findIndex((record9) => matchesEntry(record9, task, binding) && record9.objectKey === replacement.objectKey);
       const existingReplacement = replacementIndex < 0 ? void 0 : document2.records[replacementIndex];
       if (existingReplacement !== void 0) {
         throw new ContractError("replacement objectKey has already been used");
@@ -8269,7 +8698,7 @@ var TaskObjectRegistry = class {
   async retire(task, binding, rawObjectKey) {
     const key = objectKey2(rawObjectKey);
     return await this.#mutate(async (document2) => {
-      const index = document2.records.findIndex((record8) => matchesEntry(record8, task, binding) && record8.objectKey === key && record8.lifecycle === "active");
+      const index = document2.records.findIndex((record9) => matchesEntry(record9, task, binding) && record9.objectKey === key && record9.lifecycle === "active");
       const current = index < 0 ? void 0 : document2.records[index];
       if (current === void 0) throw new ContractError("active task object to retire was not found");
       const retired = {
@@ -8284,8 +8713,8 @@ var TaskObjectRegistry = class {
     });
   }
   #capacityStatus(document2, archive, task, binding) {
-    const current = document2.records.filter((record8) => matchesEntry(record8, task, binding));
-    const active = current.filter((record8) => record8.lifecycle === "active").length;
+    const current = document2.records.filter((record9) => matchesEntry(record9, task, binding));
+    const active = current.filter((record9) => record9.lifecycle === "active").length;
     const warnings = active >= TASK_OBJECT_ACTIVE_SOFT_LIMIT ? ["active_soft_limit_reached"] : [];
     return Object.freeze({
       active,
@@ -8306,7 +8735,7 @@ var TaskObjectRegistry = class {
   }
   async inventoryForTask(task, binding) {
     const [document2, archive] = await Promise.all([this.#read(), this.#readArchive()]);
-    const objects = document2.records.filter((record8) => matchesEntry(record8, task, binding)).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)).map(summary);
+    const objects = document2.records.filter((record9) => matchesEntry(record9, task, binding)).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)).map(summary);
     return Object.freeze({
       objects: Object.freeze(objects),
       capacity: this.#capacityStatus(document2, archive, task, binding)
@@ -8317,15 +8746,15 @@ var TaskObjectRegistry = class {
   }
   async auditCuration(task, binding, rawStableRecords) {
     const stableRecords = validateContextIndexForRuntime(rawStableRecords, binding.scope);
-    const current = (await this.#read()).records.filter((record8) => matchesEntry(record8, task, binding)).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-    const items = current.map((record8) => {
-      const stableMatchCount = stableMatchesFor(record8, stableRecords).length;
-      const state = record8.lifecycle === "active" ? stableMatchCount === 0 ? "active_partial" : stableMatchCount === 1 ? "active_stable_overlap" : "active_ambiguous_overlap" : stableMatchCount === 0 ? "terminal_unmatched" : stableMatchCount === 1 ? "terminal_archive_ready" : "terminal_ambiguous";
+    const current = (await this.#read()).records.filter((record9) => matchesEntry(record9, task, binding)).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    const items = current.map((record9) => {
+      const stableMatchCount = stableMatchesFor(record9, stableRecords).length;
+      const state = record9.lifecycle === "active" ? stableMatchCount === 0 ? "active_partial" : stableMatchCount === 1 ? "active_stable_overlap" : "active_ambiguous_overlap" : stableMatchCount === 0 ? "terminal_unmatched" : stableMatchCount === 1 ? "terminal_archive_ready" : "terminal_ambiguous";
       return Object.freeze({
-        objectKey: record8.objectKey,
-        entityType: record8.entityType,
-        canonicalName: record8.canonicalName,
-        lifecycle: record8.lifecycle,
+        objectKey: record9.objectKey,
+        entityType: record9.entityType,
+        canonicalName: record9.canonicalName,
+        lifecycle: record9.lifecycle,
         state,
         stableMatchCount
       });
@@ -8353,14 +8782,14 @@ var TaskObjectRegistry = class {
   async reviewCuration(task, binding, rawWorkspaceRecords, rawReview) {
     const workspaceRecords = validateContextIndexForRuntime(rawWorkspaceRecords, binding.scope);
     const review = parseTaskObjectCurationReviewInput(rawReview);
-    const taskRecords = (await this.#read()).records.filter((record8) => matchesEntry(record8, task, binding)).filter((record8) => record8.lifecycle === "active" || stableMatchesFor(record8, workspaceRecords).length === 0);
+    const taskRecords = (await this.#read()).records.filter((record9) => matchesEntry(record9, task, binding)).filter((record9) => record9.lifecycle === "active" || stableMatchesFor(record9, workspaceRecords).length === 0);
     const records = [
       ...workspaceRecords,
       ...this.#identityRecords(taskRecords)
-    ].filter((record8) => !record8.deleted);
+    ].filter((record9) => !record9.deleted);
     const items = review.needs.map((need) => {
       const normalizedTerm2 = normalizedIdentity(need.term);
-      const matches = records.filter((record8) => [record8.canonicalKey, record8.canonicalName, ...record8.aliases].filter((candidate) => typeof candidate === "string").some((candidate) => normalizedIdentity(candidate) === normalizedTerm2));
+      const matches = records.filter((record9) => [record9.canonicalKey, record9.canonicalName, ...record9.aliases].filter((candidate) => typeof candidate === "string").some((candidate) => normalizedIdentity(candidate) === normalizedTerm2));
       const candidateTypes = [...new Set(matches.map((match) => match.entityType))].sort();
       const unique = matches.length === 1 ? matches[0] : void 0;
       const state = matches.length === 0 ? "missing" : matches.length > 1 ? "ambiguous" : unique.entityType === need.expectedEntityType ? "available" : "type_mismatch";
@@ -8405,10 +8834,10 @@ var TaskObjectRegistry = class {
    */
   async adoptBinding(task, binding) {
     return await this.#mutate(async (document2) => {
-      const candidates2 = document2.records.filter((record8) => matchesTaskWorkspace(record8, task, binding) && record8.bindingRevision !== binding.bindingRevision);
+      const candidates2 = document2.records.filter((record9) => matchesTaskWorkspace(record9, task, binding) && record9.bindingRevision !== binding.bindingRevision);
       if (candidates2.length === 0) return 0;
-      const candidateIds = new Set(candidates2.map((record8) => record8.entityId));
-      document2.records = document2.records.map((record8) => candidateIds.has(record8.entityId) ? { ...copyStored(record8), bindingRevision: binding.bindingRevision } : record8);
+      const candidateIds = new Set(candidates2.map((record9) => record9.entityId));
+      document2.records = document2.records.map((record9) => candidateIds.has(record9.entityId) ? { ...copyStored(record9), bindingRevision: binding.bindingRevision } : record9);
       await this.#write(document2);
       return candidates2.length;
     });
@@ -8422,9 +8851,9 @@ var TaskObjectRegistry = class {
   async archiveGraduated(task, binding, rawStableRecords) {
     const stableRecords = validateContextIndexForRuntime(rawStableRecords, binding.scope);
     return await this.#mutate(async (document2) => {
-      const eligible = document2.records.filter((record8) => {
-        if (record8.lifecycle === "active" || !matchesEntry(record8, task, binding)) return false;
-        return stableMatchesFor(record8, stableRecords).length === 1;
+      const eligible = document2.records.filter((record9) => {
+        if (record9.lifecycle === "active" || !matchesEntry(record9, task, binding)) return false;
+        return stableMatchesFor(record9, stableRecords).length === 1;
       });
       const archive = await this.#readArchive();
       if (eligible.length === 0) {
@@ -8435,15 +8864,15 @@ var TaskObjectRegistry = class {
         });
       }
       const archivedByEntityId = new Map(
-        archive.records.map((record8) => [record8.entityId, record8])
+        archive.records.map((record9) => [record9.entityId, record9])
       );
-      for (const record8 of eligible) {
-        const existing = archivedByEntityId.get(record8.entityId);
-        if (existing !== void 0 && existing.entityRevision !== record8.entityRevision) {
+      for (const record9 of eligible) {
+        const existing = archivedByEntityId.get(record9.entityId);
+        if (existing !== void 0 && existing.entityRevision !== record9.entityRevision) {
           throw new ContractError("task object archive contains a conflicting revision");
         }
         if (existing === void 0) {
-          const copied = copyStored(record8);
+          const copied = copyStored(record9);
           archive.records.push(copied);
           archivedByEntityId.set(copied.entityId, copied);
         }
@@ -8452,8 +8881,8 @@ var TaskObjectRegistry = class {
         throw new ContractError("task object archive is full");
       }
       await this.#writeArchive(archive);
-      const eligibleIds = new Set(eligible.map((record8) => record8.entityId));
-      document2.records = document2.records.filter((record8) => !eligibleIds.has(record8.entityId));
+      const eligibleIds = new Set(eligible.map((record9) => record9.entityId));
+      document2.records = document2.records.filter((record9) => !eligibleIds.has(record9.entityId));
       await this.#write(document2);
       return Object.freeze({
         kind: "archived",
@@ -8467,37 +8896,37 @@ var TaskObjectRegistry = class {
   }
   async listActive(binding, signal) {
     if (signal?.aborted) throw signal.reason;
-    const records = (await this.#read()).records.filter((record8) => record8.lifecycle === "active" && matchesBinding(record8, binding));
+    const records = (await this.#read()).records.filter((record9) => record9.lifecycle === "active" && matchesBinding(record9, binding));
     return this.#identityRecords(records, signal);
   }
   async listForLookup(binding, stableRecords, signal) {
     if (signal?.aborted) throw signal.reason;
-    const records = (await this.#read()).records.filter((record8) => matchesBinding(record8, binding)).filter((record8) => {
-      if (record8.lifecycle === "active") return true;
-      const name = record8.canonicalName.normalize("NFKC").toLocaleLowerCase("en-US");
-      return !stableRecords.some((stable) => !stable.deleted && stable.entityType === record8.entityType && stable.canonicalName.normalize("NFKC").toLocaleLowerCase("en-US") === name);
+    const records = (await this.#read()).records.filter((record9) => matchesBinding(record9, binding)).filter((record9) => {
+      if (record9.lifecycle === "active") return true;
+      const name = record9.canonicalName.normalize("NFKC").toLocaleLowerCase("en-US");
+      return !stableRecords.some((stable) => !stable.deleted && stable.entityType === record9.entityType && stable.canonicalName.normalize("NFKC").toLocaleLowerCase("en-US") === name);
     });
     return this.#identityRecords(records, signal);
   }
   async list(binding, signal) {
     if (signal?.aborted) throw signal.reason;
-    const records = (await this.#read()).records.filter((record8) => matchesBinding(record8, binding));
+    const records = (await this.#read()).records.filter((record9) => matchesBinding(record9, binding));
     return this.#identityRecords(records, signal);
   }
   #identityRecords(records, signal) {
     if (signal?.aborted) throw signal.reason;
-    const revision2 = `task-objects:${createHash9("sha256").update(records.map((record8) => `${record8.entityId}:${record8.entityRevision}`).sort().join("\n"), "utf8").digest("hex")}`;
+    const revision2 = `task-objects:${createHash10("sha256").update(records.map((record9) => `${record9.entityId}:${record9.entityRevision}`).sort().join("\n"), "utf8").digest("hex")}`;
     const indexedAt = (/* @__PURE__ */ new Date()).toISOString();
-    return records.map((record8) => ({
+    return records.map((record9) => ({
       schemaVersion: "1.0",
-      scope: { ...record8.scope },
-      entityId: record8.entityId,
-      entityType: record8.entityType,
-      canonicalKey: record8.objectKey,
-      canonicalName: record8.canonicalName,
-      aliases: [...record8.aliases],
-      summary: record8.summary,
-      authorityRef: { provider: TASK_OBJECT_PROVIDER_ID, locator: record8.entityId },
+      scope: { ...record9.scope },
+      entityId: record9.entityId,
+      entityType: record9.entityType,
+      canonicalKey: record9.objectKey,
+      canonicalName: record9.canonicalName,
+      aliases: [...record9.aliases],
+      summary: record9.summary,
+      authorityRef: { provider: TASK_OBJECT_PROVIDER_ID, locator: record9.entityId },
       indexRevision: revision2,
       indexedAt,
       deleted: false
@@ -8508,18 +8937,18 @@ var TaskObjectRegistry = class {
     if (!this.ownsEntityId(request.entityId) || request.authorityLocator !== request.entityId) {
       return { kind: "not_found" };
     }
-    const record8 = (await this.#read()).records.find((candidate) => candidate.entityId === request.entityId && candidate.entityType === request.entityType && matchesBinding(candidate, request.binding));
-    if (record8 === void 0) return { kind: "not_found" };
+    const record9 = (await this.#read()).records.find((candidate) => candidate.entityId === request.entityId && candidate.entityType === request.entityType && matchesBinding(candidate, request.binding));
+    if (record9 === void 0) return { kind: "not_found" };
     const snapshot = {
-      scope: { ...record8.scope },
-      entityId: record8.entityId,
-      entityType: record8.entityType,
-      entityRevision: record8.entityRevision,
+      scope: { ...record9.scope },
+      entityId: record9.entityId,
+      entityType: record9.entityType,
+      entityRevision: record9.entityRevision,
       observedAt: (/* @__PURE__ */ new Date()).toISOString(),
       freshness: "partial",
-      facts: facts(record8),
+      facts: facts(record9),
       relations: [],
-      sourceRefs: [{ sourceType: TASK_OBJECT_PROVIDER_ID, sourceId: record8.objectKey }]
+      sourceRefs: [{ sourceType: TASK_OBJECT_PROVIDER_ID, sourceId: record9.objectKey }]
     };
     return {
       kind: "snapshot",
@@ -8531,8 +8960,8 @@ var TaskObjectRegistry = class {
     const observedAt = (/* @__PURE__ */ new Date()).toISOString();
     if (request.signal?.aborted) return { kind: "unavailable", observedAt, retryable: true };
     if (!this.ownsEntityId(request.entityId)) return { kind: "not_found", observedAt };
-    const record8 = (await this.#read()).records.find((candidate) => candidate.entityId === request.entityId && candidate.entityType === request.entityType && matchesBinding(candidate, request.binding));
-    return record8 === void 0 ? { kind: "not_found", observedAt } : { kind: "current", revision: record8.entityRevision, observedAt };
+    const record9 = (await this.#read()).records.find((candidate) => candidate.entityId === request.entityId && candidate.entityType === request.entityType && matchesBinding(candidate, request.binding));
+    return record9 === void 0 ? { kind: "not_found", observedAt } : { kind: "current", revision: record9.entityRevision, observedAt };
   }
 };
 var ActiveTaskObjectAnnotationIndex = class {
@@ -8912,9 +9341,9 @@ function createWorkspaceCompanion(options) {
     ]);
     const checkedPaths = new Set([
       ...artifacts.valid ? artifacts.artifacts.map((artifact) => artifact.path) : [],
-      ...records.valid ? records.records.map((record8) => record8.path) : []
+      ...records.valid ? records.records.map((record9) => record9.path) : []
     ].map((path) => `file:${path}`));
-    return indexed.filter((record8) => checkedPaths.has(record8.entityId));
+    return indexed.filter((record9) => checkedPaths.has(record9.entityId));
   };
   const auditCurrentTaskObjects = async () => {
     const current = await currentTaskBinding();
@@ -8933,6 +9362,47 @@ function createWorkspaceCompanion(options) {
       await localIndex.list(trusted),
       input
     );
+  };
+  const sameObservationContext = (left, right) => codexTaskThreadRef(left.task) === codexTaskThreadRef(right.task) && left.task.routeRef === right.task.routeRef && left.task.contextFingerprint === right.task.contextFingerprint && left.binding.bindingRevision === right.binding.bindingRevision && left.binding.workspaceRoot === right.binding.workspaceRoot && left.binding.scope.kind === right.binding.scope.kind && left.binding.scope.namespace === right.binding.scope.namespace && left.binding.scope.id === right.binding.scope.id;
+  const observeCurrentTaskMilestone = async (input) => {
+    if (options.milestoneObservationLedger === void 0) {
+      throw new Error("milestone_observation_ledger_unavailable");
+    }
+    const current = await currentTaskBinding();
+    const trusted = await trustedBindingFor(current);
+    const workspaceRecords = await localIndex.list(trusted);
+    const [review, audit, inventory] = await Promise.all([
+      current.registry.reviewCuration(
+        current.task,
+        current.binding,
+        workspaceRecords,
+        input
+      ),
+      current.registry.auditCuration(
+        current.task,
+        current.binding,
+        await checkedStableRecords(current)
+      ),
+      current.registry.inventoryForTask(current.task, current.binding)
+    ]);
+    const revalidated = await currentTaskBinding();
+    if (!sameObservationContext(current, revalidated)) {
+      throw new Error("milestone_observation_context_changed");
+    }
+    return await options.milestoneObservationLedger.record({
+      task: current.task,
+      binding: current.binding,
+      review,
+      audit,
+      inventory
+    });
+  };
+  const summarizeCurrentTaskMilestones = async () => {
+    if (options.milestoneObservationLedger === void 0) {
+      throw new Error("milestone_observation_ledger_unavailable");
+    }
+    const current = await currentTaskBinding();
+    return await options.milestoneObservationLedger.summary(current.task, current.binding);
   };
   const archiveGraduatedCurrentTaskObjects = async () => {
     const current = await currentTaskBinding();
@@ -8977,6 +9447,8 @@ function createWorkspaceCompanion(options) {
     inventoryCurrentTaskObjects,
     auditCurrentTaskObjects,
     reviewCurrentTaskObjectNeeds,
+    observeCurrentTaskMilestone,
+    summarizeCurrentTaskMilestones,
     archiveGraduatedCurrentTaskObjects,
     stop,
     status
@@ -8992,18 +9464,18 @@ var MAX_REQUEST_BYTES = 8 * 1024;
 function fail(message) {
   throw new Error(message);
 }
-function record7(value) {
+function record8(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function packageRoot(start) {
-  let current = resolve8(start);
+  let current = resolve9(start);
   for (let depth = 0; depth < 10; depth += 1) {
     const developmentLayout = existsSync(join3(current, "src"));
     const packagedLayout = existsSync(join3(current, "host", "workspace-companion.mjs"));
     if (existsSync(join3(current, "package.json")) && (developmentLayout || packagedLayout)) {
       return current;
     }
-    const parent = dirname4(current);
+    const parent = dirname5(current);
     if (parent === current) break;
     current = parent;
   }
@@ -9011,7 +9483,7 @@ function packageRoot(start) {
 }
 function localStateRoot() {
   const local = process.env.LOCALAPPDATA;
-  return resolve8(local && isAbsolute4(local) ? local : homedir(), "PointableContext");
+  return resolve9(local && isAbsolute5(local) ? local : homedir(), "PointableContext");
 }
 function boundedInteger2(value, name) {
   if (!/^\d+$/u.test(value)) fail(`${name} must be an integer`);
@@ -9023,9 +9495,9 @@ function boundedInteger2(value, name) {
 }
 function parseArguments(argv) {
   const command = argv[0];
-  if (command !== "start" && command !== "status" && command !== "bind" && command !== "unbind" && command !== "stop" && command !== "run" && command !== "object-upsert" && command !== "object-supersede" && command !== "object-retire" && command !== "object-audit" && command !== "object-review" && command !== "object-archive" && command !== "object-list") {
+  if (command !== "start" && command !== "status" && command !== "bind" && command !== "unbind" && command !== "stop" && command !== "run" && command !== "object-upsert" && command !== "object-supersede" && command !== "object-retire" && command !== "object-audit" && command !== "object-review" && command !== "object-archive" && command !== "object-list" && command !== "milestone-observe" && command !== "milestone-summary") {
     return fail(
-      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-audit|object-review|object-archive|object-list> [options]"
+      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-audit|object-review|object-archive|object-list|milestone-observe|milestone-summary> [options]"
     );
   }
   const stateRoot = localStateRoot();
@@ -9050,11 +9522,11 @@ function parseArguments(argv) {
     if (value === void 0) fail(`${argument} requires a value`);
     index += 1;
     if (argument === "--state-dir") {
-      if (!isAbsolute4(value)) fail("--state-dir must be absolute");
-      stateDir = resolve8(value);
+      if (!isAbsolute5(value)) fail("--state-dir must be absolute");
+      stateDir = resolve9(value);
     } else if (argument === "--registry") {
-      if (!isAbsolute4(value)) fail("--registry must be absolute");
-      registryPath = resolve8(value);
+      if (!isAbsolute5(value)) fail("--registry must be absolute");
+      registryPath = resolve9(value);
     } else if (argument === "--endpoint") {
       endpoint = value;
     } else if (argument === "--refresh-ms") {
@@ -9065,14 +9537,14 @@ function parseArguments(argv) {
       }
       presentationMode = value;
     } else if (argument === "--workspace-root") {
-      if (!isAbsolute4(value)) fail("--workspace-root must be absolute");
-      workspaceRoot = resolve8(value);
+      if (!isAbsolute5(value)) fail("--workspace-root must be absolute");
+      workspaceRoot = resolve9(value);
     } else if (argument === "--object-file") {
-      if (!isAbsolute4(value)) fail("--object-file must be absolute");
-      objectFile = resolve8(value);
+      if (!isAbsolute5(value)) fail("--object-file must be absolute");
+      objectFile = resolve9(value);
     } else if (argument === "--review-file") {
-      if (!isAbsolute4(value)) fail("--review-file must be absolute");
-      reviewFile = resolve8(value);
+      if (!isAbsolute5(value)) fail("--review-file must be absolute");
+      reviewFile = resolve9(value);
     } else if (argument === "--object-key") {
       objectKey3 = value;
     } else if (argument === "--replaces") {
@@ -9087,8 +9559,8 @@ function parseArguments(argv) {
   if ((command === "object-upsert" || command === "object-supersede") && objectFile === void 0) {
     fail(`${command} requires --object-file <absolute-path>`);
   }
-  if (command === "object-review" && reviewFile === void 0) {
-    fail("object-review requires --review-file <absolute-path>");
+  if ((command === "object-review" || command === "milestone-observe") && reviewFile === void 0) {
+    fail(`${command} requires --review-file <absolute-path>`);
   }
   if (command === "object-supersede" && replaces === void 0) {
     fail("object-supersede requires --replaces <object-key>");
@@ -9115,7 +9587,7 @@ var statePath = (directory) => join3(directory, "state.json");
 var lockPath = (directory) => join3(directory, "runtime.lock");
 var logPath = (directory) => join3(directory, "companion.log");
 function parseState(value) {
-  if (!record7(value) || value.schemaVersion !== CONTROL_SCHEMA_VERSION || value.mode !== "live-local-workspace" || !Number.isSafeInteger(value.pid) || Number(value.pid) < 1 || !Number.isSafeInteger(value.port) || Number(value.port) < 1 || Number(value.port) > 65535 || typeof value.token !== "string" || !/^[a-f0-9]{64}$/u.test(value.token) || typeof value.startedAt !== "string" || !Number.isFinite(Date.parse(value.startedAt))) {
+  if (!record8(value) || value.schemaVersion !== CONTROL_SCHEMA_VERSION || value.mode !== "live-local-workspace" || !Number.isSafeInteger(value.pid) || Number(value.pid) < 1 || !Number.isSafeInteger(value.port) || Number(value.port) < 1 || Number(value.port) > 65535 || typeof value.token !== "string" || !/^[a-f0-9]{64}$/u.test(value.token) || typeof value.startedAt !== "string" || !Number.isFinite(Date.parse(value.startedAt))) {
     return fail("invalid workspace companion state");
   }
   return {
@@ -9129,7 +9601,7 @@ function parseState(value) {
 }
 async function readState(directory) {
   try {
-    const text = await readFile3(statePath(directory), "utf8");
+    const text = await readFile4(statePath(directory), "utf8");
     if (Buffer.byteLength(text, "utf8") > 16 * 1024) return void 0;
     return parseState(JSON.parse(text));
   } catch {
@@ -9146,7 +9618,7 @@ function processIsAlive(pid) {
 }
 async function readLockPid(directory) {
   try {
-    const value = (await readFile3(lockPath(directory), "utf8")).trim();
+    const value = (await readFile4(lockPath(directory), "utf8")).trim();
     if (!/^\d+$/u.test(value)) return void 0;
     const pid = Number(value);
     return Number.isSafeInteger(pid) && pid > 0 ? pid : void 0;
@@ -9155,19 +9627,19 @@ async function readLockPid(directory) {
   }
 }
 async function writeJsonAtomic(path, value) {
-  const temporary = `${path}.${process.pid}.${randomUUID5()}.tmp`;
+  const temporary = `${path}.${process.pid}.${randomUUID6()}.tmp`;
   await writeFile3(temporary, `${JSON.stringify(value)}
 `, {
     encoding: "utf8",
     mode: 384,
     flag: "wx"
   });
-  await rename3(temporary, path);
+  await rename4(temporary, path);
 }
 async function claimLock(directory) {
-  await mkdir3(directory, { recursive: true, mode: 448 });
+  await mkdir4(directory, { recursive: true, mode: 448 });
   try {
-    const handle = await open4(lockPath(directory), "wx", 384);
+    const handle = await open5(lockPath(directory), "wx", 384);
     try {
       await handle.writeFile(`${process.pid}
 `, "utf8");
@@ -9186,10 +9658,10 @@ async function removeOwnedState(directory, token) {
     const current = await readState(directory);
     if (current !== void 0 && current.token !== token) return;
   }
-  await rm(statePath(directory), { force: true }).catch(() => void 0);
+  await rm2(statePath(directory), { force: true }).catch(() => void 0);
   const lockPid = await readLockPid(directory);
   if (lockPid === void 0 || lockPid === process.pid || !processIsAlive(lockPid)) {
-    await rm(lockPath(directory), { force: true }).catch(() => void 0);
+    await rm2(lockPath(directory), { force: true }).catch(() => void 0);
   }
 }
 function safeTokenEqual(left, right) {
@@ -9215,16 +9687,16 @@ async function readRequestJson(request) {
     chunks.push(value);
   }
   const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-  if (!record7(parsed)) throw new Error("control request JSON is invalid");
+  if (!record8(parsed)) throw new Error("control request JSON is invalid");
   return parsed;
 }
 async function readJsonInputFile(path) {
-  const info = await stat6(path);
+  const info = await stat7(path);
   if (!info.isFile() || info.size > MAX_REQUEST_BYTES) {
     throw new Error("input file is invalid or too large");
   }
-  const parsed = JSON.parse(await readFile3(path, "utf8"));
-  if (!record7(parsed)) throw new Error("input JSON is invalid");
+  const parsed = JSON.parse(await readFile4(path, "utf8"));
+  if (!record8(parsed)) throw new Error("input JSON is invalid");
   return parsed;
 }
 async function controlRequest(state, method, path, body) {
@@ -9258,7 +9730,7 @@ async function controlRequest(state, method, path, body) {
       response.on("end", () => {
         try {
           const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-          if (!record7(parsed)) throw new Error("control response is invalid");
+          if (!record8(parsed)) throw new Error("control response is invalid");
           if ((response.statusCode ?? 500) >= 400) {
             rejectRequest(new Error(
               typeof parsed.error === "string" ? parsed.error : "control request failed"
@@ -9302,9 +9774,13 @@ async function runServer(arguments_) {
   const taskObjectRegistry = new TaskObjectRegistry(
     join3(arguments_.stateDir, "task-objects.json")
   );
+  const milestoneObservationLedger = new MilestoneObservationLedger(
+    join3(arguments_.stateDir, "milestone-observations.json")
+  );
   const companion = createWorkspaceCompanion({
     registry,
     taskObjectRegistry,
+    milestoneObservationLedger,
     endpoint: arguments_.endpoint,
     refreshIntervalMs: arguments_.refreshIntervalMs,
     presentationMode: arguments_.presentationMode
@@ -9342,10 +9818,10 @@ async function runServer(arguments_) {
     }
     if (request.method === "POST" && request.url === "/bind") {
       void readRequestJson(request).then(async (body) => {
-        if (typeof body.workspaceRoot !== "string" || !isAbsolute4(body.workspaceRoot)) {
+        if (typeof body.workspaceRoot !== "string" || !isAbsolute5(body.workspaceRoot)) {
           throw new Error("workspace_root_invalid");
         }
-        return await companion.bindCurrentTask(resolve8(body.workspaceRoot));
+        return await companion.bindCurrentTask(resolve9(body.workspaceRoot));
       }).then(
         (result) => sendJson(response, 200, { ok: true, ...result }),
         (error) => sendJson(response, 409, {
@@ -9395,6 +9871,26 @@ async function runServer(arguments_) {
         (error) => sendJson(response, 409, {
           ok: false,
           error: error instanceof Error ? error.message : "object_review_failed"
+        })
+      );
+      return;
+    }
+    if (request.method === "POST" && request.url === "/milestones/observe") {
+      void readRequestJson(request).then(async (body) => await companion.observeCurrentTaskMilestone(body.review)).then(
+        (event) => sendJson(response, 200, { ok: true, event }),
+        (error) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "milestone_observation_failed"
+        })
+      );
+      return;
+    }
+    if (request.method === "GET" && request.url === "/milestones/summary") {
+      void companion.summarizeCurrentTaskMilestones().then(
+        (summary2) => sendJson(response, 200, { ok: true, summary: summary2 }),
+        (error) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "milestone_summary_failed"
         })
       );
       return;
@@ -9482,7 +9978,7 @@ async function startDetached(arguments_) {
     return { ...await waitForStatus(arguments_.stateDir), alreadyRunning: true };
   }
   await removeOwnedState(arguments_.stateDir);
-  await mkdir3(arguments_.stateDir, { recursive: true, mode: 448 });
+  await mkdir4(arguments_.stateDir, { recursive: true, mode: 448 });
   const logDescriptor = openSync(logPath(arguments_.stateDir), "a", 384);
   const entrypoint = fileURLToPath(import.meta.url);
   const child = spawn(process.execPath, [
@@ -9500,7 +9996,7 @@ async function startDetached(arguments_) {
     arguments_.presentationMode,
     "--json"
   ], {
-    cwd: packageRoot(dirname4(entrypoint)),
+    cwd: packageRoot(dirname5(entrypoint)),
     detached: true,
     windowsHide: true,
     stdio: ["ignore", logDescriptor, logDescriptor]
@@ -9538,7 +10034,7 @@ function print(value, json) {
 `);
     return;
   }
-  const binding = record7(value.binding) ? value.binding : void 0;
+  const binding = record8(value.binding) ? value.binding : void 0;
   if (binding !== void 0) {
     process.stdout.write(
       `${value.replaced === true ? "Rebound" : "Bound"} active Codex task ${String(binding.threadId)} to ${String(binding.workspaceRoot)}
@@ -9546,7 +10042,7 @@ function print(value, json) {
     );
     return;
   }
-  const unbound = record7(value.unbound) ? value.unbound : void 0;
+  const unbound = record8(value.unbound) ? value.unbound : void 0;
   if (value.wasBound === true && unbound !== void 0) {
     process.stdout.write(
       `Unbound active Codex task ${String(unbound.threadId)} from ${String(unbound.workspaceRoot)}
@@ -9558,8 +10054,8 @@ function print(value, json) {
     process.stdout.write("Active Codex task was not bound\n");
     return;
   }
-  const result = record7(value.result) ? value.result : void 0;
-  const object = result && record7(result.object) ? result.object : void 0;
+  const result = record8(value.result) ? value.result : void 0;
+  const object = result && record8(result.object) ? result.object : void 0;
   if (result !== void 0 && object !== void 0) {
     process.stdout.write(
       `Task object ${String(object.objectKey)}: ${String(result.kind)} (${String(object.lifecycle)})
@@ -9567,7 +10063,24 @@ function print(value, json) {
     );
     return;
   }
-  if (record7(value.audit) && typeof value.audit.currentTaskRecords === "number") {
+  if (record8(value.event) && typeof value.event.milestoneSha256 === "string") {
+    const event = value.event;
+    const review = record8(event.review) ? event.review : {};
+    process.stdout.write(
+      `Private milestone observation ${String(event.milestoneSha256).slice(0, 12)}: available=${String(review.available)}; missing=${String(review.missing)}; ambiguous=${String(review.ambiguous)}; type-mismatch=${String(review.typeMismatch)}
+`
+    );
+    return;
+  }
+  if (record8(value.summary) && value.summary.measurement === "private_milestone_observation") {
+    const summary2 = value.summary;
+    process.stdout.write(
+      `Milestone summary: events=${String(summary2.eventCount)}; milestones=${String(summary2.milestoneCount)}; available=${String(summary2.available)}; missing=${String(summary2.missing)}; failures=${String(Number(summary2.ambiguous) + Number(summary2.typeMismatch))}
+`
+    );
+    return;
+  }
+  if (record8(value.audit) && typeof value.audit.currentTaskRecords === "number") {
     const audit = value.audit;
     process.stdout.write(
       `Curation audit: active partial=${String(audit.activePartials)}; stable overlap=${String(Number(audit.activeStableOverlaps) + Number(audit.activeAmbiguousOverlaps))}; archive ready=${String(audit.terminalArchiveReady)}; terminal unresolved=${String(Number(audit.terminalUnmatched) + Number(audit.terminalAmbiguous))}
@@ -9586,13 +10099,13 @@ function print(value, json) {
     process.stdout.write(`Current task objects: ${value.objects.length}
 `);
     for (const item of value.objects) {
-      if (!record7(item)) continue;
+      if (!record8(item)) continue;
       process.stdout.write(
         `- ${String(item.objectKey)} [${String(item.entityType)}] ${String(item.lifecycle)}
 `
       );
     }
-    const capacity = record7(value.capacity) ? value.capacity : void 0;
+    const capacity = record8(value.capacity) ? value.capacity : void 0;
     if (capacity !== void 0) {
       process.stdout.write(
         `Capacity: active=${String(capacity.active)}/${String(capacity.activeHardLimit)}; registry=${String(capacity.registryRecords)}/${String(capacity.registryRecordLimit)}; archived=${String(capacity.archivedRecords)}/${String(capacity.archiveRecordLimit)}
@@ -9605,12 +10118,12 @@ function print(value, json) {
     }
     return;
   }
-  const companion = record7(value.companion) ? value.companion : void 0;
-  const adapter = companion && record7(companion.adapter) ? companion.adapter : void 0;
+  const companion = record8(value.companion) ? value.companion : void 0;
+  const adapter = companion && record8(companion.adapter) ? companion.adapter : void 0;
   const state = typeof companion?.state === "string" ? companion.state : value.stopped === true ? "stopped" : "inactive";
   const targets = typeof adapter?.targetCount === "number" ? adapter.targetCount : 0;
   const tasks = typeof companion?.activeTaskCount === "number" ? companion.activeTaskCount : 0;
-  const compatibility = companion && record7(companion.compatibility) ? companion.compatibility : void 0;
+  const compatibility = companion && record8(companion.compatibility) ? companion.compatibility : void 0;
   const compatibilityState = typeof compatibility?.state === "string" ? compatibility.state : "unchecked";
   const compatibilityCode = typeof compatibility?.code === "string" ? compatibility.code : "not_checked";
   process.stdout.write(
@@ -9650,7 +10163,7 @@ async function main() {
     print(await controlRequest(state, "POST", "/unbind"), arguments_.json);
     return;
   }
-  if (arguments_.command === "object-upsert" || arguments_.command === "object-supersede" || arguments_.command === "object-retire" || arguments_.command === "object-audit" || arguments_.command === "object-review" || arguments_.command === "object-archive" || arguments_.command === "object-list") {
+  if (arguments_.command === "object-upsert" || arguments_.command === "object-supersede" || arguments_.command === "object-retire" || arguments_.command === "object-audit" || arguments_.command === "object-review" || arguments_.command === "object-archive" || arguments_.command === "object-list" || arguments_.command === "milestone-observe" || arguments_.command === "milestone-summary") {
     const state = await readState(arguments_.stateDir);
     if (state === void 0 || !processIsAlive(state.pid)) {
       fail("workspace companion is not running");
@@ -9666,6 +10179,15 @@ async function main() {
     if (arguments_.command === "object-review") {
       const review = await readJsonInputFile(arguments_.reviewFile);
       print(await controlRequest(state, "POST", "/objects/review", { review }), arguments_.json);
+      return;
+    }
+    if (arguments_.command === "milestone-observe") {
+      const review = await readJsonInputFile(arguments_.reviewFile);
+      print(await controlRequest(state, "POST", "/milestones/observe", { review }), arguments_.json);
+      return;
+    }
+    if (arguments_.command === "milestone-summary") {
+      print(await controlRequest(state, "GET", "/milestones/summary"), arguments_.json);
       return;
     }
     if (arguments_.command === "object-archive") {

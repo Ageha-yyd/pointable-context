@@ -8,7 +8,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v2.29 records real test execution without inheriting renderer manual qualification", async () => {
+test("v2.30 adds private multi-milestone observation without widening renderer authority", async () => {
   const [prd, readme, mainSkill, workspaceSkill, recordsSkill, curationDecision, capacityDecision, coverage, compatibility, bundle] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -22,7 +22,7 @@ test("v2.29 records real test execution without inheriting renderer manual quali
     readFile(resolve("host/workspace-companion.mjs")),
   ]);
 
-  assert.match(prd, /版本：v2\.29/u);
+  assert.match(prd, /版本：v2\.30/u);
   assert.match(prd, /`annotated_click`/u);
   assert.match(prd, /`selection_lookup`/u);
   assert.match(prd, /每条消息最多标 3 个高价值对象/u);
@@ -51,9 +51,14 @@ test("v2.29 records real test execution without inheriting renderer manual quali
   assert.match(prd, /每个具备唯一 term 的对象一个主入口/u);
   assert.match(prd, /Explicit Milestone Object Review/u);
   assert.match(prd, /不得扫描 Chat、读取详情、自动补对象/u);
-  assert.match(prd, /人工十项仍集中到功能冻结后的单次 Release Candidate 验收/u);
+  assert.match(prd, /人工十项 pending/u);
+  assert.match(prd, /功能冻结后再为一个 Release Candidate 执行完整十项原生人工门禁/u);
   assert.match(prd, /Reliable Test Execution Event/u);
   assert.match(prd, /timeout\/cancel\/output overflow\/revision drift/u);
+  assert.match(prd, /Private Multi-milestone Observation Ledger/u);
+  assert.match(prd, /不保存 raw term、里程碑名、Chat、Provider facts、文件内容、workspace path 或 Codex task\/thread ID/u);
+  assert.match(prd, /超过 512 事件或 4 MiB 均 fail closed/u);
+  assert.match(prd, /不证明用户理解、时间缩短、Chat Turn 减少或统计显著性/u);
 
   assert.match(readme, /bounded identity-only catalog/u);
   assert.match(readme, /Any registered object omitted by that Top-3 remains reachable/u);
@@ -68,10 +73,14 @@ test("v2.29 records real test execution without inheriting renderer manual quali
   assert.match(readme, /one primary annotation term per unambiguous object before aliases/u);
   assert.match(
     readme,
-    /current v2\.29 product slice.*ten evidence-bound manual gates remain consolidated into the later feature-freeze Release Candidate/u,
+    /current v2\.30 product slice.*automatic gate is truthfully `unavailable` and all ten manual gates remain pending/u,
   );
   assert.match(readme, /object-review --review-file/u);
   assert.match(readme, /available, missing, ambiguous, and type-mismatch/u);
+  assert.match(readme, /Private multi-milestone observation/u);
+  assert.match(readme, /milestone-observe --review-file/u);
+  assert.match(readme, /never stores raw terms, milestone names, Chat, Provider facts, file content, workspace paths, or Codex task\/thread identifiers/u);
+  assert.match(readme, /fails closed at 512 events or 4 MiB/u);
 
   assert.match(mainSkill, /two zero-turn entries/u);
   assert.match(mainSkill, /Any registered object not marked remains reachable/u);
@@ -89,6 +98,9 @@ test("v2.29 records real test execution without inheriting renderer manual quali
   assert.match(workspaceSkill, /object-audit --json/u);
   assert.match(workspaceSkill, /object-review --review-file/u);
   assert.match(workspaceSkill, /It must not read Provider detail, persist the review, infer undeclared needs/u);
+  assert.match(workspaceSkill, /milestone-observe --review-file/u);
+  assert.match(workspaceSkill, /must not store raw terms, milestone names, Chat, Provider facts, file content, workspace paths, or task\/thread IDs/u);
+  assert.match(workspaceSkill, /milestone-summary --json/u);
   assert.match(workspaceSkill, /Active, unmatched, and ambiguous records never archive/u);
   assert.match(workspaceSkill, /must never migrate objects across another task, route, scope, or workspace/u);
   assert.match(workspaceSkill, /moved card is explicitly pinned/u);
@@ -98,6 +110,7 @@ test("v2.29 records real test execution without inheriting renderer manual quali
   assert.match(recordsSkill, /Retire the corresponding task-local object only after the stable artifact reports `valid: true`/u);
   assert.match(recordsSkill, /Archive is maintenance, not graduation evidence/u);
   assert.match(recordsSkill, /workspace companion's `object-review`/u);
+  assert.match(recordsSkill, /`milestone-observe` may persist the review only as a private digest\/status\/type\/source\/count event/u);
   assert.match(recordsSkill, /references\/test-execution\.md/u);
   assert.match(curationDecision, /Agent 在明确授权的有界任务中只于稳定里程碑维护对象/u);
   assert.match(capacityDecision, /热 Registry 在每个当前任务达到 64 个 active 对象时给出软警告/u);
@@ -105,18 +118,19 @@ test("v2.29 records real test execution without inheriting renderer manual quali
   assert.match(coverage, /"id": "object-curation-policy"/u);
   assert.match(coverage, /"id": "task-object-capacity"/u);
   assert.match(coverage, /"id": "test-execution-runner"/u);
+  assert.match(coverage, /"id": "milestone-observation-ledger"/u);
 
   const current = JSON.parse(compatibility) as {
     implementation?: { productVersion?: string; rendererBundleSha256?: string };
     automatic?: { state?: string };
     manualChecks?: Array<{ result?: string }>;
   };
-  assert.equal(current.implementation?.productVersion, "v2.29");
+  assert.equal(current.implementation?.productVersion, "v2.30");
   assert.equal(
     current.implementation?.rendererBundleSha256,
     createHash("sha256").update(bundle).digest("hex"),
   );
-  assert.equal(current.automatic?.state, "qualified");
+  assert.equal(current.automatic?.state, "unavailable");
   assert.equal(current.manualChecks?.length, 10);
   assert.ok(current.manualChecks?.every((check) => check.result === "pending"));
 });

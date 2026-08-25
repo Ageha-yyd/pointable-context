@@ -22,6 +22,11 @@ import {
 import { createWorkspaceLookupCallback } from "./workspace-lookup.js";
 import { createWorkspaceAnnotationProvider } from "./workspace-annotations.js";
 import {
+  MilestoneObservationLedger,
+  type MilestoneObservationEvent,
+  type MilestoneObservationSummary,
+} from "./milestone-observation.js";
+import {
   ActiveTaskObjectAnnotationIndex,
   CompositeContextIndex,
   RoutedWorkspaceRevisionProbe,
@@ -51,6 +56,7 @@ export interface WorkspaceCompanionOptions {
   presentationMode?: PointablePresentationMode;
   annotationRefreshIntervalMs?: number;
   taskObjectRegistry?: TaskObjectRegistry;
+  milestoneObservationLedger?: MilestoneObservationLedger;
 }
 
 export type CodexDesktopCompatibilityGate =
@@ -110,6 +116,8 @@ export interface WorkspaceCompanion {
   inventoryCurrentTaskObjects(): Promise<TaskObjectInventory>;
   auditCurrentTaskObjects(): Promise<TaskObjectCurationAudit>;
   reviewCurrentTaskObjectNeeds(input: unknown): Promise<TaskObjectCurationReview>;
+  observeCurrentTaskMilestone(input: unknown): Promise<MilestoneObservationEvent>;
+  summarizeCurrentTaskMilestones(): Promise<MilestoneObservationSummary>;
   archiveGraduatedCurrentTaskObjects(): Promise<TaskObjectArchiveResult>;
   stop(): Promise<WorkspaceCompanionStatus>;
   status(): WorkspaceCompanionStatus;
@@ -548,6 +556,64 @@ export function createWorkspaceCompanion(
     );
   };
 
+  const sameObservationContext = (
+    left: Awaited<ReturnType<typeof currentTaskBinding>>,
+    right: Awaited<ReturnType<typeof currentTaskBinding>>,
+  ): boolean => (
+    codexTaskThreadRef(left.task) === codexTaskThreadRef(right.task) &&
+    left.task.routeRef === right.task.routeRef &&
+    left.task.contextFingerprint === right.task.contextFingerprint &&
+    left.binding.bindingRevision === right.binding.bindingRevision &&
+    left.binding.workspaceRoot === right.binding.workspaceRoot &&
+    left.binding.scope.kind === right.binding.scope.kind &&
+    left.binding.scope.namespace === right.binding.scope.namespace &&
+    left.binding.scope.id === right.binding.scope.id
+  );
+
+  const observeCurrentTaskMilestone = async (
+    input: unknown,
+  ): Promise<MilestoneObservationEvent> => {
+    if (options.milestoneObservationLedger === undefined) {
+      throw new Error("milestone_observation_ledger_unavailable");
+    }
+    const current = await currentTaskBinding();
+    const trusted = await trustedBindingFor(current);
+    const workspaceRecords = await localIndex.list(trusted);
+    const [review, audit, inventory] = await Promise.all([
+      current.registry.reviewCuration(
+        current.task,
+        current.binding,
+        workspaceRecords,
+        input,
+      ),
+      current.registry.auditCuration(
+        current.task,
+        current.binding,
+        await checkedStableRecords(current),
+      ),
+      current.registry.inventoryForTask(current.task, current.binding),
+    ]);
+    const revalidated = await currentTaskBinding();
+    if (!sameObservationContext(current, revalidated)) {
+      throw new Error("milestone_observation_context_changed");
+    }
+    return await options.milestoneObservationLedger.record({
+      task: current.task,
+      binding: current.binding,
+      review,
+      audit,
+      inventory,
+    });
+  };
+
+  const summarizeCurrentTaskMilestones = async (): Promise<MilestoneObservationSummary> => {
+    if (options.milestoneObservationLedger === undefined) {
+      throw new Error("milestone_observation_ledger_unavailable");
+    }
+    const current = await currentTaskBinding();
+    return await options.milestoneObservationLedger.summary(current.task, current.binding);
+  };
+
   const archiveGraduatedCurrentTaskObjects = async (): Promise<TaskObjectArchiveResult> => {
     const current = await currentTaskBinding();
     const result = await current.registry.archiveGraduated(
@@ -593,6 +659,8 @@ export function createWorkspaceCompanion(
     inventoryCurrentTaskObjects,
     auditCurrentTaskObjects,
     reviewCurrentTaskObjectNeeds,
+    observeCurrentTaskMilestone,
+    summarizeCurrentTaskMilestones,
     archiveGraduatedCurrentTaskObjects,
     stop,
     status,

@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { createWorkspaceCompanion } from "../src/host/codex-cdp/workspace-companion.js";
+import { MilestoneObservationLedger } from "../src/host/codex-cdp/milestone-observation.js";
 import { CodexTaskWorkspaceBindingRegistry } from "../src/host/codex-cdp/task-workspace-binding.js";
 import { TaskObjectRegistry } from "../src/host/codex-cdp/task-object-registry.js";
 import type { CdpConnection, CdpEvent } from "../src/host/codex-cdp/transport.js";
@@ -180,6 +181,9 @@ test("workspace companion manages task objects only for the current bound task",
   const companion = createWorkspaceCompanion({
     registry,
     taskObjectRegistry,
+    milestoneObservationLedger: new MilestoneObservationLedger(
+      join(root, "private-state", "milestone-observations.json"),
+    ),
     refreshIntervalMs: 60_000,
     fetch: async () => targetResponse(),
     connect: async () => new CompanionConnection(),
@@ -289,6 +293,31 @@ evidence.txt:1
     assert.equal(review.missing, 1);
     assert.equal(review.omissionRate, 1 / 3);
     assert.deepEqual(review.items.map((item) => item.state), ["available", "available", "missing"]);
+    const observation = await companion.observeCurrentTaskMilestone({
+      schemaVersion: 1,
+      milestoneKey: "COMPANION-REVIEW-1",
+      needs: [
+        { term: "Companion Lifecycle v2", expectedEntityType: "task", needKind: "resume" },
+        { term: "README.md", expectedEntityType: "document", needKind: "handoff" },
+        { term: "Pilot", expectedEntityType: "concept", needKind: "understand" },
+      ],
+    });
+    assert.equal(observation.review.available, 2);
+    assert.equal(observation.review.missing, 1);
+    assert.equal(observation.needs[0]?.source, "workspace");
+    const observationSummary = await companion.summarizeCurrentTaskMilestones();
+    assert.equal(observationSummary.eventCount, 1);
+    assert.equal(observationSummary.milestoneCount, 1);
+    assert.equal(observationSummary.workspaceAvailable, 2);
+    assert.equal(observationSummary.taskLocalAvailable, 0);
+    assert.equal(observationSummary.latestEventSha256, observation.eventSha256);
+    const observationBody = await readFile(
+      join(root, "private-state", "milestone-observations.json"),
+      "utf8",
+    );
+    assert.equal(observationBody.includes("Companion Lifecycle v2"), false);
+    assert.equal(observationBody.includes("COMPANION-REVIEW-1"), false);
+    assert.equal(observationBody.includes(workspace), false);
     const archive = await companion.archiveGraduatedCurrentTaskObjects();
     assert.equal(archive.kind, "archived");
     assert.equal(archive.archivedCount, 1);
