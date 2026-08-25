@@ -625,8 +625,7 @@ export class MilestoneObservationLedger {
         const previousMissing = previous.filter((candidate) => candidate.state === "missing").length;
         const previousAmbiguous = previous.filter((candidate) => candidate.state === "ambiguous").length;
         const previousTypeMismatch = previous.filter((candidate) => candidate.state === "type_mismatch").length;
-        const previousSameState = previous.filter((candidate) => candidate.state === currentNeed.state).length;
-        const previousGapCount = previousMissing + previousAmbiguous + previousTypeMismatch;
+        const latestPrevious = previous.at(-1);
         let signal: MilestoneObservationFeedbackSignal;
         let action: MilestoneObservationFeedbackAction;
         if (previous.length === 0 && currentNeed.state === "available") {
@@ -635,13 +634,13 @@ export class MilestoneObservationLedger {
         } else if (previous.length === 0) {
           signal = "new_gap";
           action = "watch";
-        } else if (currentNeed.state === "available" && previousGapCount > 0) {
+        } else if (currentNeed.state === "available" && latestPrevious?.state !== "available") {
           signal = "recovered";
           action = "none";
         } else if (currentNeed.state === "available") {
           signal = "stable_available";
           action = "none";
-        } else if (previousSameState > 0) {
+        } else if (latestPrevious?.state === currentNeed.state) {
           signal = "recurring_gap";
           action = "review_registration";
         } else {

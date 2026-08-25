@@ -62,6 +62,11 @@
       "id": "test-execution-runner",
       "kind": "verification",
       "key": "docs/verifications/test-execution-runner.md"
+    },
+    {
+      "id": "p-map-pr63-long-task-replay",
+      "kind": "verification",
+      "key": "docs/verifications/p-map-pr63-long-task-replay.md"
     }
   ]
 }

@@ -199,10 +199,19 @@ test("ephemeral feedback identifies recurring gaps and later recovery", async ()
     assert.equal(third.feedback.items[1]?.previousMissing, 2);
     assert.equal(third.feedback.recoveredCount, 1);
 
+    const fourth = await ledger.record(
+      await observationInput(objects, activeTask, binding, "FEEDBACK-FOUR"),
+    );
+    assert.equal(fourth.feedback.items[1]?.signal, "stable_available");
+    assert.equal(fourth.feedback.items[1]?.action, "none");
+    assert.equal(fourth.feedback.items[1]?.observations, 4);
+    assert.equal(fourth.feedback.items[1]?.previousMissing, 2);
+    assert.equal(fourth.feedback.recoveredCount, 0);
+
     const persisted = await readFile(ledgerPath, "utf8");
     assert.equal(persisted.includes("Unrecorded Design Decision"), false);
     assert.equal(persisted.includes("ephemeral_current_review_feedback"), false);
-    assert.equal((await ledger.summary(activeTask, binding)).eventCount, 3);
+    assert.equal((await ledger.summary(activeTask, binding)).eventCount, 4);
 
     const anotherTask = task("thread-feedback-context-isolation");
     const anotherBinding = await bindings.bind(anotherTask, workspace);
@@ -211,7 +220,7 @@ test("ephemeral feedback identifies recurring gaps and later recovery", async ()
     );
     assert.deepEqual(isolated.feedback.items.map((item) => item.signal), ["new_gap", "new_gap"]);
     assert.ok(isolated.feedback.items.every((item) => item.observations === 1));
-    assert.equal((await ledger.summary(activeTask, binding)).eventCount, 3);
+    assert.equal((await ledger.summary(activeTask, binding)).eventCount, 4);
     assert.equal((await ledger.summary(anotherTask, anotherBinding)).eventCount, 1);
   } finally {
     await rm(root, { recursive: true, force: true });

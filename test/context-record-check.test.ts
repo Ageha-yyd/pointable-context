@@ -177,8 +177,8 @@ test("repository work-result records pass the read-only checker", async () => {
   );
   const result = await checkContextRecords(resolve("."));
   assert.equal(result.valid, true, JSON.stringify(result.issues));
-  assert.equal(result.records.length, 7);
-  assert.equal(result.candidateCount, 7);
+  assert.equal(result.records.length, 8);
+  assert.equal(result.candidateCount, 8);
   assert.equal(await readFile("docs/tasks/work-result-context.md", "utf8"), beforeTask);
   assert.equal(
     await readFile("docs/tasks/study-v2-native-runner.md", "utf8"),

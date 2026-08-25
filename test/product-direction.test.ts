@@ -8,7 +8,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v2.31 adds ephemeral milestone curation feedback without widening renderer authority", async () => {
+test("v2.32 keeps milestone feedback transition-local without widening renderer authority", async () => {
   const [prd, readme, mainSkill, workspaceSkill, recordsSkill, curationDecision, capacityDecision, coverage, compatibility, bundle] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -22,7 +22,7 @@ test("v2.31 adds ephemeral milestone curation feedback without widening renderer
     readFile(resolve("host/workspace-companion.mjs")),
   ]);
 
-  assert.match(prd, /版本：v2\.31/u);
+  assert.match(prd, /版本：v2\.32/u);
   assert.match(prd, /`annotated_click`/u);
   assert.match(prd, /`selection_lookup`/u);
   assert.match(prd, /每条消息最多标 3 个高价值对象/u);
@@ -58,6 +58,7 @@ test("v2.31 adds ephemeral milestone curation feedback without widening renderer
   assert.match(prd, /Private Multi-milestone Observation Ledger/u);
   assert.match(prd, /Ephemeral Milestone Curation Feedback/u);
   assert.match(prd, /只有同状态再次出现的 `recurring_gap` 给 `review_registration`/u);
+  assert.match(prd, /历史缺口不能让恢复永久粘住/u);
   assert.match(prd, /禁止 raw term\/milestone、Chat、事实、文件内容、路径和任务标识/u);
   assert.match(prd, /超过 512 事件或 4 MiB 均 fail closed/u);
   assert.match(prd, /不证明用户理解、时间缩短、Chat Turn 减少或统计显著性/u);
@@ -75,7 +76,7 @@ test("v2.31 adds ephemeral milestone curation feedback without widening renderer
   assert.match(readme, /one primary annotation term per unambiguous object before aliases/u);
   assert.match(
     readme,
-    /current v2\.31 product slice.*automatic Host gates pass 4\/4.*All ten manual interaction gates remain pending/u,
+    /current v2\.32 bundle.*passed automatic Host gates 4\/4.*all ten manual interaction gates remain pending/u,
   );
   assert.match(readme, /object-review --review-file/u);
   assert.match(readme, /available, missing, ambiguous, and type-mismatch/u);
@@ -85,6 +86,7 @@ test("v2.31 adds ephemeral milestone curation feedback without widening renderer
   assert.match(readme, /fails closed at 512 events or 4 MiB/u);
   assert.match(readme, /ephemeral response \(`persisted=false`\)/u);
   assert.match(readme, /Only a recurring gap may return `review_registration`/u);
+  assert.match(readme, /immediately previous observation/u);
 
   assert.match(mainSkill, /two zero-turn entries/u);
   assert.match(mainSkill, /Any registered object not marked remains reachable/u);
@@ -106,6 +108,7 @@ test("v2.31 adds ephemeral milestone curation feedback without widening renderer
   assert.match(workspaceSkill, /must not store raw terms, milestone names, Chat, Provider facts, file content, workspace paths, or task\/thread IDs/u);
   assert.match(workspaceSkill, /milestone-summary --json/u);
   assert.match(workspaceSkill, /measurement=ephemeral_current_review_feedback/u);
+  assert.match(workspaceSkill, /historical gaps must not make recovery sticky/u);
   assert.match(workspaceSkill, /another task\/workspace context starts with no inherited feedback history/u);
   assert.match(workspaceSkill, /Active, unmatched, and ambiguous records never archive/u);
   assert.match(workspaceSkill, /must never migrate objects across another task, route, scope, or workspace/u);
@@ -131,7 +134,7 @@ test("v2.31 adds ephemeral milestone curation feedback without widening renderer
     automatic?: { state?: string };
     manualChecks?: Array<{ result?: string }>;
   };
-  assert.equal(current.implementation?.productVersion, "v2.31");
+  assert.equal(current.implementation?.productVersion, "v2.32");
   assert.equal(
     current.implementation?.rendererBundleSha256,
     createHash("sha256").update(bundle).digest("hex"),
