@@ -293,6 +293,17 @@ evidence.txt:1
     assert.equal(review.missing, 1);
     assert.equal(review.omissionRate, 1 / 3);
     assert.deepEqual(review.items.map((item) => item.state), ["available", "available", "missing"]);
+    await assert.rejects(
+      () => companion.observeCurrentTaskMilestone({
+        schemaVersion: 1,
+        milestoneKey: "COMPANION-INVALID-REVIEW",
+        needs: [
+          { term: "Pilot", expectedEntityType: "concept", needKind: "unsupported" },
+        ],
+      }),
+      /needKind is invalid/u,
+    );
+    assert.equal(companion.status().state, "running");
     const observation = await companion.observeCurrentTaskMilestone({
       schemaVersion: 1,
       milestoneKey: "COMPANION-REVIEW-1",

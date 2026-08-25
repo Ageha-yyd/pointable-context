@@ -579,6 +579,11 @@ export function createWorkspaceCompanion(
     const current = await currentTaskBinding();
     const trusted = await trustedBindingFor(current);
     const workspaceRecords = await localIndex.list(trusted);
+    // Resolve the stable-record input before starting the concurrent jobs. If
+    // reviewCuration rejects synchronously while another argument is still
+    // being awaited, recent Node runtimes can treat that temporarily detached
+    // rejection as fatal before Promise.all gets a chance to observe it.
+    const stableRecords = await checkedStableRecords(current);
     const [review, audit, inventory] = await Promise.all([
       current.registry.reviewCuration(
         current.task,
@@ -589,7 +594,7 @@ export function createWorkspaceCompanion(
       current.registry.auditCuration(
         current.task,
         current.binding,
-        await checkedStableRecords(current),
+        stableRecords,
       ),
       current.registry.inventoryForTask(current.task, current.binding),
     ]);

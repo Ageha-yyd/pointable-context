@@ -67,6 +67,11 @@
       "id": "p-map-pr63-long-task-replay",
       "kind": "verification",
       "key": "docs/verifications/p-map-pr63-long-task-replay.md"
+    },
+    {
+      "id": "vite-pr22642-object-lifecycle-replay",
+      "kind": "verification",
+      "key": "docs/verifications/vite-pr22642-object-lifecycle-replay.md"
     }
   ]
 }

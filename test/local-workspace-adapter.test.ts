@@ -642,3 +642,42 @@ test("workspace index fails closed instead of silently truncating", async () => 
     await rm(fixture.root, { recursive: true, force: true });
   }
 });
+
+test("large workspace indexes the complete development context surface instead of arbitrary files", async () => {
+  const fixture = await workspaceFixture();
+  try {
+    await mkdir(join(fixture.root, "src"));
+    await writeFile(join(fixture.root, "README.md"), "# Project\n", "utf8");
+    await writeFile(join(fixture.root, "src", "index.ts"), "export const value = 1\n", "utf8");
+    await writeFile(join(fixture.root, "asset.bin"), "asset", "utf8");
+    await writeFile(join(fixture.root, "notes.txt"), "notes", "utf8");
+
+    const records = await new LocalWorkspaceContextIndex({
+      maxFiles: 3,
+      maxScannedFiles: 8,
+    }).list(fixture.binding);
+    assert.deepEqual(
+      records.map((record) => record.canonicalKey),
+      ["README.md", "src/index.ts"],
+    );
+    assert.deepEqual(records.map((record) => record.entityType), ["document", "module"]);
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("workspace discovery remains fail closed above its separate scan bound", async () => {
+  const fixture = await workspaceFixture();
+  try {
+    await writeFile(join(fixture.root, "one.bin"), "one", "utf8");
+    await writeFile(join(fixture.root, "two.bin"), "two", "utf8");
+    await writeFile(join(fixture.root, "three.bin"), "three", "utf8");
+    const index = new LocalWorkspaceContextIndex({ maxFiles: 2, maxScannedFiles: 2 });
+    await assert.rejects(
+      () => index.list(fixture.binding),
+      /scanned file count bound/u,
+    );
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});

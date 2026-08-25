@@ -5098,6 +5098,8 @@ function extractDecisionDocumentContext(content) {
 
 // src/adapters/local-workspace.ts
 var DEFAULT_MAX_FILES = 2048;
+var DEFAULT_MAX_SCANNED_FILES = 2e4;
+var MAX_SCANNED_FILES = 1e5;
 var DEFAULT_MAX_DEPTH = 12;
 var MAX_RELATIVE_PATH_CHARS = 512;
 var MAX_PREVIEW_FILE_BYTES = 1024 * 1024;
@@ -5160,6 +5162,9 @@ function workspaceEntityType(relativePath) {
   if (jsonConfigurationPath(relativePath)) return "configuration";
   return "file";
 }
+function developmentContextFile(relativePath) {
+  return workspaceEntityType(relativePath) !== "file";
+}
 function contextArtifactCanonicalName(relativePath) {
   const name = basename3(relativePath);
   const extension = extname3(name);
@@ -5193,8 +5198,8 @@ function fileAliases(relativePath) {
     safeAlias(stem)
   ].filter((value) => value !== void 0 && value !== name))];
 }
-async function scanWorkspace(root, maxFiles, maxDepth, ignoredDirectories, signal) {
-  const files = [];
+async function scanWorkspace(root, maxFiles, maxScannedFiles, maxDepth, ignoredDirectories, signal) {
+  const discovered = [];
   const visit = async (directory, depth) => {
     if (signal?.aborted) throw signal.reason ?? new Error("workspace scan aborted");
     if (depth > maxDepth) {
@@ -5218,23 +5223,41 @@ async function scanWorkspace(root, maxFiles, maxDepth, ignoredDirectories, signa
         throw new ContractError("workspace file path exceeds the representable bound");
       }
       const info = await stat2(absolutePath);
-      files.push({
+      discovered.push({
         absolutePath,
         relativePath,
         size: info.size,
         modifiedMs: info.mtimeMs
       });
-      if (files.length > maxFiles) {
-        throw new ContractError("workspace index exceeds its file count bound");
+      if (discovered.length > maxScannedFiles) {
+        throw new ContractError("workspace discovery exceeds its scanned file count bound");
       }
     }
   };
   await visit(root, 0);
-  return files;
+  if (discovered.length <= maxFiles) {
+    return {
+      files: discovered,
+      scannedFileCount: discovered.length,
+      developmentSurfaceOnly: false
+    };
+  }
+  const files = discovered.filter((file) => developmentContextFile(file.relativePath));
+  if (files.length > maxFiles) {
+    throw new ContractError("workspace development context exceeds its file count bound");
+  }
+  return {
+    files,
+    scannedFileCount: discovered.length,
+    developmentSurfaceOnly: true
+  };
 }
-function indexRevision(files) {
+function indexRevision(scan) {
   const hash = createHash6("sha256");
-  for (const file of files) {
+  hash.update(scan.developmentSurfaceOnly ? "development-surface\n" : "complete-surface\n", "utf8");
+  hash.update(String(scan.scannedFileCount), "utf8");
+  hash.update("\n", "utf8");
+  for (const file of scan.files) {
     hash.update(file.relativePath, "utf8");
     hash.update("\0", "utf8");
     hash.update(String(file.size), "utf8");
@@ -5246,6 +5269,7 @@ function indexRevision(files) {
 }
 var LocalWorkspaceContextIndex = class {
   #maxFiles;
+  #maxScannedFiles;
   #maxDepth;
   #ignoredDirectories;
   constructor(options = {}) {
@@ -5256,6 +5280,16 @@ var LocalWorkspaceContextIndex = class {
       DEFAULT_MAX_FILES,
       "maxFiles"
     );
+    this.#maxScannedFiles = boundedInteger(
+      options.maxScannedFiles,
+      DEFAULT_MAX_SCANNED_FILES,
+      1,
+      MAX_SCANNED_FILES,
+      "maxScannedFiles"
+    );
+    if (this.#maxScannedFiles < this.#maxFiles) {
+      throw new RangeError("maxScannedFiles must be greater than or equal to maxFiles");
+    }
     this.#maxDepth = boundedInteger(options.maxDepth, DEFAULT_MAX_DEPTH, 1, 64, "maxDepth");
     this.#ignoredDirectories = new Set(
       options.ignoredDirectories ?? DEFAULT_IGNORED_DIRECTORIES
@@ -5263,16 +5297,17 @@ var LocalWorkspaceContextIndex = class {
   }
   async list(binding, signal) {
     const root = await verifiedWorkspaceRoot(binding);
-    const files = await scanWorkspace(
+    const scan = await scanWorkspace(
       root,
       this.#maxFiles,
+      this.#maxScannedFiles,
       this.#maxDepth,
       this.#ignoredDirectories,
       signal
     );
-    const revision2 = indexRevision(files);
+    const revision2 = indexRevision(scan);
     const indexedAt = (/* @__PURE__ */ new Date()).toISOString();
-    return files.map((file) => {
+    return scan.files.map((file) => {
       const name = basename3(file.relativePath);
       const parent = portablePath(dirname2(file.relativePath));
       const entityType = workspaceEntityType(file.relativePath);
@@ -8199,6 +8234,7 @@ function curationNeedEntityType(value) {
   return value;
 }
 function curationNeedKind(value) {
+  if (value === "understanding") return "understand";
   if (value !== "understand" && value !== "resume" && value !== "handoff" && value !== "decision" && value !== "status" && value !== "verification") {
     throw new ContractError("needKind is invalid");
   }
@@ -9427,6 +9463,7 @@ function createWorkspaceCompanion(options) {
     const current = await currentTaskBinding();
     const trusted = await trustedBindingFor(current);
     const workspaceRecords = await localIndex.list(trusted);
+    const stableRecords = await checkedStableRecords(current);
     const [review, audit, inventory] = await Promise.all([
       current.registry.reviewCuration(
         current.task,
@@ -9437,7 +9474,7 @@ function createWorkspaceCompanion(options) {
       current.registry.auditCuration(
         current.task,
         current.binding,
-        await checkedStableRecords(current)
+        stableRecords
       ),
       current.registry.inventoryForTask(current.task, current.binding)
     ]);

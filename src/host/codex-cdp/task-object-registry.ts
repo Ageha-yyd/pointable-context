@@ -317,6 +317,9 @@ function curationNeedEntityType(value: unknown): TaskObjectCurationNeedEntityTyp
 }
 
 function curationNeedKind(value: unknown): TaskObjectCurationNeedKind {
+  // `understanding` appeared in the first public Skill wording. Keep it as a
+  // narrow compatibility alias, but persist and report the canonical token.
+  if (value === "understanding") return "understand";
   if (
     value !== "understand" &&
     value !== "resume" &&

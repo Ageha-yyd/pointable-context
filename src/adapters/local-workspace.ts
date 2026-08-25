@@ -61,6 +61,8 @@ import {
 } from "./workspace-scenario.js";
 
 const DEFAULT_MAX_FILES = 2_048;
+const DEFAULT_MAX_SCANNED_FILES = 20_000;
+const MAX_SCANNED_FILES = 100_000;
 const DEFAULT_MAX_DEPTH = 12;
 const MAX_RELATIVE_PATH_CHARS = 512;
 const MAX_PREVIEW_FILE_BYTES = 1024 * 1024;
@@ -83,6 +85,7 @@ const DEFAULT_IGNORED_DIRECTORIES = new Set([
 
 export interface LocalWorkspaceIndexOptions {
   maxFiles?: number;
+  maxScannedFiles?: number;
   maxDepth?: number;
   ignoredDirectories?: Iterable<string>;
 }
@@ -92,6 +95,12 @@ interface IndexedFile {
   relativePath: string;
   size: number;
   modifiedMs: number;
+}
+
+interface WorkspaceScan {
+  files: readonly IndexedFile[];
+  scannedFileCount: number;
+  developmentSurfaceOnly: boolean;
 }
 
 function boundedInteger(
@@ -156,6 +165,10 @@ function workspaceEntityType(relativePath: string): string {
   return "file";
 }
 
+function developmentContextFile(relativePath: string): boolean {
+  return workspaceEntityType(relativePath) !== "file";
+}
+
 function contextArtifactCanonicalName(relativePath: string): string {
   const name = basename(relativePath);
   const extension = extname(name);
@@ -203,11 +216,12 @@ function fileAliases(relativePath: string): string[] {
 async function scanWorkspace(
   root: string,
   maxFiles: number,
+  maxScannedFiles: number,
   maxDepth: number,
   ignoredDirectories: ReadonlySet<string>,
   signal?: AbortSignal,
-): Promise<IndexedFile[]> {
-  const files: IndexedFile[] = [];
+): Promise<WorkspaceScan> {
+  const discovered: IndexedFile[] = [];
   const visit = async (directory: string, depth: number): Promise<void> => {
     if (signal?.aborted) throw signal.reason ?? new Error("workspace scan aborted");
     if (depth > maxDepth) {
@@ -231,24 +245,42 @@ async function scanWorkspace(
         throw new ContractError("workspace file path exceeds the representable bound");
       }
       const info = await stat(absolutePath);
-      files.push({
+      discovered.push({
         absolutePath,
         relativePath,
         size: info.size,
         modifiedMs: info.mtimeMs,
       });
-      if (files.length > maxFiles) {
-        throw new ContractError("workspace index exceeds its file count bound");
+      if (discovered.length > maxScannedFiles) {
+        throw new ContractError("workspace discovery exceeds its scanned file count bound");
       }
     }
   };
   await visit(root, 0);
-  return files;
+  if (discovered.length <= maxFiles) {
+    return {
+      files: discovered,
+      scannedFileCount: discovered.length,
+      developmentSurfaceOnly: false,
+    };
+  }
+  const files = discovered.filter((file) => developmentContextFile(file.relativePath));
+  if (files.length > maxFiles) {
+    throw new ContractError("workspace development context exceeds its file count bound");
+  }
+  return {
+    files,
+    scannedFileCount: discovered.length,
+    developmentSurfaceOnly: true,
+  };
 }
 
-function indexRevision(files: readonly IndexedFile[]): string {
+function indexRevision(scan: WorkspaceScan): string {
   const hash = createHash("sha256");
-  for (const file of files) {
+  hash.update(scan.developmentSurfaceOnly ? "development-surface\n" : "complete-surface\n", "utf8");
+  hash.update(String(scan.scannedFileCount), "utf8");
+  hash.update("\n", "utf8");
+  for (const file of scan.files) {
     hash.update(file.relativePath, "utf8");
     hash.update("\u0000", "utf8");
     hash.update(String(file.size), "utf8");
@@ -261,6 +293,7 @@ function indexRevision(files: readonly IndexedFile[]): string {
 
 export class LocalWorkspaceContextIndex implements ContextIndexPort {
   readonly #maxFiles: number;
+  readonly #maxScannedFiles: number;
   readonly #maxDepth: number;
   readonly #ignoredDirectories: ReadonlySet<string>;
 
@@ -272,6 +305,16 @@ export class LocalWorkspaceContextIndex implements ContextIndexPort {
       DEFAULT_MAX_FILES,
       "maxFiles",
     );
+    this.#maxScannedFiles = boundedInteger(
+      options.maxScannedFiles,
+      DEFAULT_MAX_SCANNED_FILES,
+      1,
+      MAX_SCANNED_FILES,
+      "maxScannedFiles",
+    );
+    if (this.#maxScannedFiles < this.#maxFiles) {
+      throw new RangeError("maxScannedFiles must be greater than or equal to maxFiles");
+    }
     this.#maxDepth = boundedInteger(options.maxDepth, DEFAULT_MAX_DEPTH, 1, 64, "maxDepth");
     this.#ignoredDirectories = new Set(
       options.ignoredDirectories ?? DEFAULT_IGNORED_DIRECTORIES,
@@ -280,16 +323,17 @@ export class LocalWorkspaceContextIndex implements ContextIndexPort {
 
   async list(binding: TrustedContextBinding, signal?: AbortSignal): Promise<IdentityRecord[]> {
     const root = await verifiedWorkspaceRoot(binding);
-    const files = await scanWorkspace(
+    const scan = await scanWorkspace(
       root,
       this.#maxFiles,
+      this.#maxScannedFiles,
       this.#maxDepth,
       this.#ignoredDirectories,
       signal,
     );
-    const revision = indexRevision(files);
+    const revision = indexRevision(scan);
     const indexedAt = new Date().toISOString();
-    return files.map((file) => {
+    return scan.files.map((file) => {
       const name = basename(file.relativePath);
       const parent = portablePath(dirname(file.relativePath));
       const entityType = workspaceEntityType(file.relativePath);

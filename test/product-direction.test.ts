@@ -8,7 +8,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v2.32 keeps milestone feedback transition-local without widening renderer authority", async () => {
+test("v2.33 keeps large-workspace curation complete and control errors process-safe", async () => {
   const [prd, readme, mainSkill, workspaceSkill, recordsSkill, curationDecision, capacityDecision, coverage, compatibility, bundle] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -22,7 +22,7 @@ test("v2.32 keeps milestone feedback transition-local without widening renderer 
     readFile(resolve("host/workspace-companion.mjs")),
   ]);
 
-  assert.match(prd, /版本：v2\.32/u);
+  assert.match(prd, /版本：v2\.33/u);
   assert.match(prd, /`annotated_click`/u);
   assert.match(prd, /`selection_lookup`/u);
   assert.match(prd, /每条消息最多标 3 个高价值对象/u);
@@ -62,6 +62,10 @@ test("v2.32 keeps milestone feedback transition-local without widening renderer 
   assert.match(prd, /禁止 raw term\/milestone、Chat、事实、文件内容、路径和任务标识/u);
   assert.match(prd, /超过 512 事件或 4 MiB 均 fail closed/u);
   assert.match(prd, /不证明用户理解、时间缩短、Chat Turn 减少或统计显著性/u);
+  assert.match(prd, /Large Workspace Development Surface and Crash-safe Control/u);
+  assert.match(prd, /默认最多发现 20,000 个候选文件/u);
+  assert.match(prd, /保持 companion 存活/u);
+  assert.match(prd, /四个噪声里程碑 0 个误建对象/u);
 
   assert.match(readme, /bounded identity-only catalog/u);
   assert.match(readme, /Any registered object omitted by that Top-3 remains reachable/u);
@@ -76,8 +80,10 @@ test("v2.32 keeps milestone feedback transition-local without widening renderer 
   assert.match(readme, /one primary annotation term per unambiguous object before aliases/u);
   assert.match(
     readme,
-    /current v2\.32 bundle.*passed automatic Host gates 4\/4.*all ten manual interaction gates remain pending/u,
+    /current v2\.33 bundle.*passed automatic Host gates 4\/4.*all ten manual interaction gates remain pending/u,
   );
+  assert.match(readme, /complete development-context surface/u);
+  assert.match(readme, /malformed milestone review returns an error without killing the detached companion/u);
   assert.match(readme, /object-review --review-file/u);
   assert.match(readme, /available, missing, ambiguous, and type-mismatch/u);
   assert.match(readme, /Private multi-milestone observation/u);
@@ -109,6 +115,7 @@ test("v2.32 keeps milestone feedback transition-local without widening renderer 
   assert.match(workspaceSkill, /milestone-summary --json/u);
   assert.match(workspaceSkill, /measurement=ephemeral_current_review_feedback/u);
   assert.match(workspaceSkill, /historical gaps must not make recovery sticky/u);
+  assert.match(workspaceSkill, /JSON token for an understanding need is exactly `"understand"`/u);
   assert.match(workspaceSkill, /another task\/workspace context starts with no inherited feedback history/u);
   assert.match(workspaceSkill, /Active, unmatched, and ambiguous records never archive/u);
   assert.match(workspaceSkill, /must never migrate objects across another task, route, scope, or workspace/u);
@@ -128,13 +135,14 @@ test("v2.32 keeps milestone feedback transition-local without widening renderer 
   assert.match(coverage, /"id": "task-object-capacity"/u);
   assert.match(coverage, /"id": "test-execution-runner"/u);
   assert.match(coverage, /"id": "milestone-observation-ledger"/u);
+  assert.match(coverage, /"id": "vite-pr22642-object-lifecycle-replay"/u);
 
   const current = JSON.parse(compatibility) as {
     implementation?: { productVersion?: string; rendererBundleSha256?: string };
     automatic?: { state?: string };
     manualChecks?: Array<{ result?: string }>;
   };
-  assert.equal(current.implementation?.productVersion, "v2.32");
+  assert.equal(current.implementation?.productVersion, "v2.33");
   assert.equal(
     current.implementation?.rendererBundleSha256,
     createHash("sha256").update(bundle).digest("hex"),

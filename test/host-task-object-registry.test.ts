@@ -115,6 +115,12 @@ test("task object input is strict and type-specific", () => {
     needs: [{ term: "Pilot", expectedEntityType: "concept", needKind: "understand" }],
   });
   assert.equal(review.needs[0]?.term, "Pilot");
+  const compatibilityReview = parseTaskObjectCurationReviewInput({
+    schemaVersion: 1,
+    milestoneKey: "MILESTONE-ALIAS",
+    needs: [{ term: "Pilot", expectedEntityType: "concept", needKind: "understanding" }],
+  });
+  assert.equal(compatibilityReview.needs[0]?.needKind, "understand");
   assert.throws(
     () => parseTaskObjectCurationReviewInput({
       schemaVersion: 1,
