@@ -21,7 +21,7 @@ P-C 微型心智模型、动态刷新和当前精确 Codex build 已完成资格
 
 ## 证据
 
-> 开展长周期 dogfood，重点观察延迟重返、跨会话恢复、状态漂移和任务交接；当前显式 Coverage 已扩展到 14 个期望对象，2026-08-26 实测 14/14 available，另有 1 个当前任务 partial Task 用于策展校准；
+> 已建立长周期恢复基线：三个明确需要的对象 3/3 available、无遗漏或歧义；`Long Task Recovery Dogfood` 通过 Record Gate 后从 task-local partial 层升级为有证据的稳定 Task，临时对象退役归档，复验 3/3 均来自 workspace；当前显式 Coverage 扩展为 15 个期望对象，2026-08-26 实测 15/15 available。下一次自然延迟重返或新任务将复验真实理解恢复与状态漂移；
 
 ## 来源
 

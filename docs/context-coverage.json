@@ -44,6 +44,11 @@
       "key": "docs/tasks/work-result-context.md"
     },
     {
+      "id": "long-task-recovery-dogfood-task",
+      "kind": "task",
+      "key": "docs/tasks/long-task-recovery-dogfood.md"
+    },
+    {
       "id": "task-verification-contract",
       "kind": "verification",
       "key": "docs/verifications/task-verification-contract.md"

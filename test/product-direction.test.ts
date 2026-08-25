@@ -66,6 +66,8 @@ test("v2.33 keeps large-workspace curation complete and control errors process-s
   assert.match(prd, /默认最多发现 20,000 个候选文件/u);
   assert.match(prd, /保持 companion 存活/u);
   assert.match(prd, /四个噪声里程碑 0 个误建对象/u);
+  assert.match(prd, /三个明确需要的对象 3\/3 available/u);
+  assert.match(prd, /升级为有证据的稳定 Task/u);
 
   assert.match(readme, /bounded identity-only catalog/u);
   assert.match(readme, /Any registered object omitted by that Top-3 remains reachable/u);
@@ -84,6 +86,7 @@ test("v2.33 keeps large-workspace curation complete and control errors process-s
   );
   assert.match(readme, /complete development-context surface/u);
   assert.match(readme, /malformed milestone review returns an error without killing the detached companion/u);
+  assert.match(readme, /later Codex task can recover it without inheriting private task-local state/u);
   assert.match(readme, /object-review --review-file/u);
   assert.match(readme, /available, missing, ambiguous, and type-mismatch/u);
   assert.match(readme, /Private multi-milestone observation/u);
@@ -136,6 +139,7 @@ test("v2.33 keeps large-workspace curation complete and control errors process-s
   assert.match(coverage, /"id": "test-execution-runner"/u);
   assert.match(coverage, /"id": "milestone-observation-ledger"/u);
   assert.match(coverage, /"id": "vite-pr22642-object-lifecycle-replay"/u);
+  assert.match(coverage, /"id": "long-task-recovery-dogfood-task"/u);
 
   const current = JSON.parse(compatibility) as {
     implementation?: { productVersion?: string; rendererBundleSha256?: string };
