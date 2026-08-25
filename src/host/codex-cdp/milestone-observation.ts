@@ -83,6 +83,48 @@ export interface MilestoneObservationInput {
   inventory: TaskObjectInventory;
 }
 
+export type MilestoneObservationFeedbackSignal =
+  | "first_observation"
+  | "stable_available"
+  | "new_gap"
+  | "recurring_gap"
+  | "changed_gap"
+  | "recovered";
+
+export type MilestoneObservationFeedbackAction =
+  | "none"
+  | "watch"
+  | "review_registration";
+
+export interface MilestoneObservationFeedbackItem {
+  term: string;
+  expectedEntityType: TaskObjectCurationNeedEntityType;
+  needKind: TaskObjectCurationNeedKind;
+  currentState: TaskObjectCurationNeedState;
+  observations: number;
+  previousAvailable: number;
+  previousMissing: number;
+  previousAmbiguous: number;
+  previousTypeMismatch: number;
+  signal: MilestoneObservationFeedbackSignal;
+  action: MilestoneObservationFeedbackAction;
+}
+
+export interface MilestoneObservationFeedback {
+  measurement: "ephemeral_current_review_feedback";
+  persisted: false;
+  items: readonly MilestoneObservationFeedbackItem[];
+  newGapCount: number;
+  recurringGapCount: number;
+  changedGapCount: number;
+  recoveredCount: number;
+}
+
+export interface MilestoneObservationRecordResult {
+  event: MilestoneObservationEvent;
+  feedback: MilestoneObservationFeedback;
+}
+
 export interface MilestoneRecurringNeedSummary {
   termSha256: string;
   observations: number;
@@ -128,6 +170,10 @@ function exactKeys(value: Record<string, unknown>, expected: readonly string[]):
 
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function termSha256(value: string): string {
+  return sha256(value.normalize("NFKC").trim().toLocaleLowerCase("en-US"));
 }
 
 function isSha256(value: unknown): value is string {
@@ -501,7 +547,7 @@ export class MilestoneObservationLedger {
     }
   }
 
-  async record(input: MilestoneObservationInput): Promise<MilestoneObservationEvent> {
+  async record(input: MilestoneObservationInput): Promise<MilestoneObservationRecordResult> {
     return await this.#exclusive(async () => {
       const path = await this.#privatePath(input.binding.workspaceRoot);
       const document = await this.#read(path);
@@ -520,7 +566,7 @@ export class MilestoneObservationLedger {
         resolutionFailureRate: input.review.resolutionFailureRate,
       });
       const needs = input.review.items.map((item): MilestoneObservationNeed => Object.freeze({
-        termSha256: sha256(item.term.normalize("NFKC").trim().toLocaleLowerCase("en-US")),
+        termSha256: termSha256(item.term),
         expectedEntityType: item.expectedEntityType,
         needKind: item.needKind,
         state: item.state,
@@ -547,12 +593,13 @@ export class MilestoneObservationLedger {
         archivedRecords: input.inventory.capacity.archivedRecords,
         warnings: Object.freeze([...input.inventory.capacity.warnings]),
       });
+      const contextSha256 = milestoneObservationContextSha256(input.task, input.binding);
       const unsigned = {
         schemaVersion: 1 as const,
         eventId: randomUUID(),
         observedAt: input.review.observedAt,
         milestoneSha256: sha256(input.review.milestoneKey),
-        contextSha256: milestoneObservationContextSha256(input.task, input.binding),
+        contextSha256,
         bindingSha256: sha256(input.binding.bindingRevision),
         indexSnapshot: input.review.indexSnapshot,
         review,
@@ -568,7 +615,63 @@ export class MilestoneObservationLedger {
       parseEvent(event);
       document.events.push(event);
       await this.#write(path, document);
-      return event;
+      const feedbackItems = input.review.items.map((item, index): MilestoneObservationFeedbackItem => {
+        const currentNeed = needs[index]!;
+        const previous = document.events.slice(0, -1)
+          .filter((candidate) => candidate.contextSha256 === contextSha256)
+          .flatMap((candidate) => candidate.needs)
+          .filter((candidate) => candidate.termSha256 === currentNeed.termSha256);
+        const previousAvailable = previous.filter((candidate) => candidate.state === "available").length;
+        const previousMissing = previous.filter((candidate) => candidate.state === "missing").length;
+        const previousAmbiguous = previous.filter((candidate) => candidate.state === "ambiguous").length;
+        const previousTypeMismatch = previous.filter((candidate) => candidate.state === "type_mismatch").length;
+        const previousSameState = previous.filter((candidate) => candidate.state === currentNeed.state).length;
+        const previousGapCount = previousMissing + previousAmbiguous + previousTypeMismatch;
+        let signal: MilestoneObservationFeedbackSignal;
+        let action: MilestoneObservationFeedbackAction;
+        if (previous.length === 0 && currentNeed.state === "available") {
+          signal = "first_observation";
+          action = "none";
+        } else if (previous.length === 0) {
+          signal = "new_gap";
+          action = "watch";
+        } else if (currentNeed.state === "available" && previousGapCount > 0) {
+          signal = "recovered";
+          action = "none";
+        } else if (currentNeed.state === "available") {
+          signal = "stable_available";
+          action = "none";
+        } else if (previousSameState > 0) {
+          signal = "recurring_gap";
+          action = "review_registration";
+        } else {
+          signal = "changed_gap";
+          action = "watch";
+        }
+        return Object.freeze({
+          term: item.term,
+          expectedEntityType: item.expectedEntityType,
+          needKind: item.needKind,
+          currentState: currentNeed.state,
+          observations: previous.length + 1,
+          previousAvailable,
+          previousMissing,
+          previousAmbiguous,
+          previousTypeMismatch,
+          signal,
+          action,
+        });
+      });
+      const feedback: MilestoneObservationFeedback = Object.freeze({
+        measurement: "ephemeral_current_review_feedback",
+        persisted: false,
+        items: Object.freeze(feedbackItems),
+        newGapCount: feedbackItems.filter((item) => item.signal === "new_gap").length,
+        recurringGapCount: feedbackItems.filter((item) => item.signal === "recurring_gap").length,
+        changedGapCount: feedbackItems.filter((item) => item.signal === "changed_gap").length,
+        recoveredCount: feedbackItems.filter((item) => item.signal === "recovered").length,
+      });
+      return Object.freeze({ event, feedback });
     });
   }
 

@@ -54,7 +54,12 @@ export {
   MilestoneObservationLedger,
   milestoneObservationContextSha256,
   type MilestoneObservationEvent,
+  type MilestoneObservationFeedback,
+  type MilestoneObservationFeedbackAction,
+  type MilestoneObservationFeedbackItem,
+  type MilestoneObservationFeedbackSignal,
   type MilestoneObservationInput,
+  type MilestoneObservationRecordResult,
   type MilestoneObservationSummary,
 } from "./milestone-observation.js";
 export {

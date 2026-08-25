@@ -25,4 +25,4 @@ P-C 微型心智模型、动态刷新和当前精确 Codex build 已完成资格
 
 ## 来源
 
-docs/PRD-inline-pointable-widgets.md:834
+docs/PRD-inline-pointable-widgets.md:850

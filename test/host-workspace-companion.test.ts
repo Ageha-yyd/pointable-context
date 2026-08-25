@@ -302,15 +302,21 @@ evidence.txt:1
         { term: "Pilot", expectedEntityType: "concept", needKind: "understand" },
       ],
     });
-    assert.equal(observation.review.available, 2);
-    assert.equal(observation.review.missing, 1);
-    assert.equal(observation.needs[0]?.source, "workspace");
+    assert.equal(observation.event.review.available, 2);
+    assert.equal(observation.event.review.missing, 1);
+    assert.equal(observation.event.needs[0]?.source, "workspace");
+    assert.equal(observation.feedback.persisted, false);
+    assert.deepEqual(observation.feedback.items.map((item) => item.signal), [
+      "first_observation",
+      "first_observation",
+      "new_gap",
+    ]);
     const observationSummary = await companion.summarizeCurrentTaskMilestones();
     assert.equal(observationSummary.eventCount, 1);
     assert.equal(observationSummary.milestoneCount, 1);
     assert.equal(observationSummary.workspaceAvailable, 2);
     assert.equal(observationSummary.taskLocalAvailable, 0);
-    assert.equal(observationSummary.latestEventSha256, observation.eventSha256);
+    assert.equal(observationSummary.latestEventSha256, observation.event.eventSha256);
     const observationBody = await readFile(
       join(root, "private-state", "milestone-observations.json"),
       "utf8",

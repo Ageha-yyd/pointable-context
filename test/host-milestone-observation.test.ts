@@ -49,6 +49,24 @@ function conceptInput() {
   } as const;
 }
 
+function decisionInput() {
+  return {
+    schemaVersion: 1,
+    objectKey: "OBSERVATION-DECISION",
+    entityType: "decision",
+    canonicalName: "Unrecorded Design Decision",
+    aliases: [],
+    summary: "用于验证重复缺口在显式登记后被识别为已恢复。",
+    mentalModel: {
+      kind: "decision",
+      problem: "重复需要的决策对象尚不可查询。",
+      choice: "在稳定里程碑显式登记任务内决策。",
+      consequence: "后续同一明确术语可以确定性恢复。",
+      evidence: "测试构造的当前任务 Registry。",
+    },
+  } as const;
+}
+
 async function observationInput(
   objects: TaskObjectRegistry,
   activeTask: CodexHostTaskContext,
@@ -92,15 +110,18 @@ test("private milestone ledger stores only digests and bounded aggregate signals
   try {
     const firstInput = await observationInput(objects, activeTask, binding, "PRIVATE-MILESTONE-ONE");
     const first = await ledger.record(firstInput);
-    assert.match(first.eventSha256, /^[a-f0-9]{64}$/u);
-    assert.equal(first.contextSha256, milestoneObservationContextSha256(activeTask, binding));
-    assert.equal(first.review.available, 1);
-    assert.equal(first.review.missing, 1);
-    assert.equal(first.needs[0]?.source, "task_local");
+    assert.match(first.event.eventSha256, /^[a-f0-9]{64}$/u);
+    assert.equal(first.event.contextSha256, milestoneObservationContextSha256(activeTask, binding));
+    assert.equal(first.event.review.available, 1);
+    assert.equal(first.event.review.missing, 1);
+    assert.equal(first.event.needs[0]?.source, "task_local");
     assert.equal(
-      first.needs[0]?.termSha256,
+      first.event.needs[0]?.termSha256,
       sha256("Private Observation Concept".normalize("NFKC").trim().toLocaleLowerCase("en-US")),
     );
+    assert.equal(first.feedback.persisted, false);
+    assert.deepEqual(first.feedback.items.map((item) => item.signal), ["first_observation", "new_gap"]);
+    assert.deepEqual(first.feedback.items.map((item) => item.action), ["none", "watch"]);
 
     const persisted = await readFile(ledgerPath, "utf8");
     for (const forbidden of [
@@ -117,7 +138,10 @@ test("private milestone ledger stores only digests and bounded aggregate signals
     assert.equal(persisted.includes("term\""), false);
 
     const secondInput = await observationInput(objects, activeTask, binding, "PRIVATE-MILESTONE-TWO");
-    await ledger.record(secondInput);
+    const second = await ledger.record(secondInput);
+    assert.deepEqual(second.feedback.items.map((item) => item.signal), ["stable_available", "recurring_gap"]);
+    assert.equal(second.feedback.recurringGapCount, 1);
+    assert.equal(second.feedback.items[1]?.action, "review_registration");
     const summary = await ledger.summary(activeTask, binding);
     assert.equal(summary.measurement, "private_milestone_observation");
     assert.equal(summary.eventCount, 2);
@@ -139,6 +163,61 @@ test("private milestone ledger stores only digests and bounded aggregate signals
   }
 });
 
+test("ephemeral feedback identifies recurring gaps and later recovery", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pointable-milestone-feedback-"));
+  const workspace = join(root, "workspace");
+  await mkdir(workspace);
+  const activeTask = task("thread-feedback-transition");
+  const bindings = new CodexTaskWorkspaceBindingRegistry(join(root, "bindings.json"));
+  const binding = await bindings.bind(activeTask, workspace);
+  const objects = new TaskObjectRegistry(join(root, "task-objects.json"));
+  await objects.upsert(activeTask, binding, conceptInput());
+  const ledgerPath = join(root, "private", "milestones.json");
+  const ledger = new MilestoneObservationLedger(ledgerPath);
+  try {
+    const first = await ledger.record(
+      await observationInput(objects, activeTask, binding, "FEEDBACK-ONE"),
+    );
+    assert.equal(first.feedback.items[1]?.signal, "new_gap");
+    assert.equal(first.feedback.items[1]?.action, "watch");
+
+    const second = await ledger.record(
+      await observationInput(objects, activeTask, binding, "FEEDBACK-TWO"),
+    );
+    assert.equal(second.feedback.items[1]?.signal, "recurring_gap");
+    assert.equal(second.feedback.items[1]?.action, "review_registration");
+    assert.equal(second.feedback.items[1]?.observations, 2);
+    assert.equal(second.feedback.items[1]?.previousMissing, 1);
+
+    await objects.upsert(activeTask, binding, decisionInput());
+    const third = await ledger.record(
+      await observationInput(objects, activeTask, binding, "FEEDBACK-THREE"),
+    );
+    assert.equal(third.feedback.items[1]?.signal, "recovered");
+    assert.equal(third.feedback.items[1]?.action, "none");
+    assert.equal(third.feedback.items[1]?.observations, 3);
+    assert.equal(third.feedback.items[1]?.previousMissing, 2);
+    assert.equal(third.feedback.recoveredCount, 1);
+
+    const persisted = await readFile(ledgerPath, "utf8");
+    assert.equal(persisted.includes("Unrecorded Design Decision"), false);
+    assert.equal(persisted.includes("ephemeral_current_review_feedback"), false);
+    assert.equal((await ledger.summary(activeTask, binding)).eventCount, 3);
+
+    const anotherTask = task("thread-feedback-context-isolation");
+    const anotherBinding = await bindings.bind(anotherTask, workspace);
+    const isolated = await ledger.record(
+      await observationInput(objects, anotherTask, anotherBinding, "FEEDBACK-ISOLATED"),
+    );
+    assert.deepEqual(isolated.feedback.items.map((item) => item.signal), ["new_gap", "new_gap"]);
+    assert.ok(isolated.feedback.items.every((item) => item.observations === 1));
+    assert.equal((await ledger.summary(activeTask, binding)).eventCount, 3);
+    assert.equal((await ledger.summary(anotherTask, anotherBinding)).eventCount, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("private milestone ledger accepts state on a different Windows volume", {
   skip: process.platform !== "win32" || parse(process.cwd()).root === parse(tmpdir()).root,
 }, async () => {
@@ -153,7 +232,7 @@ test("private milestone ledger accepts state on a different Windows volume", {
   try {
     const input = await observationInput(objects, activeTask, binding, "CROSS-VOLUME-PRIVATE");
     const event = await ledger.record(input);
-    assert.match(event.eventSha256, /^[a-f0-9]{64}$/u);
+    assert.match(event.event.eventSha256, /^[a-f0-9]{64}$/u);
     assert.equal((await ledger.summary(activeTask, binding)).eventCount, 1);
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -180,8 +259,8 @@ test("milestone ledger serializes concurrent events and validates the hash chain
       ledger.record(firstInput),
       ledger.record(secondInput),
     ]);
-    assert.equal(first.previousEventSha256, null);
-    assert.equal(second.previousEventSha256, first.eventSha256);
+    assert.equal(first.event.previousEventSha256, null);
+    assert.equal(second.event.previousEventSha256, first.event.eventSha256);
 
     const document = JSON.parse(await readFile(ledgerPath, "utf8")) as {
       events: Array<Record<string, unknown>>;

@@ -23,7 +23,7 @@ import { createWorkspaceLookupCallback } from "./workspace-lookup.js";
 import { createWorkspaceAnnotationProvider } from "./workspace-annotations.js";
 import {
   MilestoneObservationLedger,
-  type MilestoneObservationEvent,
+  type MilestoneObservationRecordResult,
   type MilestoneObservationSummary,
 } from "./milestone-observation.js";
 import {
@@ -116,7 +116,7 @@ export interface WorkspaceCompanion {
   inventoryCurrentTaskObjects(): Promise<TaskObjectInventory>;
   auditCurrentTaskObjects(): Promise<TaskObjectCurationAudit>;
   reviewCurrentTaskObjectNeeds(input: unknown): Promise<TaskObjectCurationReview>;
-  observeCurrentTaskMilestone(input: unknown): Promise<MilestoneObservationEvent>;
+  observeCurrentTaskMilestone(input: unknown): Promise<MilestoneObservationRecordResult>;
   summarizeCurrentTaskMilestones(): Promise<MilestoneObservationSummary>;
   archiveGraduatedCurrentTaskObjects(): Promise<TaskObjectArchiveResult>;
   stop(): Promise<WorkspaceCompanionStatus>;
@@ -572,7 +572,7 @@ export function createWorkspaceCompanion(
 
   const observeCurrentTaskMilestone = async (
     input: unknown,
-  ): Promise<MilestoneObservationEvent> => {
+  ): Promise<MilestoneObservationRecordResult> => {
     if (options.milestoneObservationLedger === undefined) {
       throw new Error("milestone_observation_ledger_unavailable");
     }

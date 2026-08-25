@@ -7680,6 +7680,9 @@ function exactKeys3(value, expected) {
 function sha2563(value) {
   return createHash9("sha256").update(value, "utf8").digest("hex");
 }
+function termSha256(value) {
+  return sha2563(value.normalize("NFKC").trim().toLocaleLowerCase("en-US"));
+}
 function isSha256(value) {
   return typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
 }
@@ -7978,7 +7981,7 @@ var MilestoneObservationLedger = class {
         resolutionFailureRate: input.review.resolutionFailureRate
       });
       const needs = input.review.items.map((item) => Object.freeze({
-        termSha256: sha2563(item.term.normalize("NFKC").trim().toLocaleLowerCase("en-US")),
+        termSha256: termSha256(item.term),
         expectedEntityType: item.expectedEntityType,
         needKind: item.needKind,
         state: item.state,
@@ -8005,12 +8008,13 @@ var MilestoneObservationLedger = class {
         archivedRecords: input.inventory.capacity.archivedRecords,
         warnings: Object.freeze([...input.inventory.capacity.warnings])
       });
+      const contextSha256 = milestoneObservationContextSha256(input.task, input.binding);
       const unsigned = {
         schemaVersion: 1,
         eventId: randomUUID4(),
         observedAt: input.review.observedAt,
         milestoneSha256: sha2563(input.review.milestoneKey),
-        contextSha256: milestoneObservationContextSha256(input.task, input.binding),
+        contextSha256,
         bindingSha256: sha2563(input.binding.bindingRevision),
         indexSnapshot: input.review.indexSnapshot,
         review,
@@ -8026,7 +8030,60 @@ var MilestoneObservationLedger = class {
       parseEvent(event);
       document2.events.push(event);
       await this.#write(path, document2);
-      return event;
+      const feedbackItems = input.review.items.map((item, index) => {
+        const currentNeed = needs[index];
+        const previous = document2.events.slice(0, -1).filter((candidate) => candidate.contextSha256 === contextSha256).flatMap((candidate) => candidate.needs).filter((candidate) => candidate.termSha256 === currentNeed.termSha256);
+        const previousAvailable = previous.filter((candidate) => candidate.state === "available").length;
+        const previousMissing = previous.filter((candidate) => candidate.state === "missing").length;
+        const previousAmbiguous = previous.filter((candidate) => candidate.state === "ambiguous").length;
+        const previousTypeMismatch = previous.filter((candidate) => candidate.state === "type_mismatch").length;
+        const previousSameState = previous.filter((candidate) => candidate.state === currentNeed.state).length;
+        const previousGapCount = previousMissing + previousAmbiguous + previousTypeMismatch;
+        let signal;
+        let action;
+        if (previous.length === 0 && currentNeed.state === "available") {
+          signal = "first_observation";
+          action = "none";
+        } else if (previous.length === 0) {
+          signal = "new_gap";
+          action = "watch";
+        } else if (currentNeed.state === "available" && previousGapCount > 0) {
+          signal = "recovered";
+          action = "none";
+        } else if (currentNeed.state === "available") {
+          signal = "stable_available";
+          action = "none";
+        } else if (previousSameState > 0) {
+          signal = "recurring_gap";
+          action = "review_registration";
+        } else {
+          signal = "changed_gap";
+          action = "watch";
+        }
+        return Object.freeze({
+          term: item.term,
+          expectedEntityType: item.expectedEntityType,
+          needKind: item.needKind,
+          currentState: currentNeed.state,
+          observations: previous.length + 1,
+          previousAvailable,
+          previousMissing,
+          previousAmbiguous,
+          previousTypeMismatch,
+          signal,
+          action
+        });
+      });
+      const feedback = Object.freeze({
+        measurement: "ephemeral_current_review_feedback",
+        persisted: false,
+        items: Object.freeze(feedbackItems),
+        newGapCount: feedbackItems.filter((item) => item.signal === "new_gap").length,
+        recurringGapCount: feedbackItems.filter((item) => item.signal === "recurring_gap").length,
+        changedGapCount: feedbackItems.filter((item) => item.signal === "changed_gap").length,
+        recoveredCount: feedbackItems.filter((item) => item.signal === "recovered").length
+      });
+      return Object.freeze({ event, feedback });
     });
   }
   async summary(task, binding) {
@@ -9877,7 +9934,7 @@ async function runServer(arguments_) {
     }
     if (request.method === "POST" && request.url === "/milestones/observe") {
       void readRequestJson(request).then(async (body) => await companion.observeCurrentTaskMilestone(body.review)).then(
-        (event) => sendJson(response, 200, { ok: true, event }),
+        (result) => sendJson(response, 200, { ok: true, ...result }),
         (error) => sendJson(response, 409, {
           ok: false,
           error: error instanceof Error ? error.message : "milestone_observation_failed"

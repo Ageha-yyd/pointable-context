@@ -564,7 +564,7 @@ async function runServer(arguments_: ParsedArguments): Promise<void> {
     if (request.method === "POST" && request.url === "/milestones/observe") {
       void readRequestJson(request).then(async (body) =>
         await companion.observeCurrentTaskMilestone(body.review)).then(
-        (event) => sendJson(response, 200, { ok: true, event }),
+        (result) => sendJson(response, 200, { ok: true, ...result }),
         (error: unknown) => sendJson(response, 409, {
           ok: false,
           error: error instanceof Error ? error.message : "milestone_observation_failed",
