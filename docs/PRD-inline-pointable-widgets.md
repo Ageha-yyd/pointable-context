@@ -1,7 +1,7 @@
 # PRD：Quiet Context Reveal（轻标注 + 选区式上下文速览）
 
 - 版本：v2.33
-- 状态：P-C 微型心智模型继续作为详情默认；v2.33 由公开 Vite PR #22642 的完整 11-commit replay 驱动，补齐大型 workspace 的两级发现/索引边界，并修复非法 milestone review 可因暂时 detached rejection 终止 companion 的问题。回放只创建 Task、Concept、Decision、Change 的必要身份，正确执行一次 supersede 与一次 retire，四个 merge/link/test-only 噪声里程碑均未新增对象。随后建立首个真实恢复基线，三个明确需要的对象 3/3 available；当前恢复 Task 通过 Record Gate 后从 task-local partial 层升级为跨任务稳定制品，临时副本退役并归档，复验 3/3 均来自 workspace。全新 Codex 任务随后仅绑定同一 workspace，通过原生 Chat Lane 打开稳定 Task 卡，用户确认可直接回答目标、当前状态、已完成、下一步和边界。bundled Host digest 为 `73e78bbc…08d2`；已在精确 `OpenAI.Codex 26.818.5229.0` 重装并通过自动 Host 4/4，人工十项继续集中到功能冻结 RC。受控效率实验继续暂缓到功能和跨 build 兼容性收口之后
+- 状态：P-C 微型心智模型继续作为详情默认；v2.33 已完成 Vite 11-commit replay、大型 workspace 两级发现/索引修复、恢复 Task 的稳定制品升级，以及全新 Codex 任务中的原生跨任务恢复人工 PASS。随后新增不挂载 Renderer、也不进入正式 study-v2 的 Recovery Observation Prototype：匿名相对时间事件可自动派生恢复、活跃卡片、活跃导航、Chat Turn、交互、错对象、刷新和失败指标，三类合成回放与新增测试 6/6、完整回归 336/336 通过。bundled Host digest 仍为未改变的 `73e78bbc…08d2`，精确 `OpenAI.Codex 26.818.5229.0` 自动 Host 4/4；该测量原型不继承或改变人工十项资格，也不构成人效证据
 - 日期：2026-08-26
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
@@ -815,7 +815,7 @@ v2.20 的默认 `runStudyV2NativeTrial` 在其上完成组合：独立 App Serve
 - revision detail ref 的过期、task 重绑定、context 与容量 fail-closed 约束；
 - 无后台遥测的可重复技术延迟基准，以及 counterbalanced 人工 A/B 协议；
 - 冻结 study pack v1：P-A/P-B/P-C 与 A/B 两层分配、六类任务、exact-evidence answer key、隔离 Git workspace、revision mutation、隐私日志与 pack digest 校验；
-- 显式长任务 Context Coverage：严格声明 Module/Decision/Task/Verification，逐项复验 Index + Provider + Record Check，并分开输出 coverage/omission/projection-failure/redundancy；当前仓库声明已扩展到 16 个对象，2026-08-26 实测 16/16 available、coverage 1.0、omission/projection-failure/redundancy 均为 0。该结果只覆盖显式声明集合，不证明作者没有漏掉未声明的重要对象。
+- 显式长任务 Context Coverage：严格声明 Module/Decision/Task/Verification，逐项复验 Index + Provider + Record Check，并分开输出 coverage/omission/projection-failure/redundancy；当前仓库声明已扩展到 18 个对象，2026-08-26 实测 18/18 available、coverage 1.0、omission/projection-failure/redundancy 均为 0。该结果只覆盖显式声明集合，不证明作者没有漏掉未声明的重要对象。
 - 逐 build 兼容性资格记录与只读检查器：绑定 `OpenAI.Codex` package/executable 版本、renderer bundle digest、自动四层 gates 和十项 evidence-bound 人工门禁；renderer 变化后人工证据必须重做，不能沿用旧 digest；
 - study-v2 原生事件到严格结果的自动管线：trial-relative monotonic timing、冻结 scoring contract、客观指标推导、六轮 sequence 归一化、trial/event 交叉校验和临时目录原子发布；
 - study-v2 六轮 session orchestration：逐轮 digest checkpoint、连续前缀恢复、环境/pack/participant/slot/build 复验、`awaiting_questionnaire` 两阶段终结、未完成试次 fail-closed、原生 Chat Lane 五量表问卷和完成回执；
@@ -837,7 +837,7 @@ v2.20 的默认 `runStudyV2NativeTrial` 在其上完成组合：独立 App Serve
 - 已完成一次公开真实历史的压缩长任务 dogfood：将 `sindresorhus/p-map` PR #63 从功能出现前到最终 head 的一年跨度压缩为 7 个 Git 节点，固定检查两个 workspace 对象并让 `pMapIterable` Concept、`Async Generator Rewrite` Decision 依次经历 new gap、recurring gap、登记与 recovery；最终 4/4 available，项目自身 `xo + ava + tsd` 实际通过且 AVA 为 48 tests passed。该 replay 暴露并驱动修复 sticky recovery，也暴露大小写重复 alias 会 fail closed；它验证机制，不构成人效证据；
 - 已完成第二次公开真实历史 replay：Vite PR #22642 以 base + 全部 11 commits 形成 12 个里程碑，驱动 Task、Concept、Decision、Change 的稳定登记、原位更新、一次显式 supersede 与最终 retire；四个 merge/link/test-only 里程碑未误建对象。回放暴露并修复大型 workspace 静默不可用和非法 review 终止 companion 两个问题；最终当前 need 5/5 available，但未运行 Vite 项目测试，也不构成人效证据；
 - 证明不同 Codex Desktop 版本中的 Host Adapter 兼容性；
-- 已完成一次即时跨任务原生恢复人工验收；继续在真实长周期任务中验证延迟重返、状态漂移和交接效果，并测量恢复耗时与额外 Chat Turn，短任务受控效率研究暂缓。
+- 已完成一次即时跨任务原生恢复人工验收，并建立不挂载 Renderer 的 Recovery Observation Prototype；下一步先把经过验证的匿名事件合同接到显式启用的本地开发 observer，再观察真实延迟重返、状态漂移和交接，短任务受控效率研究暂缓。
 - study-v2 原生 Chat Lane 问卷已通过当前 build 的有界形成性验收，包括未选满禁用、五项提交、无 Chat Turn、收起后可见重进入口、状态保留与最终清理；仍缺干净 Windows ZIP 演练与真实提交演练。当前两阶段 CLI 仅用于内部原型，不能替代研究治理门禁。
 - 旧 native trial renderer 仍保留作组件资格、培训与故障诊断，但默认试次已不再调用它；当前仍缺真实 A/B 各一次当前-build 端到端和干净 Windows ZIP 验收。
 
@@ -853,14 +853,14 @@ v2.20 的默认 `runStudyV2NativeTrial` 在其上完成组合：独立 App Serve
 8. 已完成轻量 Task/Verification 制品、Context Index 投影、自动回归和真实 Chat Lane 人工理解验收；
 9. 已冻结 opt-in Agent 产出策略和只读 Record Check，防止记录泛滥并确保写后可验证；
 10. 已冻结 counterbalanced study pack v1、答案键、12-slot 分配、隔离 workspace、mutation 与完整性检查，并将其保留为非当前门禁的研究资产；
-11. 已完成显式长任务 Context Coverage 门禁：Module/Decision/Task/Verification 逐项验证、四类指标与隐私边界；当前声明扩展为 16 个真实期望对象，2026-08-26 实测 16/16 available，后续 dogfood 继续记录声明外遗漏而不是把声明内 16/16 当作完整性证明；
+11. 已完成显式长任务 Context Coverage 门禁：Module/Decision/Task/Verification 逐项验证、四类指标与隐私边界；当前声明扩展为 18 个真实期望对象，2026-08-26 实测 18/18 available，后续 dogfood 继续记录声明外遗漏而不是把声明内 18/18 当作完整性证明；
 12. 已完成对象多轮修改后的 pinned snapshot、revision drift、同卡刷新、删除/不可用、任务重绑定，以及显式刷新差异的类型化优先级与首层投影；后续 dogfood 持续校准字段优先级；
 13. 已完成逐 build 兼容性证据入口、当前宿主/renderer 精确绑定、自动与人工门禁分栏及 fail-closed 检查；v2.33 当前候选已绑定 `OpenAI.Codex 26.818.5229.0`、executable `151.0.7922.170` 与 bundled Host digest `73e78bbc…08d2`，自动 Host 4/4 通过、人工 10 项 pending；v2.32、v2.31 与 v2.29 自动 4/4、v2.26 人工 10/10 只保留为历史 bundle 证据；
 14. 已完成 opt-in Agent 里程碑制品维护扩展：Concept/Change/Decision 与 Task/Verification 共用稀疏产出策略，前三类增加只读 Artifact Check；
 15. 已实现 Task-local Dynamic Object 生命周期 v1、显式 Milestone Object Review、私有 Multi-milestone Observation Ledger 与非持久化当前 review 策展反馈：当前任务可登记、更新、替代、退役，并对真实 needed terms 做一次性只读诊断、digest-only 纵向观测和 first/recurring/recovered 分类，校准稀疏选择和 artifact graduation；
 16. 已实现 Reliable Test Execution Event：受限实际执行、revision/进程终态/输出 digest 绑定、私有事件、原子 Verification 与 Record Gate；首个真实 dogfood 6/6 PASS；
-17. v2.33 已对大型 workspace 完整开发面与 companion 非法控制请求的进程安全修复运行 330/330 全量自动测试，并用公开 Vite PR #22642 的 12 个里程碑回放验证稀疏对象生命周期；功能冻结后再为一个 Release Candidate 执行完整十项原生人工门禁，历史 bundle 证据不继承；
-18. 已建立长周期恢复基线：三个明确需要的对象 3/3 available、无遗漏或歧义；`Long Task Recovery Dogfood` 通过 Record Gate 后从 task-local partial 层升级为有证据的稳定 Task，临时对象退役归档，复验 3/3 均来自 workspace；当前显式 Coverage 扩展为 16 个期望对象。随后在全新 Codex 任务中通过原生 Chat Lane 打开该 Task，用户确认可直接回答目标、当前状态、已完成、下一步和边界。下一阶段转向真实延迟后的恢复时间、状态漂移和额外 Chat Turn；
+17. v2.33 已对大型 workspace 完整开发面与 companion 非法控制请求的进程安全修复运行全量自动测试，并用公开 Vite PR #22642 的 12 个里程碑回放验证稀疏对象生命周期；加入 Recovery Observation Prototype 后完整回归为 336/336，Host/Renderer bundle 未改变；功能冻结后再为一个 Release Candidate 执行完整十项原生人工门禁，历史 bundle 证据不继承；
+18. 已建立长周期恢复基线：三个明确需要的对象 3/3 available，恢复对象升级为有证据的稳定 Task，并完成首个即时跨任务人工 PASS；随后新增 Recovery Observation Prototype，以严格匿名事件、单调时间、终态、失焦区间和卡片/导航状态机派生客观指标，三类合成回放覆盖跨任务零查询成功、状态漂移刷新和歧义中止，定向测试 6/6 PASS。当前显式 Coverage 为 18/18；这只证明测量管线，不证明真实 Renderer 捕获、人类理解、比较效率或 Chat Turn 降幅；
 19. 已完成受控固定回复进入普通 Codex Turn 的技术垂直切片，并在 Desktop 验证四条消息可见、可选、零线上模型；
 20. 已把 TRAIN-1 与六个 measured scenario 冻结为三轮脚本，并完成答案/对象/可选词一致性门禁、私有 scripted runtime、原生 task 激活、轻量答题、B 条件 companion 与既有 checkpoint/result 管线接入；轻量答题控件的当前-build 人工形成性验收已通过；
 21. 完成 A/B 各一次当前-build 端到端和干净 Windows ZIP 演练；只有研究治理门禁也通过后，才运行效率实验，并据内部 pilot 方差决定正式样本量。

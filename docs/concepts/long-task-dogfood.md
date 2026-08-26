@@ -21,7 +21,7 @@ P-C 微型心智模型、动态刷新和当前精确 Codex build 已完成资格
 
 ## 证据
 
-> 已建立长周期恢复基线：三个明确需要的对象 3/3 available、无遗漏或歧义；`Long Task Recovery Dogfood` 通过 Record Gate 后从 task-local partial 层升级为有证据的稳定 Task，临时对象退役归档，复验 3/3 均来自 workspace；当前显式 Coverage 扩展为 16 个期望对象。随后在全新 Codex 任务中通过原生 Chat Lane 打开该 Task，用户确认可直接回答目标、当前状态、已完成、下一步和边界。下一阶段转向真实延迟后的恢复时间、状态漂移和额外 Chat Turn；
+> 已建立长周期恢复基线：三个明确需要的对象 3/3 available，恢复对象升级为有证据的稳定 Task，并完成首个即时跨任务人工 PASS；随后新增 Recovery Observation Prototype，以严格匿名事件、单调时间、终态、失焦区间和卡片/导航状态机派生客观指标，三类合成回放覆盖跨任务零查询成功、状态漂移刷新和歧义中止，定向测试 6/6 PASS。当前显式 Coverage 为 18/18；这只证明测量管线，不证明真实 Renderer 捕获、人类理解、比较效率或 Chat Turn 降幅；
 
 ## 来源
 

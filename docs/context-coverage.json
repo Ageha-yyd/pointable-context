@@ -24,6 +24,11 @@
       "key": "src/host/codex-cdp/milestone-observation.ts"
     },
     {
+      "id": "recovery-observation-metrics",
+      "kind": "module",
+      "key": "src/evaluation/recovery-observation.ts"
+    },
+    {
       "id": "native-chat-lane-decision",
       "kind": "decision",
       "key": "docs/decisions/native-chat-lane.md"
@@ -82,6 +87,11 @@
       "id": "long-task-recovery-cross-task-acceptance",
       "kind": "verification",
       "key": "docs/verifications/long-task-recovery-cross-task-acceptance.md"
+    },
+    {
+      "id": "recovery-observation-pipeline",
+      "kind": "verification",
+      "key": "docs/verifications/recovery-observation-pipeline.md"
     }
   ]
 }

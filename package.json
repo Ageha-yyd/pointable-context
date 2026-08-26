@@ -37,6 +37,7 @@
     "records:check": "pnpm run build:ts && node dist/src/records/check-cli.js --workspace-root . --json",
     "artifacts:check": "pnpm run build:ts && node dist/src/records/artifact-check-cli.js --workspace-root . --json",
     "coverage:check": "pnpm run build:ts && node dist/src/records/coverage-cli.js --workspace-root . --json",
+    "recovery:replay": "pnpm run build:ts && node dist/src/evaluation/recovery-observation-cli.js",
     "test-execution:run": "pnpm run build:ts && node dist/src/records/test-execution-cli.js",
     "compatibility:check": "pnpm run build:ts && node dist/src/compatibility/qualification-cli.js --workspace-root . --renderer-bundle host/workspace-companion.mjs --json",
     "study:validate": "pnpm run build:ts && node dist/src/evaluation/study-cli.js validate --repository-root . --json",

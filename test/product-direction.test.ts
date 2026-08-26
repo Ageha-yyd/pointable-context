@@ -87,6 +87,7 @@ test("v2.33 keeps large-workspace curation complete and control errors process-s
   assert.match(readme, /complete development-context surface/u);
   assert.match(readme, /malformed milestone review returns an error without killing the detached companion/u);
   assert.match(readme, /newly created Codex task.*without inheriting private task-local state/u);
+  assert.match(readme, /Recovery Observation Prototype.*prototype-only.*not human-efficiency evidence/u);
   assert.match(readme, /object-review --review-file/u);
   assert.match(readme, /available, missing, ambiguous, and type-mismatch/u);
   assert.match(readme, /Private multi-milestone observation/u);
