@@ -77,6 +77,11 @@
       "id": "vite-pr22642-object-lifecycle-replay",
       "kind": "verification",
       "key": "docs/verifications/vite-pr22642-object-lifecycle-replay.md"
+    },
+    {
+      "id": "long-task-recovery-cross-task-acceptance",
+      "kind": "verification",
+      "key": "docs/verifications/long-task-recovery-cross-task-acceptance.md"
     }
   ]
 }

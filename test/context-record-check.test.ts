@@ -183,10 +183,14 @@ test("repository work-result records pass the read-only checker", async () => {
     "docs/verifications/vite-pr22642-object-lifecycle-replay.md",
     "utf8",
   );
+  const beforeCrossTaskRecoveryVerification = await readFile(
+    "docs/verifications/long-task-recovery-cross-task-acceptance.md",
+    "utf8",
+  );
   const result = await checkContextRecords(resolve("."));
   assert.equal(result.valid, true, JSON.stringify(result.issues));
-  assert.equal(result.records.length, 10);
-  assert.equal(result.candidateCount, 10);
+  assert.equal(result.records.length, 11);
+  assert.equal(result.candidateCount, 11);
   assert.equal(await readFile("docs/tasks/work-result-context.md", "utf8"), beforeTask);
   assert.equal(
     await readFile("docs/tasks/study-v2-native-runner.md", "utf8"),
@@ -219,6 +223,10 @@ test("repository work-result records pass the read-only checker", async () => {
   assert.equal(
     await readFile("docs/verifications/vite-pr22642-object-lifecycle-replay.md", "utf8"),
     beforeViteReplayVerification,
+  );
+  assert.equal(
+    await readFile("docs/verifications/long-task-recovery-cross-task-acceptance.md", "utf8"),
+    beforeCrossTaskRecoveryVerification,
   );
 });
 

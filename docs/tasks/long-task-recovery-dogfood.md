@@ -6,28 +6,28 @@
 
 ## 当前状态
 
-v2.33 自动机制验证完成后已建立首个恢复基线并完成 Task 升级：三个明确需要的 Task、Concept 与 Verification 身份均唯一可用且全部来自稳定 workspace 层；同名 task-local 临时对象已在 Record Gate 通过后退役并写入私有审计归档。
+v2.33 已完成首个真实跨任务恢复验收：在新建 Codex 任务中仅绑定同一 workspace 后，用户通过原生 Chat Lane 入口打开稳定 Task 卡，并确认可直接回答目标、当前状态、已完成、下一步和边界；详情来源为 evidence-backed workspace 制品，而非旧任务私有对象。
 
 ## 已完成
 
-完成 p-map 与 Vite 两次公开历史回放、大型 workspace 完整开发面修复、非法控制请求进程安全修复、330/330 自动测试和 15/15 结构覆盖；升级后恢复复验为 3/3 available、0 missing、0 ambiguous、0 type mismatch、3/3 workspace source。
+完成 p-map 与 Vite 两次公开历史回放、大型 workspace 完整开发面修复、非法控制请求进程安全修复、330/330 自动测试和 16/16 结构覆盖；升级后恢复复验为 3/3 available、0 missing、0 ambiguous、0 type mismatch、3/3 workspace source；随后在全新 Codex 任务中完成一次原生卡片人工恢复 PASS。
 
 ## 下一步
 
-在后续自然发生的延迟重返或新 Codex 任务中重新查询同一稳定 Task、Long Task Dogfood Concept 与 Vite replay Verification，观察用户能否直接回答当前目标、已完成、下一步和证据边界，并记录真实状态漂移。
+继续在自然发生的延迟重返和状态漂移后查询同一稳定 Task、Long Task Dogfood Concept 与 Vite replay Verification；下一阶段重点记录经过时间间隔后的恢复正确性、耗时和额外 Chat Turn，而不是重复即时跨任务演示。
 
 ## 阻塞
 
-无技术阻塞。真实延迟、跨会话理解和时间效率必须在后续自然重返中观察，当前基线不能提前证明人的理解速度或 Chat Turn 已减少。
+无技术阻塞。当前只完成一次即时跨任务人工验收；真实延迟后的恢复时间、比较条件和 Chat Turn 降幅仍需后续长周期观察。
 
 ## 更新时间
 
-2026-08-26T05:21:13+08:00
+2026-08-26T20:41:48+08:00
 
 ## 证据
 
-> LONG_TASK_RECOVERY_GRADUATION v1; observed=2026-08-26T05:23:34+08:00; record_gate=valid:10/10; coverage=15/15; temporary_object=retired_then_archived:1; declared_needs=3; available=3; missing=0; ambiguous=0; type_mismatch=0; sources=workspace:3; feedback=stable_available:3; boundary=structural cross-task recoverability only, not a new-task UI observation, delayed-return comprehension, or human-efficiency evidence
+> LONG_TASK_RECOVERY_CROSS_TASK_ACCEPTANCE v1; observed=2026-08-26T20:41:48+08:00; revision=a367a5cebc9fbd8771c33c12aee9f545b839237e; host=Codex Desktop native Chat Lane; task=new Codex task; source=workspace evidence-backed Task; interaction=trusted click or selection fallback; user_result=pass; answers=goal,current_status,completed,next_step,boundary; boundary=one immediate cross-task human acceptance, not delayed-return timing, comparative efficiency, or reduced Chat Turn evidence
 
 ## 来源
 
-docs/evidence/long-task-recovery-baseline-2026-08-26.txt:2
+docs/evidence/long-task-recovery-baseline-2026-08-26.txt:3
