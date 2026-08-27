@@ -8,7 +8,7 @@ async function text(path: string): Promise<string> {
   return readFile(resolve(path), "utf8");
 }
 
-test("v2.33 keeps large-workspace curation complete and control errors process-safe", async () => {
+test("v2.34 keeps recovery observation explicit, bounded, and qualification-safe", async () => {
   const [prd, readme, mainSkill, workspaceSkill, recordsSkill, curationDecision, capacityDecision, coverage, compatibility, bundle] = await Promise.all([
     text("docs/PRD-inline-pointable-widgets.md"),
     text("README.md"),
@@ -22,7 +22,7 @@ test("v2.33 keeps large-workspace curation complete and control errors process-s
     readFile(resolve("host/workspace-companion.mjs")),
   ]);
 
-  assert.match(prd, /版本：v2\.33/u);
+  assert.match(prd, /版本：v2\.34/u);
   assert.match(prd, /`annotated_click`/u);
   assert.match(prd, /`selection_lookup`/u);
   assert.match(prd, /每条消息最多标 3 个高价值对象/u);
@@ -52,7 +52,7 @@ test("v2.33 keeps large-workspace curation complete and control errors process-s
   assert.match(prd, /Explicit Milestone Object Review/u);
   assert.match(prd, /不得扫描 Chat、读取详情、自动补对象/u);
   assert.match(prd, /人工十项 pending/u);
-  assert.match(prd, /功能冻结后再为一个 Release Candidate 执行完整十项原生人工门禁/u);
+  assert.match(prd, /人工十项集中到功能冻结后的单个 Release Candidate/u);
   assert.match(prd, /Reliable Test Execution Event/u);
   assert.match(prd, /timeout\/cancel\/output overflow\/revision drift/u);
   assert.match(prd, /Private Multi-milestone Observation Ledger/u);
@@ -82,7 +82,7 @@ test("v2.33 keeps large-workspace curation complete and control errors process-s
   assert.match(readme, /one primary annotation term per unambiguous object before aliases/u);
   assert.match(
     readme,
-    /current v2\.33 bundle.*passed automatic Host gates 4\/4.*all ten manual interaction gates remain pending/u,
+    /current v2\.34 bundle.*automatic qualification.*unavailable.*all ten manual interaction gates remain pending/u,
   );
   assert.match(readme, /complete development-context surface/u);
   assert.match(readme, /malformed milestone review returns an error without killing the detached companion/u);
@@ -141,18 +141,20 @@ test("v2.33 keeps large-workspace curation complete and control errors process-s
   assert.match(coverage, /"id": "milestone-observation-ledger"/u);
   assert.match(coverage, /"id": "vite-pr22642-object-lifecycle-replay"/u);
   assert.match(coverage, /"id": "long-task-recovery-dogfood-task"/u);
+  assert.match(coverage, /"id": "recovery-observation-adapter"/u);
+  assert.match(coverage, /"id": "recovery-native-interaction-bridge"/u);
 
   const current = JSON.parse(compatibility) as {
     implementation?: { productVersion?: string; rendererBundleSha256?: string };
     automatic?: { state?: string };
     manualChecks?: Array<{ result?: string }>;
   };
-  assert.equal(current.implementation?.productVersion, "v2.33");
+  assert.equal(current.implementation?.productVersion, "v2.34");
   assert.equal(
     current.implementation?.rendererBundleSha256,
     createHash("sha256").update(bundle).digest("hex"),
   );
-  assert.equal(current.automatic?.state, "qualified");
+  assert.equal(current.automatic?.state, "unavailable");
   assert.equal(current.manualChecks?.length, 10);
   assert.ok(current.manualChecks?.every((check) => check.result === "pending"));
 });

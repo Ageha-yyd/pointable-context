@@ -6,7 +6,7 @@
 
 ## 为什么现在出现
 
-P-C 微型心智模型、动态刷新和当前精确 Codex build 已完成资格验收；下一步需要在信息量、时间跨度和项目变化都真实存在的任务中观察对象选择、信息结构与恢复路径是否够用。
+P-C 微型心智模型与动态刷新已经稳定，Recovery Observation 原生事件桥也通过自动与 Headless 检查；v2.34 exact-build 资格仍待重建，之后需要在信息量、时间跨度和项目变化都真实存在的任务中观察对象选择、信息结构与恢复路径是否够用。
 
 ## 它不是什么
 
@@ -21,8 +21,8 @@ P-C 微型心智模型、动态刷新和当前精确 Codex build 已完成资格
 
 ## 证据
 
-> 已建立长周期恢复基线：三个明确需要的对象 3/3 available，恢复对象升级为有证据的稳定 Task，并完成首个即时跨任务人工 PASS；随后新增 Recovery Observation Prototype，以严格匿名事件、单调时间、终态、失焦区间和卡片/导航状态机派生客观指标，三类合成回放覆盖跨任务零查询成功、状态漂移刷新和歧义中止，定向测试 6/6 PASS。当前显式 Coverage 为 18/18；这只证明测量管线，不证明真实 Renderer 捕获、人类理解、比较效率或 Chat Turn 降幅；
+> 已建立长周期恢复基线：三个明确需要的对象 3/3 available，恢复对象升级为有证据的稳定 Task，并完成首个即时跨任务人工 PASS；Recovery Observation 现同时具备三类确定性回放与显式启用的原生事件桥，拖选只在可信完成点计一次，Host 只向当前内存 episode 写入匿名相对时间事件。目标自动检查 41/41 与真实 Edge Headless 通过；当前显式 Coverage 为 20/20。这只证明事件与计算合同，不证明人的理解、比较效率或 Chat Turn 降幅；
 
 ## 来源
 
-docs/PRD-inline-pointable-widgets.md:863
+docs/PRD-inline-pointable-widgets.md:873

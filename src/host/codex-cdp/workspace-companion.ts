@@ -39,6 +39,15 @@ import {
   type TaskObjectMutationResult,
   type TaskObjectSummary,
 } from "./task-object-registry.js";
+import {
+  RecoveryObservationHostBridge,
+  type RecoveryObservationHostStatus,
+} from "../../evaluation/recovery-observation-host.js";
+import type {
+  RecoveryEpisodeDefinition,
+  RecoveryEpisodeOutcome,
+} from "../../evaluation/recovery-observation.js";
+import type { RecoveryObservationResult } from "../../evaluation/recovery-observation-adapter.js";
 
 const DEFAULT_REFRESH_INTERVAL_MS = 2_000;
 
@@ -57,6 +66,7 @@ export interface WorkspaceCompanionOptions {
   annotationRefreshIntervalMs?: number;
   taskObjectRegistry?: TaskObjectRegistry;
   milestoneObservationLedger?: MilestoneObservationLedger;
+  recoveryObservationBridge?: RecoveryObservationHostBridge;
 }
 
 export type CodexDesktopCompatibilityGate =
@@ -119,6 +129,14 @@ export interface WorkspaceCompanion {
   observeCurrentTaskMilestone(input: unknown): Promise<MilestoneObservationRecordResult>;
   summarizeCurrentTaskMilestones(): Promise<MilestoneObservationSummary>;
   archiveGraduatedCurrentTaskObjects(): Promise<TaskObjectArchiveResult>;
+  beginCurrentTaskRecoveryObservation(
+    definition: RecoveryEpisodeDefinition,
+  ): Promise<RecoveryObservationHostStatus>;
+  completeCurrentTaskRecoveryObservation(
+    outcome: RecoveryEpisodeOutcome,
+  ): Promise<RecoveryObservationResult>;
+  abortCurrentTaskRecoveryObservation(): Promise<RecoveryObservationResult>;
+  currentTaskRecoveryObservationStatus(): Promise<RecoveryObservationHostStatus>;
   stop(): Promise<WorkspaceCompanionStatus>;
   status(): WorkspaceCompanionStatus;
 }
@@ -315,6 +333,13 @@ export function createWorkspaceCompanion(
     actionLabel: options.actionLabel ?? "查看上下文",
     presentationMode,
     annotationProvider,
+    ...(options.recoveryObservationBridge === undefined
+      ? {}
+      : {
+          interactionObserver: (request) => {
+            options.recoveryObservationBridge!.observe(request);
+          },
+        }),
     ...(options.annotationRefreshIntervalMs === undefined
       ? {}
       : { annotationRefreshIntervalMs: options.annotationRefreshIntervalMs }),
@@ -456,6 +481,48 @@ export function createWorkspaceCompanion(
 
   const refreshObjectAnnotations = async (): Promise<void> => {
     await adapter.refreshAnnotations(undefined, true);
+  };
+
+  const currentRecoveryTask = async () => {
+    if (state !== "running") throw new Error("workspace_companion_not_running");
+    if (options.recoveryObservationBridge === undefined) {
+      throw new Error("recovery_observation_bridge_unavailable");
+    }
+    const tasks = await adapter.activeTasks();
+    activeTaskCount = tasks.length;
+    if (tasks.length === 0) throw new Error("active_codex_task_unavailable");
+    if (tasks.length !== 1) throw new Error("active_codex_task_ambiguous");
+    const binding = await options.registry.find(tasks[0]!);
+    if (binding === undefined) throw new Error("context_binding_missing");
+    activeBinding = binding;
+    return tasks[0]!;
+  };
+
+  const beginCurrentTaskRecoveryObservation = async (
+    definition: RecoveryEpisodeDefinition,
+  ): Promise<RecoveryObservationHostStatus> => {
+    const task = await currentRecoveryTask();
+    options.recoveryObservationBridge!.begin(task.contextFingerprint, definition);
+    return options.recoveryObservationBridge!.status(task.contextFingerprint);
+  };
+
+  const completeCurrentTaskRecoveryObservation = async (
+    outcome: RecoveryEpisodeOutcome,
+  ): Promise<RecoveryObservationResult> => {
+    const task = await currentRecoveryTask();
+    return options.recoveryObservationBridge!.complete(task.contextFingerprint, outcome);
+  };
+
+  const abortCurrentTaskRecoveryObservation = async (): Promise<RecoveryObservationResult> => {
+    const task = await currentRecoveryTask();
+    return options.recoveryObservationBridge!.abort(task.contextFingerprint);
+  };
+
+  const currentTaskRecoveryObservationStatus = async (): Promise<
+    RecoveryObservationHostStatus
+  > => {
+    const task = await currentRecoveryTask();
+    return options.recoveryObservationBridge!.status(task.contextFingerprint);
   };
 
   const trustedBindingFor = async (
@@ -667,6 +734,10 @@ export function createWorkspaceCompanion(
     observeCurrentTaskMilestone,
     summarizeCurrentTaskMilestones,
     archiveGraduatedCurrentTaskObjects,
+    beginCurrentTaskRecoveryObservation,
+    completeCurrentTaskRecoveryObservation,
+    abortCurrentTaskRecoveryObservation,
+    currentTaskRecoveryObservationStatus,
     stop,
     status,
   });

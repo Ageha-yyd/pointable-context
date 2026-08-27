@@ -29,6 +29,11 @@
       "key": "src/evaluation/recovery-observation.ts"
     },
     {
+      "id": "recovery-observation-adapter",
+      "kind": "module",
+      "key": "src/evaluation/recovery-observation-adapter.ts"
+    },
+    {
       "id": "native-chat-lane-decision",
       "kind": "decision",
       "key": "docs/decisions/native-chat-lane.md"
@@ -92,6 +97,11 @@
       "id": "recovery-observation-pipeline",
       "kind": "verification",
       "key": "docs/verifications/recovery-observation-pipeline.md"
+    },
+    {
+      "id": "recovery-native-interaction-bridge",
+      "kind": "verification",
+      "key": "docs/verifications/recovery-native-interaction-bridge.md"
     }
   ]
 }

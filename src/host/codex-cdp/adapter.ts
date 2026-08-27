@@ -1,5 +1,13 @@
 import { randomUUID } from "node:crypto";
 import {
+  digestRecoveryObjectIdentity,
+  type RecoveryLookupFailureCode,
+} from "../../evaluation/recovery-observation.js";
+import {
+  RECOVERY_INTERACTION_SIGNAL_KIND,
+  type RecoveryInteractionSignal,
+} from "../../evaluation/recovery-observation-adapter.js";
+import {
   createPointableLookupResponse,
   parsePointableLookupIntent,
   PointableProtocolError,
@@ -34,6 +42,10 @@ import {
   parseCodexHostTaskContext,
   type CodexHostTaskContext,
 } from "./host-context.js";
+import {
+  parsePointableRendererInteractionEvent,
+  pointableBindingPayloadKind,
+} from "./interaction-protocol.js";
 
 export interface PointableLookupCallbackRequest {
   operation: PointableLookupIntentV1["operation"];
@@ -79,6 +91,16 @@ export type PointableAnnotationProvider = (
   request: Readonly<PointableAnnotationProviderRequest>,
 ) => Promise<unknown>;
 
+export interface PointableInteractionObserverRequest {
+  /** Ephemeral in-memory routing key. Observers must not persist this value. */
+  scopeKey: string;
+  signal: RecoveryInteractionSignal;
+}
+
+export type PointableInteractionObserver = (
+  request: Readonly<PointableInteractionObserverRequest>,
+) => void | Promise<void>;
+
 export interface CodexCdpHostAdapterOptions {
   lookup: PointableLookupCallback;
   endpoint?: string;
@@ -91,6 +113,7 @@ export interface CodexCdpHostAdapterOptions {
   presentationMode?: PointablePresentationMode;
   annotationProvider?: PointableAnnotationProvider;
   annotationRefreshIntervalMs?: number;
+  interactionObserver?: PointableInteractionObserver;
 }
 
 export interface CodexCdpHostAdapterStatus {
@@ -228,6 +251,23 @@ function lookupError(
   return { kind: "error", code, message, retryable };
 }
 
+function recoveryFailureCode(code: string): RecoveryLookupFailureCode {
+  const normalized = code.toLocaleLowerCase("en-US");
+  if (normalized.includes("ambiguous") || normalized.includes("multiple")) {
+    return "ambiguous";
+  }
+  if (normalized.includes("not_found") || normalized.includes("no_match")) {
+    return "no_match";
+  }
+  if (normalized.includes("stale") || normalized.includes("superseded")) {
+    return "stale";
+  }
+  if (normalized.includes("type") && normalized.includes("mismatch")) {
+    return "type_mismatch";
+  }
+  return "unavailable";
+}
+
 function boundedLookup<T>(
   callback: (signal: AbortSignal) => Promise<T>,
   timeoutMs: number,
@@ -349,6 +389,7 @@ export class CodexCdpHostAdapter {
   readonly #presentationMode: PointablePresentationMode | undefined;
   readonly #annotationProvider: PointableAnnotationProvider | undefined;
   readonly #annotationRefreshIntervalMs: number;
+  readonly #interactionObserver: PointableInteractionObserver | undefined;
   readonly #attachments = new Map<string, TargetAttachment>();
   readonly #attaching = new Set<TargetAttachment>();
   readonly #recoveries = new Set<Promise<void>>();
@@ -371,6 +412,7 @@ export class CodexCdpHostAdapter {
     this.#presentationMode = options.presentationMode;
     this.#annotationProvider = options.annotationProvider;
     this.#annotationRefreshIntervalMs = options.annotationRefreshIntervalMs ?? 15_000;
+    this.#interactionObserver = options.interactionObserver;
     if (
       this.#presentationMode !== undefined &&
       this.#presentationMode !== "record" &&
@@ -722,6 +764,7 @@ export class CodexCdpHostAdapter {
       const rendererConfig = {
         bindingName,
         requestTimeoutMs: this.#lookupTimeoutMs,
+        interactionObservation: this.#interactionObserver !== undefined,
         ...(this.#actionLabel === undefined
           ? {}
           : { actionLabel: this.#actionLabel }),
@@ -812,6 +855,27 @@ export class CodexCdpHostAdapter {
     ) {
       return;
     }
+    const payloadKind = pointableBindingPayloadKind(event.params.payload);
+    if (payloadKind === "interaction") {
+      if (this.#interactionObserver === undefined) return;
+      try {
+        const interaction = parsePointableRendererInteractionEvent(event.params.payload);
+        const hostTask = await this.#readCurrentHostTaskContext(
+          attachment,
+          interaction.contextFingerprint,
+        );
+        if (hostTask === undefined) return;
+        await this.#observeInteraction(attachment, hostTask, {
+          schemaVersion: 1,
+          kind: RECOVERY_INTERACTION_SIGNAL_KIND,
+          eventType: interaction.eventType,
+        });
+      } catch {
+        // Invalid or failed observation is isolated from the lookup path.
+      }
+      return;
+    }
+    if (payloadKind !== "lookup") return;
     let intent: PointableLookupIntentV1;
     try {
       intent = parsePointableLookupIntent(event.params.payload);
@@ -911,7 +975,10 @@ export class CodexCdpHostAdapter {
         return;
       }
       if (!(await this.#rendererFenceCurrent(attachment, intent))) return;
-      await this.#deliver(attachment, intent, presentation);
+      const applied = await this.#deliver(attachment, intent, presentation);
+      if (applied) {
+        await this.#observePresentation(attachment, hostTask, intent, presentation);
+      }
     } finally {
       if (controller !== undefined) attachment.pending.delete(intent.requestId);
       attachment.inFlight.delete(intent.requestId);
@@ -994,7 +1061,7 @@ export class CodexCdpHostAdapter {
     attachment: TargetAttachment,
     intent: PointableLookupIntentV1,
     presentation: PointableLookupPresentation,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const contextId = attachment.mainExecutionContextId;
     const lifecycleId = attachment.rendererLifecycleId;
     if (
@@ -1004,15 +1071,85 @@ export class CodexCdpHostAdapter {
       attachment.connection.isClosed() ||
       attachment.invalidated
     ) {
-      return;
+      return false;
     }
     const response = createPointableLookupResponse(intent, presentation);
-    await attachment.connection.send("Runtime.evaluate", {
+    const delivered = await attachment.connection.send("Runtime.evaluate", {
       expression: createDeliverPointableResultExpression(response, lifecycleId),
       contextId,
       returnByValue: true,
       awaitPromise: true,
     });
+    const acknowledgement = runtimeValue(delivered);
+    return record(acknowledgement) &&
+      acknowledgement.ok === true &&
+      acknowledgement.outcome === "applied";
+  }
+
+  async #observePresentation(
+    attachment: TargetAttachment,
+    task: CodexHostTaskContext | undefined,
+    intent: PointableLookupIntentV1,
+    presentation: PointableLookupPresentation,
+  ): Promise<void> {
+    if (task === undefined || this.#interactionObserver === undefined) return;
+    if (presentation.kind === "detail") {
+      if (intent.operation === "refresh") {
+        await this.#observeInteraction(attachment, task, {
+          schemaVersion: 1,
+          kind: RECOVERY_INTERACTION_SIGNAL_KIND,
+          eventType: "card_refreshed",
+        });
+      } else if (intent.operation === "resolve" || intent.operation === "choose") {
+        await this.#observeInteraction(attachment, task, {
+          schemaVersion: 1,
+          kind: RECOVERY_INTERACTION_SIGNAL_KIND,
+          eventType: "object_opened",
+          objectDigest: digestRecoveryObjectIdentity(presentation.detail.entityId),
+        });
+      }
+      return;
+    }
+    if (presentation.kind === "candidates") {
+      await this.#observeInteraction(attachment, task, {
+        schemaVersion: 1,
+        kind: RECOVERY_INTERACTION_SIGNAL_KIND,
+        eventType: "lookup_failed",
+        failureCode: "ambiguous",
+      });
+      return;
+    }
+    if (presentation.kind === "error") {
+      await this.#observeInteraction(attachment, task, {
+        schemaVersion: 1,
+        kind: RECOVERY_INTERACTION_SIGNAL_KIND,
+        eventType: "lookup_failed",
+        failureCode: recoveryFailureCode(presentation.code),
+      });
+    }
+  }
+
+  async #observeInteraction(
+    attachment: TargetAttachment,
+    task: CodexHostTaskContext,
+    signal: RecoveryInteractionSignal,
+  ): Promise<void> {
+    if (
+      this.#interactionObserver === undefined ||
+      this.#attachments.get(attachment.target.id) !== attachment ||
+      attachment.invalidated ||
+      attachment.connection.isClosed()
+    ) {
+      return;
+    }
+    try {
+      await this.#interactionObserver({
+        scopeKey: task.contextFingerprint,
+        signal,
+      });
+    } catch {
+      // Measurement is fail-open for the product path.
+    }
   }
 
   #invalidateAttachment(attachment: TargetAttachment): void {

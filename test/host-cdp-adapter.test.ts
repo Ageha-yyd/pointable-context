@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   CodexCdpHostAdapter,
   type PointableAnnotationProvider,
+  type PointableInteractionObserver,
   type PointableLookupCallbackRequest,
 } from "../src/host/codex-cdp/adapter.js";
 import type {
@@ -188,6 +189,30 @@ function lookupPayload(
   };
 }
 
+function interactionPayload(
+  bindingName: string,
+  eventType = "selection_completed",
+  overrides: Record<string, unknown> = {},
+  executionContextId = 101,
+): CdpEvent {
+  return {
+    method: "Runtime.bindingCalled",
+    params: {
+      name: bindingName,
+      executionContextId,
+      payload: JSON.stringify({
+        schemaVersion: 1,
+        kind: "pointable.interaction.event",
+        rendererSequence: 1,
+        eventType,
+        contextFingerprint:
+          '{"href":"app://-/index.html","threadId":"thread-1","hostId":"host-1"}',
+        ...overrides,
+      }),
+    },
+  };
+}
+
 function detailPresentation(): unknown {
   return {
     kind: "detail",
@@ -214,6 +239,7 @@ async function startedAdapter(
     presentationMode?: "record" | "narrative" | "mental-model";
     annotationProvider?: PointableAnnotationProvider;
     annotationRefreshIntervalMs?: number;
+    interactionObserver?: PointableInteractionObserver;
   } = {},
 ): Promise<CodexCdpHostAdapter> {
   const adapter = new CodexCdpHostAdapter({
@@ -317,6 +343,50 @@ test("adapter delivers a task-fenced identity-only annotation catalog without a 
   } finally {
     await adapter.stop();
   }
+});
+
+test("adapter routes strict renderer interactions without exposing Chat content", async () => {
+  const connection = new FakeCdpConnection();
+  const observed: Parameters<PointableInteractionObserver>[0][] = [];
+  const adapter = await startedAdapter(connection, async () => detailPresentation(), {
+    interactionObserver: (request) => {
+      observed.push(request);
+    },
+  });
+  const bindingName = adapter.status().targets[0]?.bindingName;
+  assert.ok(bindingName);
+  assert.equal(connection.commands.some((command) =>
+    command.method === "Runtime.evaluate" &&
+    String(command.params.expression).includes('interactionObservation":true')), true);
+
+  await connection.emit(interactionPayload(bindingName));
+  assert.equal(observed.length, 1);
+  assert.equal(observed[0]?.signal.eventType, "selection_completed");
+  assert.equal(JSON.stringify(observed[0]).includes("thread-1"), true);
+
+  await connection.emit(interactionPayload(bindingName, "selection_completed", {
+    selectionText: "private Chat content",
+  }));
+  assert.equal(observed.length, 1);
+  await adapter.stop();
+});
+
+test("applied lookup presentations emit only hashed object and bounded failure signals", async () => {
+  const connection = new FakeCdpConnection();
+  const observed: Parameters<PointableInteractionObserver>[0][] = [];
+  const adapter = await startedAdapter(connection, async () => detailPresentation(), {
+    interactionObserver: (request) => {
+      observed.push(request);
+    },
+  });
+  const bindingName = adapter.status().targets[0]?.bindingName;
+  assert.ok(bindingName);
+  await connection.emit(lookupPayload(bindingName));
+  assert.equal(observed.length, 1);
+  assert.equal(observed[0]?.signal.eventType, "object_opened");
+  assert.equal(observed[0]?.signal.objectDigest, digest("WU:GOV-1"));
+  assert.equal(JSON.stringify(observed[0]).includes("WU:GOV-1"), false);
+  await adapter.stop();
 });
 
 test("adapter revalidates the renderer DOM fence before and after callback", async () => {

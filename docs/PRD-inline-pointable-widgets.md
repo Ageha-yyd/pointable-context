@@ -1,8 +1,8 @@
 # PRD：Quiet Context Reveal（轻标注 + 选区式上下文速览）
 
-- 版本：v2.33
-- 状态：P-C 微型心智模型继续作为详情默认；v2.33 已完成 Vite 11-commit replay、大型 workspace 两级发现/索引修复、恢复 Task 的稳定制品升级，以及全新 Codex 任务中的原生跨任务恢复人工 PASS。随后新增不挂载 Renderer、也不进入正式 study-v2 的 Recovery Observation Prototype：匿名相对时间事件可自动派生恢复、活跃卡片、活跃导航、Chat Turn、交互、错对象、刷新和失败指标，三类合成回放与新增测试 6/6、完整回归 336/336 通过。bundled Host digest 仍为未改变的 `73e78bbc…08d2`，精确 `OpenAI.Codex 26.818.5229.0` 自动 Host 4/4；该测量原型不继承或改变人工十项资格，也不构成人效证据
-- 日期：2026-08-26
+- 版本：v2.34
+- 状态：P-C 微型心智模型继续作为详情默认；v2.34 将 Recovery Observation Prototype 接入显式启用的原生交互桥。Renderer 仅发送严格事件类型、序号与 task fence，Host 复验当前任务、哈希对象身份并只向内存中的 active episode 路由；未执行 `recovery-start` 时事件被忽略，观测失败不得阻断查询。目标自动检查 41/41 与真实 Edge Headless 原生事件流通过；该结果不证明人效、自动 trigger 分类、当前生产 build 兼容或正式 study-v2 有效性。Renderer bundle 已发生变化，v2.33 的自动/人工资格均不继承；当前 Codex 未暴露 9223 调试端口，v2.34 exact-build 自动资格因此为 unavailable，人工十项仍 pending
+- 日期：2026-08-27
 - 产品名：Pointable Context
 - 首个宿主：Codex Desktop 原生 Chat Lane
 - 首个场景：长时程软件开发任务
@@ -480,6 +480,16 @@ Registry 容量采用 active-hot、terminal-audit 策略：`object-list` 在当�
 3. 若 development-context surface 本身超过 2,048，或 discovery 超过独立扫描上限，必须 fail closed，不得生成不完整但看似成功的对象目录；
 4. Control 输入错误必须返回有界失败且保持 companion 存活。`needKind` 的规范理解值是 `understand`；早期 Skill 的 `understanding` 只作兼容别名并立即规范化；
 5. Vite PR #22642 replay 实测发现 2,467 个候选、完整投影 1,721 个开发上下文对象；12 个里程碑最终 5/5 当前需要可用、3 active、2 terminal，四个噪声里程碑 0 个误建对象。该结果验证策展与生命周期机制，不证明人的效率提升。
+
+### 8.17 Explicit Recovery Observation Bridge
+
+1. 恢复测量默认关闭；只有当前唯一 Host-visible task 已绑定 workspace 且开发者显式执行 `recovery-start`，才建立一个内存 Recovery Episode。未激活 scope 的事件固定忽略，不得后台常驻采集；
+2. Renderer observation payload 只允许 schema、事件类型、renderer sequence 与当前 task fence；不得加入 selection text、Chat、文件内容、对象名、路径或 authority facts。Host 复验执行上下文与 task fence 后，才把对象身份哈希为 SHA-256；task fingerprint 仅作内存路由键，不进入事件或结果；
+3. Native 事件覆盖轻标注入口、完成选区、quick action、详情打开、证据展开、刷新、关闭和失焦区间。拖选过程中的中间 Selection 不计数，只在可信 `pointerup/keyup` 后记录一次完成选区与入口呈现；
+4. Observer、协议解析或状态机失败必须 fail-open 于产品路径：可以丢弃测量事件，但不得改变 lookup、detail、refresh、close 或 Chat Turn 行为；
+5. `recovery-complete` 必须显式提供 `resumed_correctly` 或 `resumed_incorrectly`；系统不从卡片打开、停留时间或 Agent 输出推断人的理解。companion restart 不恢复内存 episode；
+6. 该桥只用于开发期 dogfood 与后续实验设计。自动回归、Headless 浏览器或 episode metrics 只能证明事件/计算合同，不能单独证明信息获取效率、认知负荷下降或 Chat Turn 显著减少。
+
 ## 9. P0 功能需求
 
 ### P0-1 Bounded object annotation
@@ -853,14 +863,14 @@ v2.20 的默认 `runStudyV2NativeTrial` 在其上完成组合：独立 App Serve
 8. 已完成轻量 Task/Verification 制品、Context Index 投影、自动回归和真实 Chat Lane 人工理解验收；
 9. 已冻结 opt-in Agent 产出策略和只读 Record Check，防止记录泛滥并确保写后可验证；
 10. 已冻结 counterbalanced study pack v1、答案键、12-slot 分配、隔离 workspace、mutation 与完整性检查，并将其保留为非当前门禁的研究资产；
-11. 已完成显式长任务 Context Coverage 门禁：Module/Decision/Task/Verification 逐项验证、四类指标与隐私边界；当前声明扩展为 18 个真实期望对象，2026-08-26 实测 18/18 available，后续 dogfood 继续记录声明外遗漏而不是把声明内 18/18 当作完整性证明；
+11. 已完成显式长任务 Context Coverage 门禁：Module/Decision/Task/Verification 逐项验证、四类指标与隐私边界；当前声明扩展为 20 个真实期望对象，2026-08-27 实测 20/20 available，后续 dogfood 继续记录声明外遗漏而不是把声明内 20/20 当作完整性证明；
 12. 已完成对象多轮修改后的 pinned snapshot、revision drift、同卡刷新、删除/不可用、任务重绑定，以及显式刷新差异的类型化优先级与首层投影；后续 dogfood 持续校准字段优先级；
 13. 已完成逐 build 兼容性证据入口、当前宿主/renderer 精确绑定、自动与人工门禁分栏及 fail-closed 检查；v2.33 当前候选已绑定 `OpenAI.Codex 26.818.5229.0`、executable `151.0.7922.170` 与 bundled Host digest `73e78bbc…08d2`，自动 Host 4/4 通过、人工 10 项 pending；v2.32、v2.31 与 v2.29 自动 4/4、v2.26 人工 10/10 只保留为历史 bundle 证据；
 14. 已完成 opt-in Agent 里程碑制品维护扩展：Concept/Change/Decision 与 Task/Verification 共用稀疏产出策略，前三类增加只读 Artifact Check；
 15. 已实现 Task-local Dynamic Object 生命周期 v1、显式 Milestone Object Review、私有 Multi-milestone Observation Ledger 与非持久化当前 review 策展反馈：当前任务可登记、更新、替代、退役，并对真实 needed terms 做一次性只读诊断、digest-only 纵向观测和 first/recurring/recovered 分类，校准稀疏选择和 artifact graduation；
 16. 已实现 Reliable Test Execution Event：受限实际执行、revision/进程终态/输出 digest 绑定、私有事件、原子 Verification 与 Record Gate；首个真实 dogfood 6/6 PASS；
-17. v2.33 已对大型 workspace 完整开发面与 companion 非法控制请求的进程安全修复运行全量自动测试，并用公开 Vite PR #22642 的 12 个里程碑回放验证稀疏对象生命周期；加入 Recovery Observation Prototype 后完整回归为 336/336，Host/Renderer bundle 未改变；功能冻结后再为一个 Release Candidate 执行完整十项原生人工门禁，历史 bundle 证据不继承；
-18. 已建立长周期恢复基线：三个明确需要的对象 3/3 available，恢复对象升级为有证据的稳定 Task，并完成首个即时跨任务人工 PASS；随后新增 Recovery Observation Prototype，以严格匿名事件、单调时间、终态、失焦区间和卡片/导航状态机派生客观指标，三类合成回放覆盖跨任务零查询成功、状态漂移刷新和歧义中止，定向测试 6/6 PASS。当前显式 Coverage 为 18/18；这只证明测量管线，不证明真实 Renderer 捕获、人类理解、比较效率或 Chat Turn 降幅；
+17. v2.34 已把 Recovery Observation Prototype 接入显式 opt-in 的原生交互桥：strict Renderer event 经 task fence 复验后进入内存 episode，实体只保留 SHA-256；目标自动检查 41/41 与 Edge Headless 的轻标注、选区、证据展开、刷新、关闭及既有 Renderer 连续性通过。Renderer bundle 已变化，必须重新执行 exact-build 自动与人工资格，历史 bundle 证据不继承；
+18. 已建立长周期恢复基线：三个明确需要的对象 3/3 available，恢复对象升级为有证据的稳定 Task，并完成首个即时跨任务人工 PASS；Recovery Observation 现同时具备三类确定性回放与显式启用的原生事件桥，拖选只在可信完成点计一次，Host 只向当前内存 episode 写入匿名相对时间事件。目标自动检查 41/41 与真实 Edge Headless 通过；当前显式 Coverage 为 20/20。这只证明事件与计算合同，不证明人的理解、比较效率或 Chat Turn 降幅；
 19. 已完成受控固定回复进入普通 Codex Turn 的技术垂直切片，并在 Desktop 验证四条消息可见、可选、零线上模型；
 20. 已把 TRAIN-1 与六个 measured scenario 冻结为三轮脚本，并完成答案/对象/可选词一致性门禁、私有 scripted runtime、原生 task 激活、轻量答题、B 条件 companion 与既有 checkpoint/result 管线接入；轻量答题控件的当前-build 人工形成性验收已通过；
 21. 完成 A/B 各一次当前-build 端到端和干净 Windows ZIP 演练；只有研究治理门禁也通过后，才运行效率实验，并据内部 pilot 方差决定正式样本量。
@@ -905,9 +915,11 @@ v2.20 的默认 `runStudyV2NativeTrial` 在其上完成组合：独立 App Serve
 36. 声明外遗漏只能通过真实里程碑中显式列出的 needed terms 测量；`object-review` 只做当前 identity-only 精确复盘，不得扫描 Chat、读取详情、自动补对象或将结果外推为人效收益。
 37. 测试 PASS/FAIL 只能来自一次实际观察到的运行事件或现有人工证据；受限 runner 的 PASS 还要求 exit 0 与前后 revision 完全一致。命令摘要不能冒充原始输出，timeout/cancel/output overflow/revision drift 固定为 inconclusive，日常测试不自动建卡。
 38. 多里程碑观测只在明确 opt-in 的真实稳定里程碑显式触发；`object-review` 继续不持久化，`milestone-observe` 只写私有 digest/status/type/source/count hash chain，`milestone-summary` 只汇总当前 context。原始术语、里程碑名、Chat、facts、路径和任务标识不得落盘，观测不成为查询权威或人效证据。
+39. Recovery Episode 测量默认关闭且只存内存；Renderer 只发 bounded event/type/sequence/task fence，Host 复验并哈希实体。中间 Selection 不计数，observer 失败不影响产品，恢复正确性只能由显式终态提供，不能从 UI 行为自动推断。
 
 ## 18. 变更记录
 
+- v2.34：将 developer-only Recovery Observation Prototype 接入原生 Chat Lane 的显式 opt-in 事件桥。Renderer 仅在启用时发送 strict event type、sequence 与 task fence；Host 复验当前 execution context/task 后，把实体身份哈希并只路由到当前内存 episode。新增 `recovery-start/status/complete/abort` 控制面、任务隔离、失效安全、隐私拒绝和对象打开/刷新映射；一次鼠标拖选的多个中间 Selection 经真实 Edge Headless 暴露后，改为仅在可信 pointerup/keyup 计一次。受限 runner 的目标命令 exit 0、无 revision drift，41/41 测试与真实 Edge Headless 原生事件流通过。该变更改变 Renderer bundle，必须重做 exact-build 资格；结果不构成人效或正式实验有效性证据。
 - v2.32：使用公开 `sindresorhus/p-map` PR #63 做压缩长任务 dogfood。七个真实 Git 节点覆盖功能前基线、初始 `pMapIterable`、backpressure、文档/类型、async generator 重写、pMapSkip/backpressure 修复与最终 head；两个 task-local 对象按 recurring-gap 提示稀疏登记并在最终节点恢复，项目自身 `xo + ava + tsd` 实际通过、AVA 48 tests passed。重放发现 v2.31 用“全历史是否曾有 gap”判断 recovery，导致后续 available 永久显示 `recovered`；现改为只比较紧邻上一条 observation，`gap→available` 只恢复一次，下一条 available 为 `stable_available`。另一次仅大小写不同 alias 被 strict validator 正确拒绝，重试前需去重。新 bundled Host digest 为 `d8b45174…f9c6`，必须重新执行 exact-build 自动资格；该结果不构成人效结论。
 - v2.31：为私有 Multi-milestone Observation Ledger 增加非持久化当前 review 策展反馈。Host 只对调用方显式提供的当前 term 计算 SHA-256 并连接同 task/workspace context 历史，返回 first observation、stable available、new/recurring/changed gap 或 recovered，以及有界历史状态计数。Raw term 仅在 `persisted=false` 的本次响应中回显，ledger、hash chain 和 summary schema 不变；只有重复缺口提示 `review_registration`，不自动创建对象、制品、卡片或 Chat Turn。跨 context 同 term 从首次观测重新开始。bundled Host digest 更新为 `c9c789a3…1478`，已在精确当前 Codex build 重装、绑定并通过自动 Host 4/4；第二个真实里程碑把三个重复 available need 全部分类为 `stable_available`/`none`，summary 为 2 个里程碑、6 次 available、0 gap。人工十项继续集中到功能冻结 RC。
 - v2.30：新增 Private Multi-milestone Observation Ledger。保留 `object-review` 的一次性只读语义；显式 `milestone-observe` 对同一 bounded review 生成 task/workspace-fenced 私有事件，但只落 term/milestone/context/binding digest、状态/类型/来源层、时间与 curation/capacity 聚合。事件使用严格 schema、SHA-256 chain、原子写入、512-event/4-MiB 上限，并拒绝 workspace-visible path、symlink、损坏与 context drift；`milestone-summary` 只返回当前 context 的纵向聚合和重复 need fingerprints。实现不读取 detail、不写 raw term/Chat/facts/path/task ID、不自动补对象、不改变 Renderer 交互合同。Windows 跨盘私有目录修复把 `path.relative` 的绝对返回值识别为 workspace 外部，同时继续拒绝同盘或跨盘 workspace 内路径；bundled Host digest 更新为 `7b208c61…db28`。当前精确 Codex `26.818.5229.0` 自动 Host 门禁 4/4 通过、第一条真实当前任务观察成功，人工十项 pending，不能继承 v2.29 资格。该层只提供策展校准，不构成人效证据。

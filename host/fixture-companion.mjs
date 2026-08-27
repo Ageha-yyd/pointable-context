@@ -349,7 +349,7 @@ function parseIdentityRecord(raw, expectedScope) {
   if (schemaVersion !== "1.0") {
     throw new ContractError("identity.schema_version must be 1.0");
   }
-  const record7 = {
+  const record8 = {
     schemaVersion,
     scope: legacyProjectScope(
       value.project_id,
@@ -370,10 +370,10 @@ function parseIdentityRecord(raw, expectedScope) {
     deleted: booleanValue(value.deleted ?? false, "identity.deleted")
   };
   if (value.canonical_key !== void 0) {
-    record7.canonicalKey = semanticStringValue(value.canonical_key, "identity.canonical_key");
+    record8.canonicalKey = semanticStringValue(value.canonical_key, "identity.canonical_key");
   }
-  assertUtf8Budget(record7, MAX_IDENTITY_BUDGET_BYTES, "identity");
-  return record7;
+  assertUtf8Budget(record8, MAX_IDENTITY_BUDGET_BYTES, "identity");
+  return record8;
 }
 function validateIdentityRecordForRuntime(raw) {
   const value = objectValue(raw, "identity");
@@ -382,7 +382,7 @@ function validateIdentityRecordForRuntime(raw) {
   if (schemaVersion !== "1.0") {
     throw new ContractError("identity.schemaVersion must be 1.0");
   }
-  const record7 = {
+  const record8 = {
     schemaVersion,
     scope: contextScopeValue(value.scope, "identity.scope"),
     entityId: semanticStringValue(value.entityId, "identity.entityId"),
@@ -399,31 +399,31 @@ function validateIdentityRecordForRuntime(raw) {
     deleted: booleanValue(value.deleted, "identity.deleted")
   };
   if (value.canonicalKey !== void 0) {
-    record7.canonicalKey = semanticStringValue(value.canonicalKey, "identity.canonicalKey");
+    record8.canonicalKey = semanticStringValue(value.canonicalKey, "identity.canonicalKey");
   }
-  assertUtf8Budget(record7, MAX_IDENTITY_BUDGET_BYTES, "identity");
-  return record7;
+  assertUtf8Budget(record8, MAX_IDENTITY_BUDGET_BYTES, "identity");
+  return record8;
 }
-function searchableIdentityTerms(record7) {
-  const terms = [record7.entityId, record7.canonicalName, ...record7.aliases];
-  if (record7.canonicalKey !== void 0) {
-    terms.push(record7.canonicalKey);
+function searchableIdentityTerms(record8) {
+  const terms = [record8.entityId, record8.canonicalName, ...record8.aliases];
+  if (record8.canonicalKey !== void 0) {
+    terms.push(record8.canonicalKey);
   }
   return terms;
 }
-function addContextIndexBudget(state, record7, selection, normalizedSelection) {
-  state.aliases += record7.aliases.length;
+function addContextIndexBudget(state, record8, selection, normalizedSelection) {
+  state.aliases += record8.aliases.length;
   if (state.aliases > CONTEXT_INDEX_LIMITS.aliases) {
     throw new ContractError("context index exceeds the aggregate alias bound");
   }
-  state.utf8Bytes += Buffer2.byteLength(JSON.stringify(record7), "utf8") + 1;
+  state.utf8Bytes += Buffer2.byteLength(JSON.stringify(record8), "utf8") + 1;
   if (state.utf8Bytes > CONTEXT_INDEX_LIMITS.utf8Bytes) {
     throw new ContractError("context index exceeds the aggregate UTF-8 bound");
   }
   if (selection === void 0 || normalizedSelection === void 0) {
     return;
   }
-  for (const term of searchableIdentityTerms(record7)) {
+  for (const term of searchableIdentityTerms(record8)) {
     const normalizedTerm = normalizeText(term);
     state.resolutionWorkUnits += selection.length + term.length + 1 + normalizedSelection.length + normalizedTerm.length + 1;
     if (state.resolutionWorkUnits > CONTEXT_INDEX_LIMITS.resolutionWorkUnits) {
@@ -455,24 +455,24 @@ function validateContextIndex(rawRecords, expectedScope, parser, selection) {
   const entityIds = /* @__PURE__ */ new Set();
   const canonicalKeys = /* @__PURE__ */ new Set();
   for (let index = 0; index < rawRecords.length; index += 1) {
-    const record7 = parser(rawRecords[index], expectedScope);
-    if (!sameContextScope(record7.scope, expectedScope)) {
+    const record8 = parser(rawRecords[index], expectedScope);
+    if (!sameContextScope(record8.scope, expectedScope)) {
       throw new ContractError("context index contains a cross-scope record");
     }
-    const entityId = normalizeText(record7.entityId);
+    const entityId = normalizeText(record8.entityId);
     if (entityIds.has(entityId)) {
       throw new ContractError("context index contains a duplicate entity identity");
     }
     entityIds.add(entityId);
-    if (record7.canonicalKey !== void 0) {
-      const canonicalKey = normalizeText(record7.canonicalKey);
+    if (record8.canonicalKey !== void 0) {
+      const canonicalKey = normalizeText(record8.canonicalKey);
       if (canonicalKeys.has(canonicalKey)) {
         throw new ContractError("context index contains a duplicate canonical key");
       }
       canonicalKeys.add(canonicalKey);
     }
-    addContextIndexBudget(state, record7, selection, normalizedSelection);
-    records.push(record7);
+    addContextIndexBudget(state, record8, selection, normalizedSelection);
+    records.push(record8);
   }
   return records;
 }
@@ -500,11 +500,11 @@ function assertContextIndexResolutionBudget(records, selection) {
     resolutionWorkUnits: 0
   };
   const normalizedSelection = normalizeText(selection);
-  for (const record7 of records) {
-    if (!Array.isArray(record7.aliases)) {
+  for (const record8 of records) {
+    if (!Array.isArray(record8.aliases)) {
       throw new ContractError("context index aliases must be an array");
     }
-    addContextIndexBudget(state, record7, selection, normalizedSelection);
+    addContextIndexBudget(state, record8, selection, normalizedSelection);
   }
 }
 function parseSourceRef(raw, index, style) {
@@ -885,8 +885,28 @@ var JsonAuthoritativeProvider = class {
 // src/host/codex-cdp/adapter.ts
 import { randomUUID } from "node:crypto";
 
-// src/host/codex-cdp/protocol.ts
+// src/evaluation/recovery-observation.ts
 import { createHash } from "node:crypto";
+var RecoveryObservationError = class extends Error {
+  constructor(code) {
+    super(code);
+    this.code = code;
+    this.name = "RecoveryObservationError";
+  }
+  code;
+};
+function digestRecoveryObjectIdentity(identity) {
+  if (identity.length < 1 || identity.length > 512 || /[\p{Cc}\p{Cf}]/u.test(identity)) {
+    throw new RecoveryObservationError("recovery_observation_identity_invalid");
+  }
+  return createHash("sha256").update(identity.normalize("NFKC"), "utf8").digest("hex");
+}
+
+// src/evaluation/recovery-observation-adapter.ts
+var RECOVERY_INTERACTION_SIGNAL_KIND = "pointable.recovery-observation.signal";
+
+// src/host/codex-cdp/protocol.ts
+import { createHash as createHash2 } from "node:crypto";
 var POINTABLE_PROTOCOL_VERSION = 1;
 var MAX_SELECTION_CHARS = 512;
 var MAX_BINDING_PAYLOAD_CHARS = 4096;
@@ -918,7 +938,7 @@ function requiredString(value, field, maximum) {
   return value;
 }
 function sha256(value) {
-  return createHash("sha256").update(value, "utf8").digest("hex");
+  return createHash2("sha256").update(value, "utf8").digest("hex");
 }
 function parsePointableLookupIntent(payload) {
   if (payload.length === 0 || payload.length > MAX_BINDING_PAYLOAD_CHARS) {
@@ -1488,6 +1508,9 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   if (!Number.isSafeInteger(revisionCheckIntervalMs) || revisionCheckIntervalMs < 100 || revisionCheckIntervalMs > 6e4) {
     throw new Error("pointable_renderer_revision_interval_invalid");
   }
+  if (config.interactionObservation !== void 0 && typeof config.interactionObservation !== "boolean") {
+    throw new Error("pointable_renderer_interaction_observation_invalid");
+  }
   const actionLabel = typeof config.actionLabel === "string" && config.actionLabel.trim().length > 0 && config.actionLabel.length <= 64 ? config.actionLabel.trim() : "\u67E5\u770B\u4E0A\u4E0B\u6587";
   const presentationMode = config.presentationMode === "narrative" || config.presentationMode === "mental-model" || config.presentationMode === "record" ? config.presentationMode : "record";
   const existing = window[namespace];
@@ -1543,6 +1566,9 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   let annotationHits = [];
   let annotationFrame;
   let annotationStyle;
+  let interactionSequence = 0;
+  let lastObservedSelectionGeneration = 0;
+  let rendererInactive = false;
   let uninstalled = false;
   const activeObserver = new MutationObserver(() => {
     if (candidate !== void 0) scheduleReconcile();
@@ -1557,7 +1583,10 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       if (hit !== void 0) {
         activateAnnotation(hit);
       } else {
-        window.setTimeout(evaluateSelection, 0);
+        window.setTimeout(() => {
+          evaluateSelection();
+          observeCompletedSelection();
+        }, 0);
       }
     }
   };
@@ -1592,13 +1621,16 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   };
   const keyUpHandler = (event) => {
     if (event.key.startsWith("Arrow") || event.key === "Home" || event.key === "End") {
-      window.setTimeout(evaluateSelection, 0);
+      window.setTimeout(() => {
+        evaluateSelection();
+        observeCompletedSelection();
+      }, 0);
     }
   };
   const keyDownHandler = (event) => {
     if (event.key === "Escape" && (candidate !== void 0 || ownedUiExists())) {
       event.preventDefault();
-      cleanup(true, true);
+      closeForUser(true, event.isTrusted);
       return;
     }
     if (event.altKey && event.shiftKey && event.key.toLowerCase() === "k") {
@@ -1619,6 +1651,12 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   const selectionHandler = () => {
     window.setTimeout(evaluateSelection, 0);
   };
+  const visibilityHandler = () => {
+    const inactive = document.visibilityState === "hidden";
+    if (inactive === rendererInactive) return;
+    rendererInactive = inactive;
+    emitInteraction(inactive ? "inactive_started" : "inactive_ended");
+  };
   document.addEventListener("selectionchange", selectionHandler);
   document.addEventListener("pointerup", pointerUpHandler, true);
   document.addEventListener("pointermove", dragMoveHandler, true);
@@ -1626,6 +1664,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   document.addEventListener("pointercancel", dragEndHandler, true);
   document.addEventListener("keyup", keyUpHandler, true);
   document.addEventListener("keydown", keyDownHandler, true);
+  document.addEventListener("visibilitychange", visibilityHandler);
   window.addEventListener("scroll", viewportHandler, true);
   window.addEventListener("resize", viewportHandler);
   window.addEventListener("popstate", routeHandler);
@@ -1634,6 +1673,34 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   window.visualViewport?.addEventListener("scroll", viewportHandler);
   function ownedUiExists() {
     return connectedOwnedElement("action") !== null || connectedOwnedElement("card") !== null;
+  }
+  function emitInteraction(eventType) {
+    if (config.interactionObservation !== true || uninstalled) return;
+    try {
+      binding(JSON.stringify({
+        schemaVersion: 1,
+        kind: "pointable.interaction.event",
+        rendererSequence: ++interactionSequence,
+        eventType,
+        contextFingerprint: readContextFingerprint()
+      }));
+    } catch {
+    }
+  }
+  function closeForUser(restore, trusted) {
+    if (trusted && connectedOwnedElement("card") !== null) {
+      emitInteraction("card_closed");
+    }
+    window.getSelection()?.removeAllRanges();
+    cleanup(true, restore);
+  }
+  function observeCompletedSelection() {
+    if (candidate === void 0 || candidate.generation === lastObservedSelectionGeneration || connectedOwnedElement("action") === null) {
+      return;
+    }
+    lastObservedSelectionGeneration = candidate.generation;
+    emitInteraction("selection_completed");
+    emitInteraction("quick_action_shown");
   }
   function ownedElement(role) {
     const element = role === "action" ? actionElement : cardElement;
@@ -1918,6 +1985,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       contextFingerprint: hit.contextFingerprint
     };
     refreshObserver();
+    emitInteraction("entry_presented");
     void submitLookup("resolve", candidate.generation);
   }
   function updateAnnotations(value) {
@@ -2045,7 +2113,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
         restoreFocus = composer;
         return;
       }
-      cleanup(true, true);
+      closeForUser(true, event.isTrusted);
     };
     window.addEventListener("pointerdown", outsideHandler, true);
   }
@@ -2206,8 +2274,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     close.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      window.getSelection()?.removeAllRanges();
-      cleanup(true, true);
+      closeForUser(true, event.isTrusted);
     });
     header.addEventListener("pointerdown", (event) => {
       if (!event.isTrusted || event.button !== 0 || !(event.target instanceof Node) || close.contains(event.target)) {
@@ -2562,6 +2629,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       evidenceBody.hidden = !expanded;
       evidenceBody.style.display = expanded ? "block" : "none";
       evidenceToggle.textContent = expanded ? "\u6536\u8D77\u4F9D\u636E" : "\u4E3A\u4EC0\u4E48\u8FD9\u6837\u8BF4";
+      if (expanded) emitInteraction("evidence_expanded");
       reposition();
     });
     evidenceDisclosure.append(evidenceToggle, evidenceBody);
@@ -2965,6 +3033,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     document.removeEventListener("pointercancel", dragEndHandler, true);
     document.removeEventListener("keyup", keyUpHandler, true);
     document.removeEventListener("keydown", keyDownHandler, true);
+    document.removeEventListener("visibilitychange", visibilityHandler);
     window.removeEventListener("scroll", viewportHandler, true);
     window.removeEventListener("resize", viewportHandler);
     window.removeEventListener("popstate", routeHandler);
@@ -3529,47 +3598,128 @@ function parseCodexHostTaskContext(value, expectedFingerprint) {
   });
 }
 
-// src/host/codex-cdp/adapter.ts
+// src/host/codex-cdp/interaction-protocol.ts
+var POINTABLE_INTERACTION_EVENT_KIND = "pointable.interaction.event";
+var PointableInteractionProtocolError = class extends Error {
+  constructor(code) {
+    super(code);
+    this.code = code;
+    this.name = "PointableInteractionProtocolError";
+  }
+  code;
+};
+var EVENT_TYPES = /* @__PURE__ */ new Set([
+  "entry_presented",
+  "selection_completed",
+  "quick_action_shown",
+  "card_closed",
+  "evidence_expanded",
+  "inactive_started",
+  "inactive_ended"
+]);
 function record5(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function exactKeys2(value, expected) {
+  return Object.keys(value).sort().join("|") === [...expected].sort().join("|");
+}
+function pointableBindingPayloadKind(payload) {
+  if (payload.length < 2 || payload.length > 4096) return void 0;
+  try {
+    const value = JSON.parse(payload);
+    if (!record5(value)) return void 0;
+    if (value.kind === "pointable.selection.lookup") return "lookup";
+    if (value.kind === POINTABLE_INTERACTION_EVENT_KIND) return "interaction";
+    return void 0;
+  } catch {
+    return void 0;
+  }
+}
+function parsePointableRendererInteractionEvent(payload) {
+  if (payload.length < 2 || payload.length > 4096) {
+    throw new PointableInteractionProtocolError("pointable_interaction_payload_invalid");
+  }
+  let value;
+  try {
+    value = JSON.parse(payload);
+  } catch {
+    throw new PointableInteractionProtocolError("pointable_interaction_payload_invalid");
+  }
+  if (!record5(value) || !exactKeys2(value, [
+    "schemaVersion",
+    "kind",
+    "rendererSequence",
+    "eventType",
+    "contextFingerprint"
+  ]) || value.schemaVersion !== 1 || value.kind !== POINTABLE_INTERACTION_EVENT_KIND || !Number.isSafeInteger(value.rendererSequence) || Number(value.rendererSequence) < 1 || Number(value.rendererSequence) > Number.MAX_SAFE_INTEGER || typeof value.eventType !== "string" || !EVENT_TYPES.has(value.eventType) || typeof value.contextFingerprint !== "string" || value.contextFingerprint.length < 1 || value.contextFingerprint.length > 2048 || /[\p{Cc}\p{Cf}]/u.test(value.contextFingerprint)) {
+    throw new PointableInteractionProtocolError("pointable_interaction_payload_invalid");
+  }
+  return Object.freeze({
+    schemaVersion: 1,
+    kind: POINTABLE_INTERACTION_EVENT_KIND,
+    rendererSequence: Number(value.rendererSequence),
+    eventType: value.eventType,
+    contextFingerprint: value.contextFingerprint
+  });
+}
+
+// src/host/codex-cdp/adapter.ts
+function record6(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function sameHostTask(left, right) {
   return left.host === right.host && left.hostId === right.hostId && left.threadId === right.threadId && left.routeRef === right.routeRef && left.contextFingerprint === right.contextFingerprint;
 }
 function runtimeValue(value) {
-  if (!record5(value) || !record5(value.result) || value.exceptionDetails !== void 0) {
+  if (!record6(value) || !record6(value.result) || value.exceptionDetails !== void 0) {
     return void 0;
   }
   return value.result.value;
 }
 function parseInstalledStatus(value, bindingName) {
-  if (!record5(value) || value.installed !== true || value.bindingName !== bindingName || typeof value.lifecycleId !== "string" || !/^[A-Za-z0-9:_-]{8,256}$/u.test(value.lifecycleId) || typeof value.state !== "string") {
+  if (!record6(value) || value.installed !== true || value.bindingName !== bindingName || typeof value.lifecycleId !== "string" || !/^[A-Za-z0-9:_-]{8,256}$/u.test(value.lifecycleId) || typeof value.state !== "string") {
     throw new Error("pointable_renderer_install_unverified");
   }
   return value;
 }
 function parseMainFrameId(value, target) {
-  if (!record5(value) || !record5(value.frameTree) || !record5(value.frameTree.frame) || typeof value.frameTree.frame.id !== "string" || value.frameTree.frame.id.length < 1 || value.frameTree.frame.id.length > 256 || value.frameTree.frame.url !== target.url) {
+  if (!record6(value) || !record6(value.frameTree) || !record6(value.frameTree.frame) || typeof value.frameTree.frame.id !== "string" || value.frameTree.frame.id.length < 1 || value.frameTree.frame.id.length > 256 || value.frameTree.frame.url !== target.url) {
     throw new Error("pointable_main_frame_unverified");
   }
   return value.frameTree.frame.id;
 }
 function mainExecutionContext(event, mainFrameId) {
-  if (event.method !== "Runtime.executionContextCreated" || !record5(event.params)) {
+  if (event.method !== "Runtime.executionContextCreated" || !record6(event.params)) {
     return void 0;
   }
   const context = event.params.context;
-  if (!record5(context) || !Number.isSafeInteger(context.id) || Number(context.id) < 1) {
+  if (!record6(context) || !Number.isSafeInteger(context.id) || Number(context.id) < 1) {
     return void 0;
   }
   const auxiliary = context.auxData;
-  if (!record5(auxiliary) || auxiliary.isDefault !== true || auxiliary.frameId !== mainFrameId) {
+  if (!record6(auxiliary) || auxiliary.isDefault !== true || auxiliary.frameId !== mainFrameId) {
     return void 0;
   }
   return Number(context.id);
 }
 function lookupError(code, message, retryable) {
   return { kind: "error", code, message, retryable };
+}
+function recoveryFailureCode(code) {
+  const normalized = code.toLocaleLowerCase("en-US");
+  if (normalized.includes("ambiguous") || normalized.includes("multiple")) {
+    return "ambiguous";
+  }
+  if (normalized.includes("not_found") || normalized.includes("no_match")) {
+    return "no_match";
+  }
+  if (normalized.includes("stale") || normalized.includes("superseded")) {
+    return "stale";
+  }
+  if (normalized.includes("type") && normalized.includes("mismatch")) {
+    return "type_mismatch";
+  }
+  return "unavailable";
 }
 function boundedLookup(callback, timeoutMs, controller) {
   return new Promise((resolve4, reject) => {
@@ -3676,6 +3826,7 @@ var CodexCdpHostAdapter = class {
   #presentationMode;
   #annotationProvider;
   #annotationRefreshIntervalMs;
+  #interactionObserver;
   #attachments = /* @__PURE__ */ new Map();
   #attaching = /* @__PURE__ */ new Set();
   #recoveries = /* @__PURE__ */ new Set();
@@ -3696,6 +3847,7 @@ var CodexCdpHostAdapter = class {
     this.#presentationMode = options.presentationMode;
     this.#annotationProvider = options.annotationProvider;
     this.#annotationRefreshIntervalMs = options.annotationRefreshIntervalMs ?? 15e3;
+    this.#interactionObserver = options.interactionObserver;
     if (this.#presentationMode !== void 0 && this.#presentationMode !== "record" && this.#presentationMode !== "narrative" && this.#presentationMode !== "mental-model") {
       throw new RangeError("presentationMode is invalid");
     }
@@ -3969,6 +4121,7 @@ var CodexCdpHostAdapter = class {
       const rendererConfig = {
         bindingName,
         requestTimeoutMs: this.#lookupTimeoutMs,
+        interactionObservation: this.#interactionObserver !== void 0,
         ...this.#actionLabel === void 0 ? {} : { actionLabel: this.#actionLabel },
         ...this.#presentationMode === void 0 ? {} : { presentationMode: this.#presentationMode }
       };
@@ -4017,18 +4170,38 @@ var CodexCdpHostAdapter = class {
       this.#invalidateAttachment(attachment);
       return;
     }
-    if (event.method === "Runtime.executionContextDestroyed" && record5(event.params) && event.params.executionContextId === attachment.mainExecutionContextId) {
+    if (event.method === "Runtime.executionContextDestroyed" && record6(event.params) && event.params.executionContextId === attachment.mainExecutionContextId) {
       this.#invalidateAttachment(attachment);
       return;
     }
-    if (event.method === "Page.frameNavigated" && record5(event.params) && record5(event.params.frame) && event.params.frame.id === attachment.mainFrameId && attachment.mainFrameId.length > 0) {
+    if (event.method === "Page.frameNavigated" && record6(event.params) && record6(event.params.frame) && event.params.frame.id === attachment.mainFrameId && attachment.mainFrameId.length > 0) {
       this.#invalidateAttachment(attachment);
       return;
     }
-    if (event.method !== "Runtime.bindingCalled" || !record5(event.params)) return;
+    if (event.method !== "Runtime.bindingCalled" || !record6(event.params)) return;
     if (event.params.name !== attachment.bindingName || typeof event.params.payload !== "string" || event.params.executionContextId !== attachment.mainExecutionContextId || this.#attachments.get(attachment.target.id) !== attachment || attachment.rendererLifecycleId === void 0 || attachment.invalidated) {
       return;
     }
+    const payloadKind = pointableBindingPayloadKind(event.params.payload);
+    if (payloadKind === "interaction") {
+      if (this.#interactionObserver === void 0) return;
+      try {
+        const interaction = parsePointableRendererInteractionEvent(event.params.payload);
+        const hostTask = await this.#readCurrentHostTaskContext(
+          attachment,
+          interaction.contextFingerprint
+        );
+        if (hostTask === void 0) return;
+        await this.#observeInteraction(attachment, hostTask, {
+          schemaVersion: 1,
+          kind: RECOVERY_INTERACTION_SIGNAL_KIND,
+          eventType: interaction.eventType
+        });
+      } catch {
+      }
+      return;
+    }
+    if (payloadKind !== "lookup") return;
     let intent;
     try {
       intent = parsePointableLookupIntent(event.params.payload);
@@ -4109,7 +4282,10 @@ var CodexCdpHostAdapter = class {
         return;
       }
       if (!await this.#rendererFenceCurrent(attachment, intent)) return;
-      await this.#deliver(attachment, intent, presentation);
+      const applied = await this.#deliver(attachment, intent, presentation);
+      if (applied) {
+        await this.#observePresentation(attachment, hostTask, intent, presentation);
+      }
     } finally {
       if (controller !== void 0) attachment.pending.delete(intent.requestId);
       attachment.inFlight.delete(intent.requestId);
@@ -4168,15 +4344,66 @@ var CodexCdpHostAdapter = class {
     const contextId = attachment.mainExecutionContextId;
     const lifecycleId = attachment.rendererLifecycleId;
     if (contextId === void 0 || lifecycleId === void 0 || this.#attachments.get(attachment.target.id) !== attachment || attachment.connection.isClosed() || attachment.invalidated) {
-      return;
+      return false;
     }
     const response = createPointableLookupResponse(intent, presentation);
-    await attachment.connection.send("Runtime.evaluate", {
+    const delivered = await attachment.connection.send("Runtime.evaluate", {
       expression: createDeliverPointableResultExpression(response, lifecycleId),
       contextId,
       returnByValue: true,
       awaitPromise: true
     });
+    const acknowledgement = runtimeValue(delivered);
+    return record6(acknowledgement) && acknowledgement.ok === true && acknowledgement.outcome === "applied";
+  }
+  async #observePresentation(attachment, task, intent, presentation) {
+    if (task === void 0 || this.#interactionObserver === void 0) return;
+    if (presentation.kind === "detail") {
+      if (intent.operation === "refresh") {
+        await this.#observeInteraction(attachment, task, {
+          schemaVersion: 1,
+          kind: RECOVERY_INTERACTION_SIGNAL_KIND,
+          eventType: "card_refreshed"
+        });
+      } else if (intent.operation === "resolve" || intent.operation === "choose") {
+        await this.#observeInteraction(attachment, task, {
+          schemaVersion: 1,
+          kind: RECOVERY_INTERACTION_SIGNAL_KIND,
+          eventType: "object_opened",
+          objectDigest: digestRecoveryObjectIdentity(presentation.detail.entityId)
+        });
+      }
+      return;
+    }
+    if (presentation.kind === "candidates") {
+      await this.#observeInteraction(attachment, task, {
+        schemaVersion: 1,
+        kind: RECOVERY_INTERACTION_SIGNAL_KIND,
+        eventType: "lookup_failed",
+        failureCode: "ambiguous"
+      });
+      return;
+    }
+    if (presentation.kind === "error") {
+      await this.#observeInteraction(attachment, task, {
+        schemaVersion: 1,
+        kind: RECOVERY_INTERACTION_SIGNAL_KIND,
+        eventType: "lookup_failed",
+        failureCode: recoveryFailureCode(presentation.code)
+      });
+    }
+  }
+  async #observeInteraction(attachment, task, signal) {
+    if (this.#interactionObserver === void 0 || this.#attachments.get(attachment.target.id) !== attachment || attachment.invalidated || attachment.connection.isClosed()) {
+      return;
+    }
+    try {
+      await this.#interactionObserver({
+        scopeKey: task.contextFingerprint,
+        signal
+      });
+    } catch {
+    }
   }
   #invalidateAttachment(attachment) {
     if (attachment.invalidated || attachment.detached) return;
@@ -4249,7 +4476,7 @@ var CodexCdpHostAdapter = class {
 };
 
 // src/host/codex-cdp/fixture-lookup.ts
-import { createHash as createHash2, randomBytes as randomBytes2 } from "node:crypto";
+import { createHash as createHash3, randomBytes as randomBytes2 } from "node:crypto";
 import { resolve as resolve2 } from "node:path";
 
 // src/lookup-service.ts
@@ -4262,19 +4489,19 @@ import {
 import { performance as performance2 } from "node:perf_hooks";
 
 // src/resolver.ts
-function toCandidate(record7, attempt) {
+function toCandidate(record8, attempt) {
   const match = {
-    scope: copyContextScope(record7.scope),
-    entityId: record7.entityId,
-    entityType: record7.entityType,
-    label: record7.canonicalName,
-    summary: record7.summary,
+    scope: copyContextScope(record8.scope),
+    entityId: record8.entityId,
+    entityType: record8.entityType,
+    label: record8.canonicalName,
+    summary: record8.summary,
     matchKind: attempt.kind,
-    indexRevision: record7.indexRevision,
-    indexedAt: record7.indexedAt,
+    indexRevision: record8.indexRevision,
+    indexedAt: record8.indexedAt,
     detailFreshness: "unknown"
   };
-  return { match, record: record7 };
+  return { match, record: record8 };
 }
 function deduplicateAndSort(candidates2) {
   const byEntity = /* @__PURE__ */ new Map();
@@ -4285,8 +4512,8 @@ function deduplicateAndSort(candidates2) {
     (left, right) => left.record.entityId.localeCompare(right.record.entityId, "en")
   );
 }
-function exactIdMatch(selection, record7) {
-  const keys = [record7.canonicalKey, record7.entityId].filter(
+function exactIdMatch(selection, record8) {
+  const keys = [record8.canonicalKey, record8.entityId].filter(
     (value) => Boolean(value)
   );
   for (const key of keys) {
@@ -4297,12 +4524,12 @@ function exactIdMatch(selection, record7) {
   }
   return void 0;
 }
-function exactNameMatch(selection, record7) {
-  const matchedText = findLiteralPhrase(selection, record7.canonicalName);
+function exactNameMatch(selection, record8) {
+  const matchedText = findLiteralPhrase(selection, record8.canonicalName);
   return matchedText ? { kind: "exact_name", matchedText } : void 0;
 }
-function exactAliasMatch(selection, record7) {
-  for (const alias of record7.aliases) {
+function exactAliasMatch(selection, record8) {
+  for (const alias of record8.aliases) {
     const matchedText = findLiteralPhrase(selection, alias);
     if (matchedText) {
       return { kind: "exact_alias", matchedText };
@@ -4310,12 +4537,12 @@ function exactAliasMatch(selection, record7) {
   }
   return void 0;
 }
-function normalizedMatch(normalizedSelection, record7) {
+function normalizedMatch(normalizedSelection, record8) {
   const values = [
-    record7.canonicalKey,
-    record7.entityId,
-    record7.canonicalName,
-    ...record7.aliases
+    record8.canonicalKey,
+    record8.entityId,
+    record8.canonicalName,
+    ...record8.aliases
   ].filter((value) => Boolean(value));
   for (const value of values) {
     const normalizedValue = normalizeText(value);
@@ -4359,20 +4586,20 @@ function route(candidates2) {
 function resolveSelection(scope, selection, records) {
   assertContextIndexResolutionBudget(records, selection);
   const scoped = records.filter(
-    (record7) => sameContextScope(record7.scope, scope) && !record7.deleted
+    (record8) => sameContextScope(record8.scope, scope) && !record8.deleted
   );
   const normalizedSelection = normalizeText(selection);
   const layers = [
     exactIdMatch,
     exactNameMatch,
     exactAliasMatch,
-    (_selection, record7) => normalizedMatch(normalizedSelection, record7)
+    (_selection, record8) => normalizedMatch(normalizedSelection, record8)
   ];
   for (const matchLayer of layers) {
     const candidates2 = deduplicateAndSort(
-      scoped.flatMap((record7) => {
-        const attempt = matchLayer(selection, record7);
-        return attempt ? [toCandidate(record7, attempt)] : [];
+      scoped.flatMap((record8) => {
+        const attempt = matchLayer(selection, record8);
+        return attempt ? [toCandidate(record8, attempt)] : [];
       })
     );
     if (candidates2.length > 0) {
@@ -4935,11 +5162,11 @@ var LookupService = class {
     if (!/^[A-Za-z0-9:_-]{8,128}$/u.test(intent.activationNonce)) {
       return blocked("invalid_activation");
     }
-    const record7 = this.#activations.get(intent.activationNonce);
-    if (!record7 || record7.activatedAt !== intent.activatedAt) {
+    const record8 = this.#activations.get(intent.activationNonce);
+    if (!record8 || record8.activatedAt !== intent.activatedAt) {
       return blocked("invalid_activation");
     }
-    if (record7.state === "consumed") {
+    if (record8.state === "consumed") {
       return blocked("replayed_activation");
     }
     const presented = this.#activationDigest(
@@ -4947,15 +5174,15 @@ var LookupService = class {
       hostContext,
       intent.chosenEntityId
     );
-    if (presented.length !== record7.digest.length || !timingSafeEqual(presented, record7.digest)) {
+    if (presented.length !== record8.digest.length || !timingSafeEqual(presented, record8.digest)) {
       return blocked("invalid_activation");
     }
-    record7.state = "consumed";
+    record8.state = "consumed";
     return void 0;
   }
   #pruneActivations(now) {
-    for (const [nonce, record7] of this.#activations) {
-      if (now - record7.activatedAt > this.#nonceTtlMs) {
+    for (const [nonce, record8] of this.#activations) {
+      if (now - record8.activatedAt > this.#nonceTtlMs) {
         this.#activations.delete(nonce);
       }
     }
@@ -5073,7 +5300,7 @@ function sourceLabel(sourceType, sourceId) {
   return truncate(`${sourceType} / ${sourceId}`, 512);
 }
 function sha2562(value) {
-  return createHash2("sha256").update(value, "utf8").digest("hex");
+  return createHash3("sha256").update(value, "utf8").digest("hex");
 }
 function errorPresentation(code, message, retryable) {
   return { kind: "error", code, message, retryable };
@@ -5512,11 +5739,11 @@ function lockPath(stateDir) {
 function logPath(stateDir) {
   return join(stateDir, "companion.log");
 }
-function record6(value) {
+function record7(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function parseState(value) {
-  if (!record6(value)) return fail("invalid companion state");
+  if (!record7(value)) return fail("invalid companion state");
   const token = value.token;
   if (value.schemaVersion !== CONTROL_SCHEMA_VERSION || value.fixtureOnly !== true || !Number.isSafeInteger(value.pid) || Number(value.pid) <= 0 || !Number.isSafeInteger(value.port) || Number(value.port) < 1 || Number(value.port) > 65535 || typeof token !== "string" || !/^[a-f0-9]{64}$/u.test(token) || typeof value.startedAt !== "string" || !Number.isFinite(Date.parse(value.startedAt))) {
     return fail("invalid companion state");
@@ -5634,7 +5861,7 @@ async function controlRequest(state, method, path) {
       response.on("end", () => {
         try {
           const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-          if ((response.statusCode ?? 500) >= 400 || !record6(parsed)) {
+          if ((response.statusCode ?? 500) >= 400 || !record7(parsed)) {
             rejectRequest(new Error("companion control request failed"));
             return;
           }
@@ -5815,8 +6042,8 @@ function printResult(value, json) {
 `);
     return;
   }
-  const companion = record6(value.companion) ? value.companion : void 0;
-  const adapter = companion && record6(companion.adapter) ? companion.adapter : void 0;
+  const companion = record7(value.companion) ? value.companion : void 0;
+  const adapter = companion && record7(companion.adapter) ? companion.adapter : void 0;
   const state = typeof companion?.state === "string" ? companion.state : value.stopped === true ? "stopped" : "inactive";
   const targetCount = typeof adapter?.targetCount === "number" ? adapter.targetCount : 0;
   process.stdout.write(`Pointable Context fixture companion: ${state}; targets=${targetCount}; fixture-only=true

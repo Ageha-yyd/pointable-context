@@ -6,6 +6,7 @@ import type {
   PointablePresentationMode,
   PointableSelectionSurface,
 } from "./protocol.js";
+import type { PointableRendererInteractionEventType } from "./interaction-protocol.js";
 
 export interface RendererEligibilityObservation {
   rangeCount: number;
@@ -43,6 +44,7 @@ export interface PointableRendererConfig {
   revisionCheckIntervalMs?: number;
   actionLabel?: string;
   presentationMode?: PointablePresentationMode;
+  interactionObservation?: boolean;
 }
 
 export interface PointableObjectAnnotation {
@@ -459,6 +461,12 @@ export function installPointableContextRenderer(
   ) {
     throw new Error("pointable_renderer_revision_interval_invalid");
   }
+  if (
+    config.interactionObservation !== undefined &&
+    typeof config.interactionObservation !== "boolean"
+  ) {
+    throw new Error("pointable_renderer_interaction_observation_invalid");
+  }
   const actionLabel = typeof config.actionLabel === "string" &&
     config.actionLabel.trim().length > 0 &&
     config.actionLabel.length <= 64
@@ -570,6 +578,9 @@ export function installPointableContextRenderer(
   let annotationHits: AnnotationHit[] = [];
   let annotationFrame: number | undefined;
   let annotationStyle: HTMLStyleElement | undefined;
+  let interactionSequence = 0;
+  let lastObservedSelectionGeneration = 0;
+  let rendererInactive = false;
   let uninstalled = false;
   const activeObserver = new MutationObserver(() => {
     if (candidate !== undefined) scheduleReconcile();
@@ -591,7 +602,10 @@ export function installPointableContextRenderer(
       if (hit !== undefined) {
         activateAnnotation(hit);
       } else {
-        window.setTimeout(evaluateSelection, 0);
+        window.setTimeout(() => {
+          evaluateSelection();
+          observeCompletedSelection();
+        }, 0);
       }
     }
   };
@@ -635,13 +649,16 @@ export function installPointableContextRenderer(
       event.key === "Home" ||
       event.key === "End"
     ) {
-      window.setTimeout(evaluateSelection, 0);
+      window.setTimeout(() => {
+        evaluateSelection();
+        observeCompletedSelection();
+      }, 0);
     }
   };
   const keyDownHandler = (event: KeyboardEvent): void => {
     if (event.key === "Escape" && (candidate !== undefined || ownedUiExists())) {
       event.preventDefault();
-      cleanup(true, true);
+      closeForUser(true, event.isTrusted);
       return;
     }
     if (
@@ -666,6 +683,12 @@ export function installPointableContextRenderer(
   const selectionHandler = (): void => {
     window.setTimeout(evaluateSelection, 0);
   };
+  const visibilityHandler = (): void => {
+    const inactive = document.visibilityState === "hidden";
+    if (inactive === rendererInactive) return;
+    rendererInactive = inactive;
+    emitInteraction(inactive ? "inactive_started" : "inactive_ended");
+  };
 
   document.addEventListener("selectionchange", selectionHandler);
   document.addEventListener("pointerup", pointerUpHandler, true);
@@ -674,6 +697,7 @@ export function installPointableContextRenderer(
   document.addEventListener("pointercancel", dragEndHandler, true);
   document.addEventListener("keyup", keyUpHandler, true);
   document.addEventListener("keydown", keyDownHandler, true);
+  document.addEventListener("visibilitychange", visibilityHandler);
   window.addEventListener("scroll", viewportHandler, true);
   window.addEventListener("resize", viewportHandler);
   window.addEventListener("popstate", routeHandler);
@@ -686,6 +710,42 @@ export function installPointableContextRenderer(
       connectedOwnedElement("action") !== null ||
       connectedOwnedElement("card") !== null
     );
+  }
+
+  function emitInteraction(eventType: PointableRendererInteractionEventType): void {
+    if (config.interactionObservation !== true || uninstalled) return;
+    try {
+      (binding as (payload: string) => void)(JSON.stringify({
+        schemaVersion: 1,
+        kind: "pointable.interaction.event",
+        rendererSequence: ++interactionSequence,
+        eventType,
+        contextFingerprint: readContextFingerprint(),
+      }));
+    } catch {
+      // Observation is best-effort and must never block the product path.
+    }
+  }
+
+  function closeForUser(restore: boolean, trusted: boolean): void {
+    if (trusted && connectedOwnedElement("card") !== null) {
+      emitInteraction("card_closed");
+    }
+    window.getSelection()?.removeAllRanges();
+    cleanup(true, restore);
+  }
+
+  function observeCompletedSelection(): void {
+    if (
+      candidate === undefined ||
+      candidate.generation === lastObservedSelectionGeneration ||
+      connectedOwnedElement("action") === null
+    ) {
+      return;
+    }
+    lastObservedSelectionGeneration = candidate.generation;
+    emitInteraction("selection_completed");
+    emitInteraction("quick_action_shown");
   }
 
   function ownedElement(role: "action" | "card"): HTMLElement | null {
@@ -1090,6 +1150,7 @@ export function installPointableContextRenderer(
       contextFingerprint: hit.contextFingerprint,
     };
     refreshObserver();
+    emitInteraction("entry_presented");
     void submitLookup("resolve", candidate.generation);
   }
 
@@ -1240,7 +1301,7 @@ export function installPointableContextRenderer(
         restoreFocus = composer;
         return;
       }
-      cleanup(true, true);
+      closeForUser(true, event.isTrusted);
     };
     window.addEventListener("pointerdown", outsideHandler, true);
   }
@@ -1450,8 +1511,7 @@ export function installPointableContextRenderer(
       // Closing is a terminal action for this selection. Merely removing the
       // card leaves Chromium's native Range alive, allowing a queued
       // selectionchange/reconcile pass to recreate the affordance.
-      window.getSelection()?.removeAllRanges();
-      cleanup(true, true);
+      closeForUser(true, event.isTrusted);
     });
     header.addEventListener("pointerdown", (event) => {
       if (
@@ -1860,6 +1920,7 @@ export function installPointableContextRenderer(
       evidenceBody.hidden = !expanded;
       evidenceBody.style.display = expanded ? "block" : "none";
       evidenceToggle.textContent = expanded ? "收起依据" : "为什么这样说";
+      if (expanded) emitInteraction("evidence_expanded");
       reposition();
     });
     evidenceDisclosure.append(evidenceToggle, evidenceBody);
@@ -2344,6 +2405,7 @@ export function installPointableContextRenderer(
     document.removeEventListener("pointercancel", dragEndHandler, true);
     document.removeEventListener("keyup", keyUpHandler, true);
     document.removeEventListener("keydown", keyDownHandler, true);
+    document.removeEventListener("visibilitychange", visibilityHandler);
     window.removeEventListener("scroll", viewportHandler, true);
     window.removeEventListener("resize", viewportHandler);
     window.removeEventListener("popstate", routeHandler);

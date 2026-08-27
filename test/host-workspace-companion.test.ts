@@ -8,6 +8,9 @@ import { MilestoneObservationLedger } from "../src/host/codex-cdp/milestone-obse
 import { CodexTaskWorkspaceBindingRegistry } from "../src/host/codex-cdp/task-workspace-binding.js";
 import { TaskObjectRegistry } from "../src/host/codex-cdp/task-object-registry.js";
 import type { CdpConnection, CdpEvent } from "../src/host/codex-cdp/transport.js";
+import { RecoveryObservationAdapter } from "../src/evaluation/recovery-observation-adapter.js";
+import { RecoveryObservationHostBridge } from "../src/evaluation/recovery-observation-host.js";
+import { digestRecoveryObjectIdentity } from "../src/evaluation/recovery-observation.js";
 
 class CompanionConnection implements CdpConnection {
   #events = new Set<(event: CdpEvent) => void | Promise<void>>();
@@ -166,6 +169,66 @@ test("workspace companion binds exactly one active Codex task to a live workspac
     assert.equal(companion.status().activeBinding, undefined);
     assert.equal(await registry.find({ hostId: "host-1", threadId: "thread-1" }), undefined);
     assert.equal(await companion.unbindCurrentTask(), undefined);
+  } finally {
+    await companion.stop();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("workspace companion controls an explicit in-memory recovery episode", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pointable-workspace-recovery-"));
+  const workspace = join(root, "workspace");
+  await mkdir(workspace);
+  const registry = new CodexTaskWorkspaceBindingRegistry(join(root, "bindings.json"));
+  const connection = new CompanionConnection();
+  let now = 1_000;
+  const recoveryObservationBridge = new RecoveryObservationHostBridge(
+    new RecoveryObservationAdapter(() => now),
+  );
+  const companion = createWorkspaceCompanion({
+    registry,
+    recoveryObservationBridge,
+    refreshIntervalMs: 60_000,
+    fetch: async () => targetResponse(),
+    connect: async () => connection,
+  });
+  try {
+    await companion.start();
+    await companion.bindCurrentTask(workspace);
+    assert.deepEqual(await companion.beginCurrentTaskRecoveryObservation({
+      episodeId: "companion_recovery_1",
+      trigger: "cross_task",
+      expectedObjectDigest: digestRecoveryObjectIdentity("task:expected"),
+    }), { active: true, eventCount: 1 });
+    const bindingName = companion.status().adapter.targets[0]?.bindingName;
+    assert.ok(bindingName);
+    now = 1_025;
+    await connection.emit({
+      method: "Runtime.bindingCalled",
+      params: {
+        name: bindingName,
+        executionContextId: 1,
+        payload: JSON.stringify({
+          schemaVersion: 1,
+          kind: "pointable.interaction.event",
+          rendererSequence: 1,
+          eventType: "selection_completed",
+          contextFingerprint:
+            '{"href":"app://-/index.html","threadId":"thread-1","hostId":"host-1"}',
+        }),
+      },
+    });
+    assert.deepEqual(await companion.currentTaskRecoveryObservationStatus(), {
+      active: true,
+      eventCount: 2,
+    });
+    now = 1_050;
+    const result = await companion.completeCurrentTaskRecoveryObservation(
+      "resumed_correctly",
+    );
+    assert.equal(result.metrics.selectionCount, 1);
+    assert.equal(result.metrics.totalElapsedMs, 50);
+    assert.equal(JSON.stringify(result).includes("thread-1"), false);
   } finally {
     await companion.stop();
     await rm(root, { recursive: true, force: true });

@@ -334,7 +334,7 @@ function validateIdentityRecordForRuntime(raw) {
   if (schemaVersion !== "1.0") {
     throw new ContractError("identity.schemaVersion must be 1.0");
   }
-  const record9 = {
+  const record12 = {
     schemaVersion,
     scope: contextScopeValue(value.scope, "identity.scope"),
     entityId: semanticStringValue(value.entityId, "identity.entityId"),
@@ -351,31 +351,31 @@ function validateIdentityRecordForRuntime(raw) {
     deleted: booleanValue(value.deleted, "identity.deleted")
   };
   if (value.canonicalKey !== void 0) {
-    record9.canonicalKey = semanticStringValue(value.canonicalKey, "identity.canonicalKey");
+    record12.canonicalKey = semanticStringValue(value.canonicalKey, "identity.canonicalKey");
   }
-  assertUtf8Budget(record9, MAX_IDENTITY_BUDGET_BYTES, "identity");
-  return record9;
+  assertUtf8Budget(record12, MAX_IDENTITY_BUDGET_BYTES, "identity");
+  return record12;
 }
-function searchableIdentityTerms(record9) {
-  const terms = [record9.entityId, record9.canonicalName, ...record9.aliases];
-  if (record9.canonicalKey !== void 0) {
-    terms.push(record9.canonicalKey);
+function searchableIdentityTerms(record12) {
+  const terms = [record12.entityId, record12.canonicalName, ...record12.aliases];
+  if (record12.canonicalKey !== void 0) {
+    terms.push(record12.canonicalKey);
   }
   return terms;
 }
-function addContextIndexBudget(state, record9, selection, normalizedSelection) {
-  state.aliases += record9.aliases.length;
+function addContextIndexBudget(state, record12, selection, normalizedSelection) {
+  state.aliases += record12.aliases.length;
   if (state.aliases > CONTEXT_INDEX_LIMITS.aliases) {
     throw new ContractError("context index exceeds the aggregate alias bound");
   }
-  state.utf8Bytes += Buffer2.byteLength(JSON.stringify(record9), "utf8") + 1;
+  state.utf8Bytes += Buffer2.byteLength(JSON.stringify(record12), "utf8") + 1;
   if (state.utf8Bytes > CONTEXT_INDEX_LIMITS.utf8Bytes) {
     throw new ContractError("context index exceeds the aggregate UTF-8 bound");
   }
   if (selection === void 0 || normalizedSelection === void 0) {
     return;
   }
-  for (const term of searchableIdentityTerms(record9)) {
+  for (const term of searchableIdentityTerms(record12)) {
     const normalizedTerm2 = normalizeText(term);
     state.resolutionWorkUnits += selection.length + term.length + 1 + normalizedSelection.length + normalizedTerm2.length + 1;
     if (state.resolutionWorkUnits > CONTEXT_INDEX_LIMITS.resolutionWorkUnits) {
@@ -407,24 +407,24 @@ function validateContextIndex(rawRecords, expectedScope, parser, selection) {
   const entityIds = /* @__PURE__ */ new Set();
   const canonicalKeys = /* @__PURE__ */ new Set();
   for (let index = 0; index < rawRecords.length; index += 1) {
-    const record9 = parser(rawRecords[index], expectedScope);
-    if (!sameContextScope(record9.scope, expectedScope)) {
+    const record12 = parser(rawRecords[index], expectedScope);
+    if (!sameContextScope(record12.scope, expectedScope)) {
       throw new ContractError("context index contains a cross-scope record");
     }
-    const entityId = normalizeText(record9.entityId);
+    const entityId = normalizeText(record12.entityId);
     if (entityIds.has(entityId)) {
       throw new ContractError("context index contains a duplicate entity identity");
     }
     entityIds.add(entityId);
-    if (record9.canonicalKey !== void 0) {
-      const canonicalKey = normalizeText(record9.canonicalKey);
+    if (record12.canonicalKey !== void 0) {
+      const canonicalKey = normalizeText(record12.canonicalKey);
       if (canonicalKeys.has(canonicalKey)) {
         throw new ContractError("context index contains a duplicate canonical key");
       }
       canonicalKeys.add(canonicalKey);
     }
-    addContextIndexBudget(state, record9, selection, normalizedSelection);
-    records.push(record9);
+    addContextIndexBudget(state, record12, selection, normalizedSelection);
+    records.push(record12);
   }
   return records;
 }
@@ -449,11 +449,11 @@ function assertContextIndexResolutionBudget(records, selection) {
     resolutionWorkUnits: 0
   };
   const normalizedSelection = normalizeText(selection);
-  for (const record9 of records) {
-    if (!Array.isArray(record9.aliases)) {
+  for (const record12 of records) {
+    if (!Array.isArray(record12.aliases)) {
       throw new ContractError("context index aliases must be an array");
     }
-    addContextIndexBudget(state, record9, selection, normalizedSelection);
+    addContextIndexBudget(state, record12, selection, normalizedSelection);
   }
 }
 function parseSourceRef(raw, index, style) {
@@ -815,8 +815,433 @@ var CodexTaskWorkspaceBindingPort = class {
 // src/host/codex-cdp/adapter.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
 
-// src/host/codex-cdp/protocol.ts
+// src/evaluation/recovery-observation.ts
 import { createHash as createHash2 } from "node:crypto";
+var RECOVERY_OBSERVATION_EVENT_KIND = "pointable.recovery-observation.event";
+var RecoveryObservationError = class extends Error {
+  constructor(code) {
+    super(code);
+    this.code = code;
+    this.name = "RecoveryObservationError";
+  }
+  code;
+};
+var EVENT_TYPES = /* @__PURE__ */ new Set([
+  "episode_started",
+  "entry_presented",
+  "selection_completed",
+  "quick_action_shown",
+  "object_opened",
+  "card_closed",
+  "card_refreshed",
+  "evidence_expanded",
+  "workspace_left",
+  "workspace_returned",
+  "inactive_started",
+  "inactive_ended",
+  "chat_turn_sent",
+  "lookup_failed",
+  "episode_completed",
+  "episode_aborted"
+]);
+var TRIGGERS = /* @__PURE__ */ new Set([
+  "dense_turn",
+  "cross_task",
+  "state_drift"
+]);
+var FAILURE_CODES = /* @__PURE__ */ new Set([
+  "no_match",
+  "ambiguous",
+  "stale",
+  "unavailable",
+  "type_mismatch"
+]);
+var OUTCOMES = /* @__PURE__ */ new Set([
+  "resumed_correctly",
+  "resumed_incorrectly"
+]);
+var TERMINAL_EVENTS = /* @__PURE__ */ new Set([
+  "episode_completed",
+  "episode_aborted"
+]);
+var MAX_EPISODE_MS = 864e5;
+function record2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function exactKeys2(value, allowed) {
+  const accepted = new Set(allowed);
+  return Object.keys(value).every((key) => accepted.has(key));
+}
+function episodeId(value) {
+  return typeof value === "string" && /^[a-z0-9][a-z0-9_-]{3,63}$/u.test(value);
+}
+function digest(value) {
+  return typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
+}
+function boundedMilliseconds(value) {
+  if (!Number.isFinite(value) || value < 0 || value > MAX_EPISODE_MS) {
+    throw new RecoveryObservationError("recovery_observation_time_invalid");
+  }
+  return Math.round(value);
+}
+function digestRecoveryObjectIdentity(identity2) {
+  if (identity2.length < 1 || identity2.length > 512 || /[\p{Cc}\p{Cf}]/u.test(identity2)) {
+    throw new RecoveryObservationError("recovery_observation_identity_invalid");
+  }
+  return createHash2("sha256").update(identity2.normalize("NFKC"), "utf8").digest("hex");
+}
+function validateRecoveryEpisodeDefinition(value) {
+  if (!record2(value) || !exactKeys2(value, ["episodeId", "trigger", "expectedObjectDigest"]) || !episodeId(value.episodeId) || typeof value.trigger !== "string" || !TRIGGERS.has(value.trigger) || !digest(value.expectedObjectDigest)) {
+    throw new RecoveryObservationError("recovery_observation_definition_invalid");
+  }
+  return Object.freeze({
+    episodeId: value.episodeId,
+    trigger: value.trigger,
+    expectedObjectDigest: value.expectedObjectDigest
+  });
+}
+function validateRecoveryObservationEvent(value, expectedEpisodeId) {
+  if (!record2(value) || !exactKeys2(value, [
+    "schemaVersion",
+    "kind",
+    "episodeId",
+    "trigger",
+    "sequence",
+    "eventType",
+    "monotonicMs",
+    "objectDigest",
+    "failureCode",
+    "outcome"
+  ]) || value.schemaVersion !== 1 || value.kind !== RECOVERY_OBSERVATION_EVENT_KIND || value.episodeId !== expectedEpisodeId || !episodeId(value.episodeId) || typeof value.trigger !== "string" || !TRIGGERS.has(value.trigger) || !Number.isSafeInteger(value.sequence) || Number(value.sequence) < 1 || typeof value.eventType !== "string" || !EVENT_TYPES.has(value.eventType) || typeof value.monotonicMs !== "number" || !Number.isFinite(value.monotonicMs) || value.monotonicMs < 0 || value.monotonicMs > MAX_EPISODE_MS || value.objectDigest !== void 0 && !digest(value.objectDigest) || value.failureCode !== void 0 && (typeof value.failureCode !== "string" || !FAILURE_CODES.has(value.failureCode)) || value.outcome !== void 0 && (typeof value.outcome !== "string" || !OUTCOMES.has(value.outcome))) {
+    throw new RecoveryObservationError("recovery_observation_event_invalid");
+  }
+  const eventType = value.eventType;
+  const objectFieldValid = eventType === "object_opened" ? value.objectDigest !== void 0 : value.objectDigest === void 0;
+  const failureFieldValid = eventType === "lookup_failed" ? value.failureCode !== void 0 : value.failureCode === void 0;
+  const outcomeFieldValid = eventType === "episode_completed" ? value.outcome !== void 0 : value.outcome === void 0;
+  if (!objectFieldValid || !failureFieldValid || !outcomeFieldValid) {
+    throw new RecoveryObservationError("recovery_observation_event_fields_invalid");
+  }
+  return Object.freeze({
+    schemaVersion: 1,
+    kind: RECOVERY_OBSERVATION_EVENT_KIND,
+    episodeId: value.episodeId,
+    trigger: value.trigger,
+    sequence: Number(value.sequence),
+    eventType,
+    monotonicMs: value.monotonicMs,
+    ...value.objectDigest === void 0 ? {} : { objectDigest: value.objectDigest },
+    ...value.failureCode === void 0 ? {} : { failureCode: value.failureCode },
+    ...value.outcome === void 0 ? {} : { outcome: value.outcome }
+  });
+}
+function deriveRecoveryEpisodeMetrics(untrustedDefinition, untrustedEvents) {
+  const definition = validateRecoveryEpisodeDefinition(untrustedDefinition);
+  const events = untrustedEvents.map(
+    (event) => validateRecoveryObservationEvent(event, definition.episodeId)
+  );
+  if (events.length < 2 || events[0]?.eventType !== "episode_started" || events[0]?.monotonicMs !== 0) {
+    throw new RecoveryObservationError("recovery_observation_events_incomplete");
+  }
+  let priorTime = -1;
+  let expectedSequence = 1;
+  for (const event of events) {
+    if (event.trigger !== definition.trigger || event.sequence !== expectedSequence || event.monotonicMs < priorTime) {
+      throw new RecoveryObservationError("recovery_observation_event_order_invalid");
+    }
+    expectedSequence += 1;
+    priorTime = event.monotonicMs;
+  }
+  const terminalEvents = events.filter((event) => TERMINAL_EVENTS.has(event.eventType));
+  const terminal = events.at(-1);
+  if (terminalEvents.length !== 1 || terminal === void 0 || !TERMINAL_EVENTS.has(terminal.eventType)) {
+    throw new RecoveryObservationError("recovery_observation_terminal_invalid");
+  }
+  let inactiveStartedAt;
+  let inactiveMs = 0;
+  let navigationStartedAt;
+  let navigationTimeMs = 0;
+  let cardOpenedAt;
+  let cardDwellMs = 0;
+  let activeCardDwellMs = 0;
+  let activeNavigationTimeMs = 0;
+  let previousTime = 0;
+  for (const event of events) {
+    const interval = event.monotonicMs - previousTime;
+    if (inactiveStartedAt === void 0) {
+      if (cardOpenedAt !== void 0) activeCardDwellMs += interval;
+      if (navigationStartedAt !== void 0) activeNavigationTimeMs += interval;
+    }
+    previousTime = event.monotonicMs;
+    if (event.eventType === "inactive_started") {
+      if (inactiveStartedAt !== void 0) {
+        throw new RecoveryObservationError("recovery_observation_inactive_invalid");
+      }
+      inactiveStartedAt = event.monotonicMs;
+    } else if (event.eventType === "inactive_ended") {
+      if (inactiveStartedAt === void 0) {
+        throw new RecoveryObservationError("recovery_observation_inactive_invalid");
+      }
+      inactiveMs += event.monotonicMs - inactiveStartedAt;
+      inactiveStartedAt = void 0;
+    } else if (event.eventType === "workspace_left") {
+      if (navigationStartedAt !== void 0) {
+        throw new RecoveryObservationError("recovery_observation_navigation_invalid");
+      }
+      navigationStartedAt = event.monotonicMs;
+    } else if (event.eventType === "workspace_returned") {
+      if (navigationStartedAt === void 0) {
+        throw new RecoveryObservationError("recovery_observation_navigation_invalid");
+      }
+      navigationTimeMs += event.monotonicMs - navigationStartedAt;
+      navigationStartedAt = void 0;
+    } else if (event.eventType === "object_opened") {
+      if (cardOpenedAt !== void 0) {
+        throw new RecoveryObservationError("recovery_observation_card_invalid");
+      }
+      cardOpenedAt = event.monotonicMs;
+    } else if (event.eventType === "card_closed") {
+      if (cardOpenedAt === void 0) {
+        throw new RecoveryObservationError("recovery_observation_card_invalid");
+      }
+      cardDwellMs += event.monotonicMs - cardOpenedAt;
+      cardOpenedAt = void 0;
+    } else if ((event.eventType === "card_refreshed" || event.eventType === "evidence_expanded") && cardOpenedAt === void 0) {
+      throw new RecoveryObservationError("recovery_observation_card_invalid");
+    }
+  }
+  if (inactiveStartedAt !== void 0) inactiveMs += terminal.monotonicMs - inactiveStartedAt;
+  if (navigationStartedAt !== void 0) {
+    navigationTimeMs += terminal.monotonicMs - navigationStartedAt;
+  }
+  if (cardOpenedAt !== void 0) cardDwellMs += terminal.monotonicMs - cardOpenedAt;
+  const objectOpens = events.filter((event) => event.eventType === "object_opened");
+  const firstExpectedObject = objectOpens.find(
+    (event) => event.objectDigest === definition.expectedObjectDigest
+  );
+  const failureCounts = {
+    no_match: 0,
+    ambiguous: 0,
+    stale: 0,
+    unavailable: 0,
+    type_mismatch: 0
+  };
+  for (const event of events) {
+    if (event.eventType === "lookup_failed" && event.failureCode !== void 0) {
+      failureCounts[event.failureCode] += 1;
+    }
+  }
+  const totalElapsedMs = boundedMilliseconds(terminal.monotonicMs);
+  const outcome = terminal.eventType === "episode_completed" ? terminal.outcome ?? null : null;
+  const interactionTypes = /* @__PURE__ */ new Set([
+    "selection_completed",
+    "quick_action_shown",
+    "object_opened",
+    "card_refreshed",
+    "evidence_expanded"
+  ]);
+  return Object.freeze({
+    episodeId: definition.episodeId,
+    trigger: definition.trigger,
+    success: outcome === "resumed_correctly",
+    aborted: terminal.eventType === "episode_aborted",
+    outcome,
+    totalElapsedMs,
+    activeRecoveryMs: boundedMilliseconds(totalElapsedMs - inactiveMs),
+    inactiveMs: boundedMilliseconds(inactiveMs),
+    timeToFirstExpectedObjectMs: firstExpectedObject === void 0 ? null : boundedMilliseconds(firstExpectedObject.monotonicMs),
+    chatTurnCount: events.filter((event) => event.eventType === "chat_turn_sent").length,
+    interactionCount: events.filter((event) => interactionTypes.has(event.eventType)).length,
+    selectionCount: events.filter((event) => event.eventType === "selection_completed").length,
+    quickActionCount: events.filter((event) => event.eventType === "quick_action_shown").length,
+    objectOpenCount: objectOpens.length,
+    wrongObjectCount: objectOpens.filter(
+      (event) => event.objectDigest !== definition.expectedObjectDigest
+    ).length,
+    cardRefreshCount: events.filter((event) => event.eventType === "card_refreshed").length,
+    evidenceExpandCount: events.filter((event) => event.eventType === "evidence_expanded").length,
+    cardDwellMs: boundedMilliseconds(cardDwellMs),
+    activeCardDwellMs: boundedMilliseconds(activeCardDwellMs),
+    navigationCount: events.filter((event) => event.eventType === "workspace_left").length,
+    navigationTimeMs: boundedMilliseconds(navigationTimeMs),
+    activeNavigationTimeMs: boundedMilliseconds(activeNavigationTimeMs),
+    lookupFailureCount: events.filter((event) => event.eventType === "lookup_failed").length,
+    lookupFailures: Object.freeze({ ...failureCounts })
+  });
+}
+
+// src/evaluation/recovery-observation-adapter.ts
+var RECOVERY_INTERACTION_SIGNAL_KIND = "pointable.recovery-observation.signal";
+var SIGNAL_TYPES = /* @__PURE__ */ new Set([
+  "entry_presented",
+  "selection_completed",
+  "quick_action_shown",
+  "object_opened",
+  "card_closed",
+  "card_refreshed",
+  "evidence_expanded",
+  "workspace_left",
+  "workspace_returned",
+  "inactive_started",
+  "inactive_ended",
+  "chat_turn_sent",
+  "lookup_failed"
+]);
+function record3(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function scopeKey(value) {
+  if (value.length < 1 || value.length > 2048 || /[\p{Cc}\p{Cf}]/u.test(value)) {
+    throw new RecoveryObservationError("recovery_observation_scope_invalid");
+  }
+  return value;
+}
+function validateSignal(value) {
+  if (!record3(value)) {
+    throw new RecoveryObservationError("recovery_observation_signal_invalid");
+  }
+  const keys = /* @__PURE__ */ new Set([
+    "schemaVersion",
+    "kind",
+    "eventType",
+    "objectDigest",
+    "failureCode"
+  ]);
+  if (Object.keys(value).some((key) => !keys.has(key)) || value.schemaVersion !== 1 || value.kind !== RECOVERY_INTERACTION_SIGNAL_KIND || typeof value.eventType !== "string" || !SIGNAL_TYPES.has(value.eventType) || value.objectDigest !== void 0 && (typeof value.objectDigest !== "string" || !/^[a-f0-9]{64}$/u.test(value.objectDigest)) || value.failureCode !== void 0 && value.failureCode !== "no_match" && value.failureCode !== "ambiguous" && value.failureCode !== "stale" && value.failureCode !== "unavailable" && value.failureCode !== "type_mismatch") {
+    throw new RecoveryObservationError("recovery_observation_signal_invalid");
+  }
+  const eventType = value.eventType;
+  if (eventType === "object_opened" !== (value.objectDigest !== void 0) || eventType === "lookup_failed" !== (value.failureCode !== void 0)) {
+    throw new RecoveryObservationError("recovery_observation_signal_fields_invalid");
+  }
+  return Object.freeze({
+    schemaVersion: 1,
+    kind: RECOVERY_INTERACTION_SIGNAL_KIND,
+    eventType,
+    ...value.objectDigest === void 0 ? {} : { objectDigest: value.objectDigest },
+    ...value.failureCode === void 0 ? {} : { failureCode: value.failureCode }
+  });
+}
+var RecoveryObservationAdapter = class {
+  #clock;
+  #episodes = /* @__PURE__ */ new Map();
+  constructor(clock = () => performance.now()) {
+    this.#clock = clock;
+  }
+  begin(scope, definition) {
+    const key = scopeKey(scope);
+    if (this.#episodes.has(key)) {
+      throw new RecoveryObservationError("recovery_observation_scope_active");
+    }
+    const checked = validateRecoveryEpisodeDefinition(definition);
+    const startedAt = this.#clock();
+    if (!Number.isFinite(startedAt)) {
+      throw new RecoveryObservationError("recovery_observation_clock_invalid");
+    }
+    const event = Object.freeze({
+      schemaVersion: 1,
+      kind: RECOVERY_OBSERVATION_EVENT_KIND,
+      episodeId: checked.episodeId,
+      trigger: checked.trigger,
+      sequence: 1,
+      eventType: "episode_started",
+      monotonicMs: 0
+    });
+    this.#episodes.set(key, {
+      definition: checked,
+      startedAt,
+      lastMonotonicMs: 0,
+      events: [event]
+    });
+    return event;
+  }
+  record(scope, value) {
+    const key = scopeKey(scope);
+    const active = this.#episodes.get(key);
+    if (active === void 0) {
+      return Object.freeze({ accepted: false, reason: "inactive_scope", eventCount: 0 });
+    }
+    const signal = validateSignal(value);
+    const event = this.#event(active, signal.eventType, {
+      ...signal.objectDigest === void 0 ? {} : { objectDigest: signal.objectDigest },
+      ...signal.failureCode === void 0 ? {} : { failureCode: signal.failureCode }
+    });
+    const sentinel = this.#terminal(
+      active,
+      "episode_aborted",
+      void 0,
+      event.sequence + 1
+    );
+    deriveRecoveryEpisodeMetrics(active.definition, [...active.events, event, sentinel]);
+    active.events.push(event);
+    active.lastMonotonicMs = event.monotonicMs;
+    return Object.freeze({
+      accepted: true,
+      reason: "recorded",
+      eventCount: active.events.length
+    });
+  }
+  complete(scope, outcome) {
+    if (outcome !== "resumed_correctly" && outcome !== "resumed_incorrectly") {
+      throw new RecoveryObservationError("recovery_observation_outcome_invalid");
+    }
+    return this.#finish(scope, "episode_completed", outcome);
+  }
+  abort(scope) {
+    return this.#finish(scope, "episode_aborted");
+  }
+  active(scope) {
+    return this.#episodes.has(scopeKey(scope));
+  }
+  eventCount(scope) {
+    return this.#episodes.get(scopeKey(scope))?.events.length ?? 0;
+  }
+  #finish(scope, eventType, outcome) {
+    const key = scopeKey(scope);
+    const active = this.#episodes.get(key);
+    if (active === void 0) {
+      throw new RecoveryObservationError("recovery_observation_scope_inactive");
+    }
+    const terminal = this.#terminal(active, eventType, outcome);
+    const events = Object.freeze([...active.events, terminal]);
+    const metrics = deriveRecoveryEpisodeMetrics(active.definition, events);
+    this.#episodes.delete(key);
+    return Object.freeze({ definition: active.definition, events, metrics });
+  }
+  #terminal(active, eventType, outcome, sequence) {
+    return this.#event(
+      active,
+      eventType,
+      outcome === void 0 ? {} : { outcome },
+      sequence
+    );
+  }
+  #event(active, eventType, fields, sequence = active.events.length + 1) {
+    const now = this.#clock();
+    if (!Number.isFinite(now)) {
+      throw new RecoveryObservationError("recovery_observation_clock_invalid");
+    }
+    const monotonicMs = Math.max(
+      active.lastMonotonicMs,
+      Math.round(now - active.startedAt)
+    );
+    return Object.freeze({
+      schemaVersion: 1,
+      kind: RECOVERY_OBSERVATION_EVENT_KIND,
+      episodeId: active.definition.episodeId,
+      trigger: active.definition.trigger,
+      sequence,
+      eventType,
+      monotonicMs,
+      ...fields.objectDigest === void 0 ? {} : { objectDigest: fields.objectDigest },
+      ...fields.failureCode === void 0 ? {} : { failureCode: fields.failureCode },
+      ...fields.outcome === void 0 ? {} : { outcome: fields.outcome }
+    });
+  }
+};
+
+// src/host/codex-cdp/protocol.ts
+import { createHash as createHash3 } from "node:crypto";
 var POINTABLE_PROTOCOL_VERSION = 1;
 var MAX_SELECTION_CHARS = 512;
 var MAX_BINDING_PAYLOAD_CHARS = 4096;
@@ -828,10 +1253,10 @@ var PointableProtocolError = class extends Error {
   }
   code;
 };
-function record2(value) {
+function record4(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-function exactKeys2(value, allowed) {
+function exactKeys3(value, allowed) {
   const allowedKeys = new Set(allowed);
   return Object.keys(value).every((key) => allowedKeys.has(key));
 }
@@ -848,7 +1273,7 @@ function requiredString(value, field, maximum) {
   return value;
 }
 function sha256(value) {
-  return createHash2("sha256").update(value, "utf8").digest("hex");
+  return createHash3("sha256").update(value, "utf8").digest("hex");
 }
 function parsePointableLookupIntent(payload) {
   if (payload.length === 0 || payload.length > MAX_BINDING_PAYLOAD_CHARS) {
@@ -866,13 +1291,13 @@ function parsePointableLookupIntent(payload) {
       "binding payload is not valid JSON"
     );
   }
-  if (!record2(parsed)) {
+  if (!record4(parsed)) {
     throw new PointableProtocolError(
       "binding_payload_invalid",
       "binding payload must be an object"
     );
   }
-  if (!exactKeys2(parsed, [
+  if (!exactKeys3(parsed, [
     "schemaVersion",
     "kind",
     "operation",
@@ -928,7 +1353,7 @@ function parsePointableLookupIntent(payload) {
   return intent;
 }
 function validateCandidate(value) {
-  if (!record2(value) || !exactKeys2(value, [
+  if (!record4(value) || !exactKeys3(value, [
     "candidateRef",
     "label",
     "entityType",
@@ -962,7 +1387,7 @@ function validateEvidence(value) {
     );
   }
   return value.map((item) => {
-    if (!record2(item) || !exactKeys2(item, ["excerpt", "source"]) || !boundedString(item.excerpt, 1, 1024) || !boundedString(item.source, 1, 512)) {
+    if (!record4(item) || !exactKeys3(item, ["excerpt", "source"]) || !boundedString(item.excerpt, 1, 1024) || !boundedString(item.source, 1, 512)) {
       throw new PointableProtocolError(
         "invalid_lookup_result",
         "detail evidence is invalid"
@@ -972,7 +1397,7 @@ function validateEvidence(value) {
   });
 }
 function validateDetail(value) {
-  if (!record2(value) || !exactKeys2(value, [
+  if (!record4(value) || !exactKeys3(value, [
     "entityId",
     "entityType",
     "label",
@@ -999,14 +1424,14 @@ function validateDetail(value) {
       "detail freshness is invalid"
     );
   }
-  if (!boundedString(value.observedAt, 20, 64) || !Number.isFinite(Date.parse(value.observedAt)) || !Array.isArray(value.facts) || value.facts.length > 5 || !Array.isArray(value.sources) || value.sources.length > 5 || value.humanSummary !== void 0 && !boundedString(value.humanSummary, 1, 1024) || value.terminalState !== void 0 && !record2(value.terminalState) || value.detailRef !== void 0 && !boundedString(value.detailRef, 8, 256) || value.changes !== void 0 && (!Array.isArray(value.changes) || value.changes.length > 3)) {
+  if (!boundedString(value.observedAt, 20, 64) || !Number.isFinite(Date.parse(value.observedAt)) || !Array.isArray(value.facts) || value.facts.length > 5 || !Array.isArray(value.sources) || value.sources.length > 5 || value.humanSummary !== void 0 && !boundedString(value.humanSummary, 1, 1024) || value.terminalState !== void 0 && !record4(value.terminalState) || value.detailRef !== void 0 && !boundedString(value.detailRef, 8, 256) || value.changes !== void 0 && (!Array.isArray(value.changes) || value.changes.length > 3)) {
     throw new PointableProtocolError(
       "invalid_lookup_result",
       "detail metadata exceeds its contract"
     );
   }
   const facts2 = value.facts.map((fact) => {
-    if (!record2(fact) || !exactKeys2(fact, ["label", "value"])) {
+    if (!record4(fact) || !exactKeys3(fact, ["label", "value"])) {
       throw new PointableProtocolError(
         "invalid_lookup_result",
         "detail fact is invalid"
@@ -1018,7 +1443,7 @@ function validateDetail(value) {
     };
   });
   const sources = value.sources.map((source) => {
-    if (!record2(source) || !exactKeys2(source, ["label"])) {
+    if (!record4(source) || !exactKeys3(source, ["label"])) {
       throw new PointableProtocolError(
         "invalid_lookup_result",
         "detail source is invalid"
@@ -1029,14 +1454,14 @@ function validateDetail(value) {
   let comprehension;
   if (value.comprehension !== void 0) {
     const view = value.comprehension;
-    if (!record2(view)) {
+    if (!record4(view)) {
       throw new PointableProtocolError(
         "invalid_lookup_result",
         "detail comprehension view is invalid"
       );
     }
     if (view.kind === "concept") {
-      if (!exactKeys2(view, [
+      if (!exactKeys3(view, [
         "kind",
         "meaning",
         "context",
@@ -1060,7 +1485,7 @@ function validateDetail(value) {
         evidence: validateEvidence(view.evidence)
       };
     } else if (view.kind === "change") {
-      if (!exactKeys2(view, ["kind", "before", "after", "impact", "evidence"]) || !boundedString(view.before, 1, 1024) || !boundedString(view.after, 1, 1024) || !boundedString(view.impact, 1, 1024)) {
+      if (!exactKeys3(view, ["kind", "before", "after", "impact", "evidence"]) || !boundedString(view.before, 1, 1024) || !boundedString(view.after, 1, 1024) || !boundedString(view.impact, 1, 1024)) {
         throw new PointableProtocolError(
           "invalid_lookup_result",
           "detail comprehension view is invalid"
@@ -1074,7 +1499,7 @@ function validateDetail(value) {
         evidence: validateEvidence(view.evidence)
       };
     } else if (view.kind === "decision") {
-      if (!exactKeys2(view, ["kind", "problem", "choice", "consequence", "evidence"]) || !boundedString(view.problem, 1, 1024) || !boundedString(view.choice, 1, 1024) || !boundedString(view.consequence, 1, 1024)) {
+      if (!exactKeys3(view, ["kind", "problem", "choice", "consequence", "evidence"]) || !boundedString(view.problem, 1, 1024) || !boundedString(view.choice, 1, 1024) || !boundedString(view.consequence, 1, 1024)) {
         throw new PointableProtocolError(
           "invalid_lookup_result",
           "detail comprehension view is invalid"
@@ -1088,7 +1513,7 @@ function validateDetail(value) {
         evidence: validateEvidence(view.evidence)
       };
     } else if (view.kind === "task") {
-      if (!exactKeys2(view, [
+      if (!exactKeys3(view, [
         "kind",
         "goal",
         "status",
@@ -1114,7 +1539,7 @@ function validateDetail(value) {
         evidence: validateEvidence(view.evidence)
       };
     } else if (view.kind === "verification") {
-      if (!exactKeys2(view, ["kind", "claim", "result", "gap", "executedAt", "evidence"]) || !boundedString(view.claim, 1, 1024) || !boundedString(view.result, 1, 1024) || !boundedString(view.gap, 1, 1024) || !boundedString(view.executedAt, 20, 64) || !Number.isFinite(Date.parse(view.executedAt))) {
+      if (!exactKeys3(view, ["kind", "claim", "result", "gap", "executedAt", "evidence"]) || !boundedString(view.claim, 1, 1024) || !boundedString(view.result, 1, 1024) || !boundedString(view.gap, 1, 1024) || !boundedString(view.executedAt, 20, 64) || !Number.isFinite(Date.parse(view.executedAt))) {
         throw new PointableProtocolError(
           "invalid_lookup_result",
           "detail comprehension view is invalid"
@@ -1138,19 +1563,19 @@ function validateDetail(value) {
   let terminalState;
   if (value.terminalState !== void 0) {
     const state = value.terminalState;
-    if (!record2(state)) {
+    if (!record4(state)) {
       throw new PointableProtocolError("invalid_lookup_result", "detail terminal state is invalid");
     }
-    if (state.kind === "superseded" && exactKeys2(state, ["kind", "replacementKey"]) && boundedString(state.replacementKey, 1, 128)) {
+    if (state.kind === "superseded" && exactKeys3(state, ["kind", "replacementKey"]) && boundedString(state.replacementKey, 1, 128)) {
       terminalState = { kind: "superseded", replacementKey: state.replacementKey };
-    } else if (state.kind === "retired" && exactKeys2(state, ["kind"])) {
+    } else if (state.kind === "retired" && exactKeys3(state, ["kind"])) {
       terminalState = { kind: "retired" };
     } else {
       throw new PointableProtocolError("invalid_lookup_result", "detail terminal state is invalid");
     }
   }
   const changes = value.changes === void 0 ? void 0 : value.changes.map((change) => {
-    if (!record2(change) || !exactKeys2(change, ["label", "before", "after"])) {
+    if (!record4(change) || !exactKeys3(change, ["label", "before", "after"])) {
       throw new PointableProtocolError(
         "invalid_lookup_result",
         "detail change is invalid"
@@ -1180,14 +1605,14 @@ function validateDetail(value) {
   };
 }
 function validatePointableLookupPresentation(value) {
-  if (!record2(value) || typeof value.kind !== "string") {
+  if (!record4(value) || typeof value.kind !== "string") {
     throw new PointableProtocolError(
       "invalid_lookup_result",
       "lookup callback returned an invalid presentation"
     );
   }
   if (value.kind === "candidates") {
-    if (!exactKeys2(value, ["kind", "candidates"]) || !Array.isArray(value.candidates) || value.candidates.length < 1 || value.candidates.length > 3) {
+    if (!exactKeys3(value, ["kind", "candidates"]) || !Array.isArray(value.candidates) || value.candidates.length < 1 || value.candidates.length > 3) {
       throw new PointableProtocolError(
         "invalid_lookup_result",
         "candidate result must contain one to three candidates"
@@ -1203,7 +1628,7 @@ function validatePointableLookupPresentation(value) {
     return { kind: "candidates", candidates: candidates2 };
   }
   if (value.kind === "detail") {
-    if (!exactKeys2(value, ["kind", "detail"])) {
+    if (!exactKeys3(value, ["kind", "detail"])) {
       throw new PointableProtocolError(
         "invalid_lookup_result",
         "detail result contains unsupported fields"
@@ -1212,7 +1637,7 @@ function validatePointableLookupPresentation(value) {
     return { kind: "detail", detail: validateDetail(value.detail) };
   }
   if (value.kind === "revision") {
-    if (!exactKeys2(value, ["kind", "revision"]) || !record2(value.revision) || !exactKeys2(value.revision, ["detailRef", "state", "checkedAt"]) || !boundedString(value.revision.detailRef, 8, 256) || value.revision.state !== "unchanged" && value.revision.state !== "updated" && value.revision.state !== "deleted" && value.revision.state !== "unavailable" || !boundedString(value.revision.checkedAt, 20, 64) || !Number.isFinite(Date.parse(value.revision.checkedAt))) {
+    if (!exactKeys3(value, ["kind", "revision"]) || !record4(value.revision) || !exactKeys3(value.revision, ["detailRef", "state", "checkedAt"]) || !boundedString(value.revision.detailRef, 8, 256) || value.revision.state !== "unchanged" && value.revision.state !== "updated" && value.revision.state !== "deleted" && value.revision.state !== "unavailable" || !boundedString(value.revision.checkedAt, 20, 64) || !Number.isFinite(Date.parse(value.revision.checkedAt))) {
       throw new PointableProtocolError(
         "invalid_lookup_result",
         "revision result is invalid"
@@ -1228,7 +1653,7 @@ function validatePointableLookupPresentation(value) {
     };
   }
   if (value.kind === "error") {
-    if (!exactKeys2(value, ["kind", "code", "message", "retryable"]) || !boundedString(value.code, 1, 128) || !/^[a-z0-9_:-]+$/u.test(value.code) || !boundedString(value.message, 1, 1024) || typeof value.retryable !== "boolean") {
+    if (!exactKeys3(value, ["kind", "code", "message", "retryable"]) || !boundedString(value.code, 1, 128) || !/^[a-z0-9_:-]+$/u.test(value.code) || !boundedString(value.message, 1, 1024) || typeof value.retryable !== "boolean") {
       throw new PointableProtocolError(
         "invalid_lookup_result",
         "error result is invalid"
@@ -1418,6 +1843,9 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   if (!Number.isSafeInteger(revisionCheckIntervalMs) || revisionCheckIntervalMs < 100 || revisionCheckIntervalMs > 6e4) {
     throw new Error("pointable_renderer_revision_interval_invalid");
   }
+  if (config.interactionObservation !== void 0 && typeof config.interactionObservation !== "boolean") {
+    throw new Error("pointable_renderer_interaction_observation_invalid");
+  }
   const actionLabel = typeof config.actionLabel === "string" && config.actionLabel.trim().length > 0 && config.actionLabel.length <= 64 ? config.actionLabel.trim() : "\u67E5\u770B\u4E0A\u4E0B\u6587";
   const presentationMode = config.presentationMode === "narrative" || config.presentationMode === "mental-model" || config.presentationMode === "record" ? config.presentationMode : "record";
   const existing = window[namespace];
@@ -1473,6 +1901,9 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   let annotationHits = [];
   let annotationFrame;
   let annotationStyle;
+  let interactionSequence = 0;
+  let lastObservedSelectionGeneration = 0;
+  let rendererInactive = false;
   let uninstalled = false;
   const activeObserver = new MutationObserver(() => {
     if (candidate !== void 0) scheduleReconcile();
@@ -1487,7 +1918,10 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       if (hit !== void 0) {
         activateAnnotation(hit);
       } else {
-        window.setTimeout(evaluateSelection, 0);
+        window.setTimeout(() => {
+          evaluateSelection();
+          observeCompletedSelection();
+        }, 0);
       }
     }
   };
@@ -1522,13 +1956,16 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   };
   const keyUpHandler = (event) => {
     if (event.key.startsWith("Arrow") || event.key === "Home" || event.key === "End") {
-      window.setTimeout(evaluateSelection, 0);
+      window.setTimeout(() => {
+        evaluateSelection();
+        observeCompletedSelection();
+      }, 0);
     }
   };
   const keyDownHandler = (event) => {
     if (event.key === "Escape" && (candidate !== void 0 || ownedUiExists())) {
       event.preventDefault();
-      cleanup(true, true);
+      closeForUser(true, event.isTrusted);
       return;
     }
     if (event.altKey && event.shiftKey && event.key.toLowerCase() === "k") {
@@ -1549,6 +1986,12 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   const selectionHandler = () => {
     window.setTimeout(evaluateSelection, 0);
   };
+  const visibilityHandler = () => {
+    const inactive = document.visibilityState === "hidden";
+    if (inactive === rendererInactive) return;
+    rendererInactive = inactive;
+    emitInteraction(inactive ? "inactive_started" : "inactive_ended");
+  };
   document.addEventListener("selectionchange", selectionHandler);
   document.addEventListener("pointerup", pointerUpHandler, true);
   document.addEventListener("pointermove", dragMoveHandler, true);
@@ -1556,6 +1999,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   document.addEventListener("pointercancel", dragEndHandler, true);
   document.addEventListener("keyup", keyUpHandler, true);
   document.addEventListener("keydown", keyDownHandler, true);
+  document.addEventListener("visibilitychange", visibilityHandler);
   window.addEventListener("scroll", viewportHandler, true);
   window.addEventListener("resize", viewportHandler);
   window.addEventListener("popstate", routeHandler);
@@ -1564,6 +2008,34 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
   window.visualViewport?.addEventListener("scroll", viewportHandler);
   function ownedUiExists() {
     return connectedOwnedElement("action") !== null || connectedOwnedElement("card") !== null;
+  }
+  function emitInteraction(eventType) {
+    if (config.interactionObservation !== true || uninstalled) return;
+    try {
+      binding(JSON.stringify({
+        schemaVersion: 1,
+        kind: "pointable.interaction.event",
+        rendererSequence: ++interactionSequence,
+        eventType,
+        contextFingerprint: readContextFingerprint()
+      }));
+    } catch {
+    }
+  }
+  function closeForUser(restore, trusted) {
+    if (trusted && connectedOwnedElement("card") !== null) {
+      emitInteraction("card_closed");
+    }
+    window.getSelection()?.removeAllRanges();
+    cleanup(true, restore);
+  }
+  function observeCompletedSelection() {
+    if (candidate === void 0 || candidate.generation === lastObservedSelectionGeneration || connectedOwnedElement("action") === null) {
+      return;
+    }
+    lastObservedSelectionGeneration = candidate.generation;
+    emitInteraction("selection_completed");
+    emitInteraction("quick_action_shown");
   }
   function ownedElement(role) {
     const element = role === "action" ? actionElement : cardElement;
@@ -1848,6 +2320,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       contextFingerprint: hit.contextFingerprint
     };
     refreshObserver();
+    emitInteraction("entry_presented");
     void submitLookup("resolve", candidate.generation);
   }
   function updateAnnotations(value) {
@@ -1975,16 +2448,16 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
         restoreFocus = composer;
         return;
       }
-      cleanup(true, true);
+      closeForUser(true, event.isTrusted);
     };
     window.addEventListener("pointerdown", outsideHandler, true);
   }
   async function digestText(value) {
-    const digest = await crypto.subtle.digest(
+    const digest2 = await crypto.subtle.digest(
       "SHA-256",
       new TextEncoder().encode(value)
     );
-    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    return [...new Uint8Array(digest2)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
   }
   async function submitLookup(operation, expectedGeneration, reference) {
     const current = candidate;
@@ -2002,7 +2475,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     }
     if (operation === "resolve" || operation === "choose") state = "resolving";
     try {
-      const digest = await digestText(current.text);
+      const digest2 = await digestText(current.text);
       if (candidate?.generation !== expectedGeneration || current.range.toString().trim() !== current.text || readContextFingerprint() !== current.contextFingerprint || !candidateAnchorIsCurrent()) {
         cleanup(true, false);
         return;
@@ -2021,7 +2494,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       pending = {
         requestId,
         generation: current.generation,
-        digest,
+        digest: digest2,
         contextFingerprint: current.contextFingerprint,
         operation,
         ...operation === "choose" && reference !== void 0 ? { candidateRef: reference } : {},
@@ -2040,7 +2513,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
         requestId,
         selectionGeneration: current.generation,
         selectionText: current.text,
-        selectionDigest: digest,
+        selectionDigest: digest2,
         surface: current.surface,
         contextFingerprint: current.contextFingerprint,
         requestedAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -2136,8 +2609,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     close.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      window.getSelection()?.removeAllRanges();
-      cleanup(true, true);
+      closeForUser(true, event.isTrusted);
     });
     header.addEventListener("pointerdown", (event) => {
       if (!event.isTrusted || event.button !== 0 || !(event.target instanceof Node) || close.contains(event.target)) {
@@ -2492,6 +2964,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
       evidenceBody.hidden = !expanded;
       evidenceBody.style.display = expanded ? "block" : "none";
       evidenceToggle.textContent = expanded ? "\u6536\u8D77\u4F9D\u636E" : "\u4E3A\u4EC0\u4E48\u8FD9\u6837\u8BF4";
+      if (expanded) emitInteraction("evidence_expanded");
       reposition();
     });
     evidenceDisclosure.append(evidenceToggle, evidenceBody);
@@ -2895,6 +3368,7 @@ function installPointableContextRenderer(config, evaluateEligibility2, validateR
     document.removeEventListener("pointercancel", dragEndHandler, true);
     document.removeEventListener("keyup", keyUpHandler, true);
     document.removeEventListener("keydown", keyDownHandler, true);
+    document.removeEventListener("visibilitychange", visibilityHandler);
     window.removeEventListener("scroll", viewportHandler, true);
     window.removeEventListener("resize", viewportHandler);
     window.removeEventListener("popstate", routeHandler);
@@ -2987,7 +3461,7 @@ function normalizeCodexDebugEndpoint(value) {
   }
   return new URL(parsed.origin);
 }
-function record3(value) {
+function record5(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 async function readBoundedResponseText(response, maximumBytes, signal) {
@@ -3059,7 +3533,7 @@ function awaitWithAbort(promise, signal) {
   });
 }
 function parseTarget(value, endpoint) {
-  if (!record3(value) || value.type !== "page" || typeof value.id !== "string" || value.id.length < 1 || value.id.length > 256 || !/^[A-Za-z0-9:_-]+$/u.test(value.id) || typeof value.title !== "string" || value.title.length > 512 || value.url !== "app://-/index.html" || typeof value.webSocketDebuggerUrl !== "string") {
+  if (!record5(value) || value.type !== "page" || typeof value.id !== "string" || value.id.length < 1 || value.id.length > 256 || !/^[A-Za-z0-9:_-]+$/u.test(value.id) || typeof value.title !== "string" || value.title.length > 512 || value.url !== "app://-/index.html" || typeof value.webSocketDebuggerUrl !== "string") {
     return void 0;
   }
   let websocket;
@@ -3174,7 +3648,7 @@ var CdpTransportError = class extends Error {
   code;
 };
 var MAX_CDP_MESSAGE_BYTES = 1048576;
-function record4(value) {
+function record6(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function loopbackWebSocket(value) {
@@ -3289,13 +3763,13 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
     } catch {
       return;
     }
-    if (!record4(message)) return;
+    if (!record6(message)) return;
     if (typeof message.id === "number") {
       const command = pending.get(message.id);
       if (command === void 0) return;
       pending.delete(message.id);
       clearTimeout(command.timer);
-      if (record4(message.error)) {
+      if (record6(message.error)) {
         command.reject(
           new CdpTransportError(
             "cdp_command_failed",
@@ -3311,7 +3785,7 @@ async function connectCdpWebSocket(webSocketDebuggerUrl, signal) {
     const cdpEvent = {
       method: message.method
     };
-    if (record4(message.params)) cdpEvent.params = message.params;
+    if (record6(message.params)) cdpEvent.params = message.params;
     for (const listener of listeners) {
       Promise.resolve(listener(cdpEvent)).catch(() => void 0);
     }
@@ -3394,7 +3868,7 @@ var CodexHostContextError = class extends Error {
     this.name = "CodexHostContextError";
   }
 };
-function record5(value) {
+function record7(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function boundedIdentity(value) {
@@ -3438,7 +3912,7 @@ function createReadCodexHostTaskContextExpression() {
 }
 function parseCodexHostTaskContext(value, expectedFingerprint) {
   if (value === null || value === void 0) return void 0;
-  if (!record5(value) || Reflect.ownKeys(value).some((key) => typeof key !== "string") || Object.keys(value).sort().join("|") !== "contextFingerprint|host|hostId|routeRef|schemaVersion|threadId" || value.schemaVersion !== 1 || value.host !== "codex-desktop" || !boundedIdentity(value.threadId) || !boundedIdentity(value.hostId) || !boundedRoute(value.routeRef) || typeof value.contextFingerprint !== "string" || value.contextFingerprint.length < 1 || value.contextFingerprint.length > 2048) {
+  if (!record7(value) || Reflect.ownKeys(value).some((key) => typeof key !== "string") || Object.keys(value).sort().join("|") !== "contextFingerprint|host|hostId|routeRef|schemaVersion|threadId" || value.schemaVersion !== 1 || value.host !== "codex-desktop" || !boundedIdentity(value.threadId) || !boundedIdentity(value.hostId) || !boundedRoute(value.routeRef) || typeof value.contextFingerprint !== "string" || value.contextFingerprint.length < 1 || value.contextFingerprint.length > 2048) {
     throw new CodexHostContextError("pointable_host_task_context_invalid");
   }
   const canonicalFingerprint = JSON.stringify({
@@ -3459,47 +3933,128 @@ function parseCodexHostTaskContext(value, expectedFingerprint) {
   });
 }
 
+// src/host/codex-cdp/interaction-protocol.ts
+var POINTABLE_INTERACTION_EVENT_KIND = "pointable.interaction.event";
+var PointableInteractionProtocolError = class extends Error {
+  constructor(code) {
+    super(code);
+    this.code = code;
+    this.name = "PointableInteractionProtocolError";
+  }
+  code;
+};
+var EVENT_TYPES2 = /* @__PURE__ */ new Set([
+  "entry_presented",
+  "selection_completed",
+  "quick_action_shown",
+  "card_closed",
+  "evidence_expanded",
+  "inactive_started",
+  "inactive_ended"
+]);
+function record8(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function exactKeys4(value, expected) {
+  return Object.keys(value).sort().join("|") === [...expected].sort().join("|");
+}
+function pointableBindingPayloadKind(payload) {
+  if (payload.length < 2 || payload.length > 4096) return void 0;
+  try {
+    const value = JSON.parse(payload);
+    if (!record8(value)) return void 0;
+    if (value.kind === "pointable.selection.lookup") return "lookup";
+    if (value.kind === POINTABLE_INTERACTION_EVENT_KIND) return "interaction";
+    return void 0;
+  } catch {
+    return void 0;
+  }
+}
+function parsePointableRendererInteractionEvent(payload) {
+  if (payload.length < 2 || payload.length > 4096) {
+    throw new PointableInteractionProtocolError("pointable_interaction_payload_invalid");
+  }
+  let value;
+  try {
+    value = JSON.parse(payload);
+  } catch {
+    throw new PointableInteractionProtocolError("pointable_interaction_payload_invalid");
+  }
+  if (!record8(value) || !exactKeys4(value, [
+    "schemaVersion",
+    "kind",
+    "rendererSequence",
+    "eventType",
+    "contextFingerprint"
+  ]) || value.schemaVersion !== 1 || value.kind !== POINTABLE_INTERACTION_EVENT_KIND || !Number.isSafeInteger(value.rendererSequence) || Number(value.rendererSequence) < 1 || Number(value.rendererSequence) > Number.MAX_SAFE_INTEGER || typeof value.eventType !== "string" || !EVENT_TYPES2.has(value.eventType) || typeof value.contextFingerprint !== "string" || value.contextFingerprint.length < 1 || value.contextFingerprint.length > 2048 || /[\p{Cc}\p{Cf}]/u.test(value.contextFingerprint)) {
+    throw new PointableInteractionProtocolError("pointable_interaction_payload_invalid");
+  }
+  return Object.freeze({
+    schemaVersion: 1,
+    kind: POINTABLE_INTERACTION_EVENT_KIND,
+    rendererSequence: Number(value.rendererSequence),
+    eventType: value.eventType,
+    contextFingerprint: value.contextFingerprint
+  });
+}
+
 // src/host/codex-cdp/adapter.ts
-function record6(value) {
+function record9(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function sameHostTask(left, right) {
   return left.host === right.host && left.hostId === right.hostId && left.threadId === right.threadId && left.routeRef === right.routeRef && left.contextFingerprint === right.contextFingerprint;
 }
 function runtimeValue(value) {
-  if (!record6(value) || !record6(value.result) || value.exceptionDetails !== void 0) {
+  if (!record9(value) || !record9(value.result) || value.exceptionDetails !== void 0) {
     return void 0;
   }
   return value.result.value;
 }
 function parseInstalledStatus(value, bindingName) {
-  if (!record6(value) || value.installed !== true || value.bindingName !== bindingName || typeof value.lifecycleId !== "string" || !/^[A-Za-z0-9:_-]{8,256}$/u.test(value.lifecycleId) || typeof value.state !== "string") {
+  if (!record9(value) || value.installed !== true || value.bindingName !== bindingName || typeof value.lifecycleId !== "string" || !/^[A-Za-z0-9:_-]{8,256}$/u.test(value.lifecycleId) || typeof value.state !== "string") {
     throw new Error("pointable_renderer_install_unverified");
   }
   return value;
 }
 function parseMainFrameId(value, target) {
-  if (!record6(value) || !record6(value.frameTree) || !record6(value.frameTree.frame) || typeof value.frameTree.frame.id !== "string" || value.frameTree.frame.id.length < 1 || value.frameTree.frame.id.length > 256 || value.frameTree.frame.url !== target.url) {
+  if (!record9(value) || !record9(value.frameTree) || !record9(value.frameTree.frame) || typeof value.frameTree.frame.id !== "string" || value.frameTree.frame.id.length < 1 || value.frameTree.frame.id.length > 256 || value.frameTree.frame.url !== target.url) {
     throw new Error("pointable_main_frame_unverified");
   }
   return value.frameTree.frame.id;
 }
 function mainExecutionContext(event, mainFrameId) {
-  if (event.method !== "Runtime.executionContextCreated" || !record6(event.params)) {
+  if (event.method !== "Runtime.executionContextCreated" || !record9(event.params)) {
     return void 0;
   }
   const context = event.params.context;
-  if (!record6(context) || !Number.isSafeInteger(context.id) || Number(context.id) < 1) {
+  if (!record9(context) || !Number.isSafeInteger(context.id) || Number(context.id) < 1) {
     return void 0;
   }
   const auxiliary = context.auxData;
-  if (!record6(auxiliary) || auxiliary.isDefault !== true || auxiliary.frameId !== mainFrameId) {
+  if (!record9(auxiliary) || auxiliary.isDefault !== true || auxiliary.frameId !== mainFrameId) {
     return void 0;
   }
   return Number(context.id);
 }
 function lookupError(code, message, retryable) {
   return { kind: "error", code, message, retryable };
+}
+function recoveryFailureCode(code) {
+  const normalized = code.toLocaleLowerCase("en-US");
+  if (normalized.includes("ambiguous") || normalized.includes("multiple")) {
+    return "ambiguous";
+  }
+  if (normalized.includes("not_found") || normalized.includes("no_match")) {
+    return "no_match";
+  }
+  if (normalized.includes("stale") || normalized.includes("superseded")) {
+    return "stale";
+  }
+  if (normalized.includes("type") && normalized.includes("mismatch")) {
+    return "type_mismatch";
+  }
+  return "unavailable";
 }
 function boundedLookup(callback, timeoutMs, controller) {
   return new Promise((resolve10, reject) => {
@@ -3606,6 +4161,7 @@ var CodexCdpHostAdapter = class {
   #presentationMode;
   #annotationProvider;
   #annotationRefreshIntervalMs;
+  #interactionObserver;
   #attachments = /* @__PURE__ */ new Map();
   #attaching = /* @__PURE__ */ new Set();
   #recoveries = /* @__PURE__ */ new Set();
@@ -3626,6 +4182,7 @@ var CodexCdpHostAdapter = class {
     this.#presentationMode = options.presentationMode;
     this.#annotationProvider = options.annotationProvider;
     this.#annotationRefreshIntervalMs = options.annotationRefreshIntervalMs ?? 15e3;
+    this.#interactionObserver = options.interactionObserver;
     if (this.#presentationMode !== void 0 && this.#presentationMode !== "record" && this.#presentationMode !== "narrative" && this.#presentationMode !== "mental-model") {
       throw new RangeError("presentationMode is invalid");
     }
@@ -3899,6 +4456,7 @@ var CodexCdpHostAdapter = class {
       const rendererConfig = {
         bindingName,
         requestTimeoutMs: this.#lookupTimeoutMs,
+        interactionObservation: this.#interactionObserver !== void 0,
         ...this.#actionLabel === void 0 ? {} : { actionLabel: this.#actionLabel },
         ...this.#presentationMode === void 0 ? {} : { presentationMode: this.#presentationMode }
       };
@@ -3947,18 +4505,38 @@ var CodexCdpHostAdapter = class {
       this.#invalidateAttachment(attachment);
       return;
     }
-    if (event.method === "Runtime.executionContextDestroyed" && record6(event.params) && event.params.executionContextId === attachment.mainExecutionContextId) {
+    if (event.method === "Runtime.executionContextDestroyed" && record9(event.params) && event.params.executionContextId === attachment.mainExecutionContextId) {
       this.#invalidateAttachment(attachment);
       return;
     }
-    if (event.method === "Page.frameNavigated" && record6(event.params) && record6(event.params.frame) && event.params.frame.id === attachment.mainFrameId && attachment.mainFrameId.length > 0) {
+    if (event.method === "Page.frameNavigated" && record9(event.params) && record9(event.params.frame) && event.params.frame.id === attachment.mainFrameId && attachment.mainFrameId.length > 0) {
       this.#invalidateAttachment(attachment);
       return;
     }
-    if (event.method !== "Runtime.bindingCalled" || !record6(event.params)) return;
+    if (event.method !== "Runtime.bindingCalled" || !record9(event.params)) return;
     if (event.params.name !== attachment.bindingName || typeof event.params.payload !== "string" || event.params.executionContextId !== attachment.mainExecutionContextId || this.#attachments.get(attachment.target.id) !== attachment || attachment.rendererLifecycleId === void 0 || attachment.invalidated) {
       return;
     }
+    const payloadKind = pointableBindingPayloadKind(event.params.payload);
+    if (payloadKind === "interaction") {
+      if (this.#interactionObserver === void 0) return;
+      try {
+        const interaction = parsePointableRendererInteractionEvent(event.params.payload);
+        const hostTask = await this.#readCurrentHostTaskContext(
+          attachment,
+          interaction.contextFingerprint
+        );
+        if (hostTask === void 0) return;
+        await this.#observeInteraction(attachment, hostTask, {
+          schemaVersion: 1,
+          kind: RECOVERY_INTERACTION_SIGNAL_KIND,
+          eventType: interaction.eventType
+        });
+      } catch {
+      }
+      return;
+    }
+    if (payloadKind !== "lookup") return;
     let intent;
     try {
       intent = parsePointableLookupIntent(event.params.payload);
@@ -4039,7 +4617,10 @@ var CodexCdpHostAdapter = class {
         return;
       }
       if (!await this.#rendererFenceCurrent(attachment, intent)) return;
-      await this.#deliver(attachment, intent, presentation);
+      const applied = await this.#deliver(attachment, intent, presentation);
+      if (applied) {
+        await this.#observePresentation(attachment, hostTask, intent, presentation);
+      }
     } finally {
       if (controller !== void 0) attachment.pending.delete(intent.requestId);
       attachment.inFlight.delete(intent.requestId);
@@ -4098,15 +4679,66 @@ var CodexCdpHostAdapter = class {
     const contextId = attachment.mainExecutionContextId;
     const lifecycleId = attachment.rendererLifecycleId;
     if (contextId === void 0 || lifecycleId === void 0 || this.#attachments.get(attachment.target.id) !== attachment || attachment.connection.isClosed() || attachment.invalidated) {
-      return;
+      return false;
     }
     const response = createPointableLookupResponse(intent, presentation);
-    await attachment.connection.send("Runtime.evaluate", {
+    const delivered = await attachment.connection.send("Runtime.evaluate", {
       expression: createDeliverPointableResultExpression(response, lifecycleId),
       contextId,
       returnByValue: true,
       awaitPromise: true
     });
+    const acknowledgement = runtimeValue(delivered);
+    return record9(acknowledgement) && acknowledgement.ok === true && acknowledgement.outcome === "applied";
+  }
+  async #observePresentation(attachment, task, intent, presentation) {
+    if (task === void 0 || this.#interactionObserver === void 0) return;
+    if (presentation.kind === "detail") {
+      if (intent.operation === "refresh") {
+        await this.#observeInteraction(attachment, task, {
+          schemaVersion: 1,
+          kind: RECOVERY_INTERACTION_SIGNAL_KIND,
+          eventType: "card_refreshed"
+        });
+      } else if (intent.operation === "resolve" || intent.operation === "choose") {
+        await this.#observeInteraction(attachment, task, {
+          schemaVersion: 1,
+          kind: RECOVERY_INTERACTION_SIGNAL_KIND,
+          eventType: "object_opened",
+          objectDigest: digestRecoveryObjectIdentity(presentation.detail.entityId)
+        });
+      }
+      return;
+    }
+    if (presentation.kind === "candidates") {
+      await this.#observeInteraction(attachment, task, {
+        schemaVersion: 1,
+        kind: RECOVERY_INTERACTION_SIGNAL_KIND,
+        eventType: "lookup_failed",
+        failureCode: "ambiguous"
+      });
+      return;
+    }
+    if (presentation.kind === "error") {
+      await this.#observeInteraction(attachment, task, {
+        schemaVersion: 1,
+        kind: RECOVERY_INTERACTION_SIGNAL_KIND,
+        eventType: "lookup_failed",
+        failureCode: recoveryFailureCode(presentation.code)
+      });
+    }
+  }
+  async #observeInteraction(attachment, task, signal) {
+    if (this.#interactionObserver === void 0 || this.#attachments.get(attachment.target.id) !== attachment || attachment.invalidated || attachment.connection.isClosed()) {
+      return;
+    }
+    try {
+      await this.#interactionObserver({
+        scopeKey: task.contextFingerprint,
+        signal
+      });
+    } catch {
+    }
   }
   #invalidateAttachment(attachment) {
     if (attachment.invalidated || attachment.detached) return;
@@ -4180,7 +4812,7 @@ var CodexCdpHostAdapter = class {
 
 // src/adapters/local-workspace.ts
 import { execFile as execFile3 } from "node:child_process";
-import { createHash as createHash6 } from "node:crypto";
+import { createHash as createHash7 } from "node:crypto";
 import { open, readdir, realpath as realpath2, stat as stat2 } from "node:fs/promises";
 import {
   basename as basename3,
@@ -4194,7 +4826,7 @@ import {
 
 // src/adapters/markdown-artifact.ts
 import { execFile } from "node:child_process";
-import { createHash as createHash3 } from "node:crypto";
+import { createHash as createHash4 } from "node:crypto";
 import { resolve as resolve2 } from "node:path";
 var GIT_TIMEOUT_MS = 750;
 var MAX_GIT_OUTPUT_BYTES = 256 * 1024;
@@ -4370,7 +5002,7 @@ async function extractMarkdownArtifactContext(options) {
     };
     return Object.freeze({
       ...base2,
-      contextRevision: createHash3("sha256").update(JSON.stringify(base2), "utf8").digest("hex")
+      contextRevision: createHash4("sha256").update(JSON.stringify(base2), "utf8").digest("hex")
     });
   }
   const [statusResult, unstaged, staged, references, lastCommit] = await Promise.all([
@@ -4414,12 +5046,12 @@ ${staged.kind === "ok" ? staged.stdout : ""}`;
   };
   return Object.freeze({
     ...base,
-    contextRevision: createHash3("sha256").update(JSON.stringify(base), "utf8").digest("hex")
+    contextRevision: createHash4("sha256").update(JSON.stringify(base), "utf8").digest("hex")
   });
 }
 
 // src/adapters/context-concept.ts
-import { createHash as createHash4 } from "node:crypto";
+import { createHash as createHash5 } from "node:crypto";
 var MAX_FIELD_CHARS = 1024;
 var MAX_SEQUENCE_ITEMS = 4;
 var MAX_SOURCE_PATH_CHARS = 480;
@@ -4516,7 +5148,7 @@ function artifactEvidence(sections) {
 function revision(base) {
   return Object.freeze({
     ...base,
-    contextRevision: createHash4("sha256").update(JSON.stringify(base), "utf8").digest("hex")
+    contextRevision: createHash5("sha256").update(JSON.stringify(base), "utf8").digest("hex")
   });
 }
 function isoTimestamp(value) {
@@ -4641,7 +5273,7 @@ function extractContextVerificationArtifact(content) {
 
 // src/adapters/source-module-artifact.ts
 import { execFile as execFile2 } from "node:child_process";
-import { createHash as createHash5 } from "node:crypto";
+import { createHash as createHash6 } from "node:crypto";
 import { basename, extname, resolve as resolve3 } from "node:path";
 var GIT_TIMEOUT_MS2 = 750;
 var MAX_GIT_OUTPUT_BYTES2 = 256 * 1024;
@@ -4927,7 +5559,7 @@ async function extractSourceModuleArtifactContext(options) {
     };
     return Object.freeze({
       ...base2,
-      contextRevision: createHash5("sha256").update(JSON.stringify(base2), "utf8").digest("hex")
+      contextRevision: createHash6("sha256").update(JSON.stringify(base2), "utf8").digest("hex")
     });
   }
   const stem = basename(options.relativePath, extname(options.relativePath));
@@ -4964,7 +5596,7 @@ ${staged.kind === "ok" ? staged.stdout : ""}`;
   };
   return Object.freeze({
     ...base,
-    contextRevision: createHash5("sha256").update(JSON.stringify(base), "utf8").digest("hex")
+    contextRevision: createHash6("sha256").update(JSON.stringify(base), "utf8").digest("hex")
   });
 }
 
@@ -5253,7 +5885,7 @@ async function scanWorkspace(root, maxFiles, maxScannedFiles, maxDepth, ignoredD
   };
 }
 function indexRevision(scan) {
-  const hash = createHash6("sha256");
+  const hash = createHash7("sha256");
   hash.update(scan.developmentSurfaceOnly ? "development-surface\n" : "complete-surface\n", "utf8");
   hash.update(String(scan.scannedFileCount), "utf8");
   hash.update("\n", "utf8");
@@ -5393,7 +6025,7 @@ async function verifyContextArtifactEvidence(root, artifact, signal) {
     if (compact2 !== artifact.evidence.excerpt) return void 0;
     return {
       sourceId: `${artifact.evidence.sourcePath}:${artifact.evidence.sourceLine}`,
-      revision: createHash6("sha256").update(content).digest("hex")
+      revision: createHash7("sha256").update(content).digest("hex")
     };
   } catch {
     return void 0;
@@ -5491,7 +6123,7 @@ async function gitRevisionFingerprint(root, locator, entityType, signal) {
   };
   return {
     kind: "current",
-    fingerprint: createHash6("sha256").update(JSON.stringify(base), "utf8").digest("hex")
+    fingerprint: createHash7("sha256").update(JSON.stringify(base), "utf8").digest("hex")
   };
 }
 async function evidenceRevisionFingerprint(root, canonicalFile, locator, entityType, signal) {
@@ -5515,7 +6147,7 @@ async function evidenceRevisionFingerprint(root, canonicalFile, locator, entityT
     }
     const sourceInfo = await stat2(canonicalSource);
     if (!sourceInfo.isFile()) return "evidence-not-file";
-    return createHash6("sha256").update(JSON.stringify({
+    return createHash7("sha256").update(JSON.stringify({
       path: artifact.evidence.sourcePath,
       size: sourceInfo.size,
       modifiedMs: sourceInfo.mtimeMs,
@@ -5578,7 +6210,7 @@ var LocalWorkspaceRevisionProbe = class {
       if (request.signal?.aborted) {
         return { kind: "unavailable", observedAt, retryable: true };
       }
-      const revision2 = createHash6("sha256").update(JSON.stringify({
+      const revision2 = createHash7("sha256").update(JSON.stringify({
         schema: "workspace-context-revision-v2",
         path: locator,
         size: info.size,
@@ -5668,20 +6300,20 @@ var LocalWorkspaceAuthoritativeProvider = class {
       if (!stableFileStat(before, after) || request.signal?.aborted) {
         return { kind: "unavailable", retryable: true };
       }
-      const statRevision = createHash6("sha256").update(JSON.stringify({
+      const statRevision = createHash7("sha256").update(JSON.stringify({
         path: relativePath,
         size: after.size,
         modifiedMs: after.mtimeMs,
         changedMs: after.ctimeMs,
         inode: after.ino
       }), "utf8").digest("hex");
-      const contentHash = content === void 0 ? void 0 : createHash6("sha256").update(content).digest("hex");
+      const contentHash = content === void 0 ? void 0 : createHash7("sha256").update(content).digest("hex");
       const mentalModelContext = conceptContext ?? changeContext ?? explicitDecisionContext ?? taskContext ?? explicitVerificationContext;
       const artifactEvidence2 = mentalModelContext === void 0 ? void 0 : await verifyContextArtifactEvidence(root, mentalModelContext, request.signal);
       if (mentalModelContext !== void 0 && artifactEvidence2 === void 0) {
         return { kind: "not_found" };
       }
-      const detailRevision = createHash6("sha256").update(contentHash ?? statRevision, "utf8").update("\0", "utf8").update(
+      const detailRevision = createHash7("sha256").update(contentHash ?? statRevision, "utf8").update("\0", "utf8").update(
         markdownContext?.contextRevision ?? sourceModuleContext?.contextRevision ?? conceptContext?.contextRevision ?? changeContext?.contextRevision ?? explicitDecisionContext?.contextRevision ?? taskContext?.contextRevision ?? explicitVerificationContext?.contextRevision ?? "file-metadata-v1",
         "utf8"
       ).update(artifactEvidence2?.revision ?? "", "utf8").digest("hex");
@@ -6222,7 +6854,7 @@ async function checkContextRecords(workspaceRoot, options = {}) {
 }
 
 // src/host/codex-cdp/workspace-lookup.ts
-import { createHash as createHash7, randomBytes as randomBytes3 } from "node:crypto";
+import { createHash as createHash8, randomBytes as randomBytes3 } from "node:crypto";
 
 // src/lookup-service.ts
 import {
@@ -6234,19 +6866,19 @@ import {
 import { performance as performance2 } from "node:perf_hooks";
 
 // src/resolver.ts
-function toCandidate(record9, attempt) {
+function toCandidate(record12, attempt) {
   const match = {
-    scope: copyContextScope(record9.scope),
-    entityId: record9.entityId,
-    entityType: record9.entityType,
-    label: record9.canonicalName,
-    summary: record9.summary,
+    scope: copyContextScope(record12.scope),
+    entityId: record12.entityId,
+    entityType: record12.entityType,
+    label: record12.canonicalName,
+    summary: record12.summary,
     matchKind: attempt.kind,
-    indexRevision: record9.indexRevision,
-    indexedAt: record9.indexedAt,
+    indexRevision: record12.indexRevision,
+    indexedAt: record12.indexedAt,
     detailFreshness: "unknown"
   };
-  return { match, record: record9 };
+  return { match, record: record12 };
 }
 function deduplicateAndSort(candidates2) {
   const byEntity = /* @__PURE__ */ new Map();
@@ -6257,8 +6889,8 @@ function deduplicateAndSort(candidates2) {
     (left, right) => left.record.entityId.localeCompare(right.record.entityId, "en")
   );
 }
-function exactIdMatch(selection, record9) {
-  const keys = [record9.canonicalKey, record9.entityId].filter(
+function exactIdMatch(selection, record12) {
+  const keys = [record12.canonicalKey, record12.entityId].filter(
     (value) => Boolean(value)
   );
   for (const key of keys) {
@@ -6269,12 +6901,12 @@ function exactIdMatch(selection, record9) {
   }
   return void 0;
 }
-function exactNameMatch(selection, record9) {
-  const matchedText = findLiteralPhrase(selection, record9.canonicalName);
+function exactNameMatch(selection, record12) {
+  const matchedText = findLiteralPhrase(selection, record12.canonicalName);
   return matchedText ? { kind: "exact_name", matchedText } : void 0;
 }
-function exactAliasMatch(selection, record9) {
-  for (const alias of record9.aliases) {
+function exactAliasMatch(selection, record12) {
+  for (const alias of record12.aliases) {
     const matchedText = findLiteralPhrase(selection, alias);
     if (matchedText) {
       return { kind: "exact_alias", matchedText };
@@ -6282,12 +6914,12 @@ function exactAliasMatch(selection, record9) {
   }
   return void 0;
 }
-function normalizedMatch(normalizedSelection, record9) {
+function normalizedMatch(normalizedSelection, record12) {
   const values = [
-    record9.canonicalKey,
-    record9.entityId,
-    record9.canonicalName,
-    ...record9.aliases
+    record12.canonicalKey,
+    record12.entityId,
+    record12.canonicalName,
+    ...record12.aliases
   ].filter((value) => Boolean(value));
   for (const value of values) {
     const normalizedValue = normalizeText(value);
@@ -6331,20 +6963,20 @@ function route(candidates2) {
 function resolveSelection(scope, selection, records) {
   assertContextIndexResolutionBudget(records, selection);
   const scoped = records.filter(
-    (record9) => sameContextScope(record9.scope, scope) && !record9.deleted
+    (record12) => sameContextScope(record12.scope, scope) && !record12.deleted
   );
   const normalizedSelection = normalizeText(selection);
   const layers = [
     exactIdMatch,
     exactNameMatch,
     exactAliasMatch,
-    (_selection, record9) => normalizedMatch(normalizedSelection, record9)
+    (_selection, record12) => normalizedMatch(normalizedSelection, record12)
   ];
   for (const matchLayer of layers) {
     const candidates2 = deduplicateAndSort(
-      scoped.flatMap((record9) => {
-        const attempt = matchLayer(selection, record9);
-        return attempt ? [toCandidate(record9, attempt)] : [];
+      scoped.flatMap((record12) => {
+        const attempt = matchLayer(selection, record12);
+        return attempt ? [toCandidate(record12, attempt)] : [];
       })
     );
     if (candidates2.length > 0) {
@@ -6907,11 +7539,11 @@ var LookupService = class {
     if (!/^[A-Za-z0-9:_-]{8,128}$/u.test(intent.activationNonce)) {
       return blocked("invalid_activation");
     }
-    const record9 = this.#activations.get(intent.activationNonce);
-    if (!record9 || record9.activatedAt !== intent.activatedAt) {
+    const record12 = this.#activations.get(intent.activationNonce);
+    if (!record12 || record12.activatedAt !== intent.activatedAt) {
       return blocked("invalid_activation");
     }
-    if (record9.state === "consumed") {
+    if (record12.state === "consumed") {
       return blocked("replayed_activation");
     }
     const presented = this.#activationDigest(
@@ -6919,15 +7551,15 @@ var LookupService = class {
       hostContext,
       intent.chosenEntityId
     );
-    if (presented.length !== record9.digest.length || !timingSafeEqual(presented, record9.digest)) {
+    if (presented.length !== record12.digest.length || !timingSafeEqual(presented, record12.digest)) {
       return blocked("invalid_activation");
     }
-    record9.state = "consumed";
+    record12.state = "consumed";
     return void 0;
   }
   #pruneActivations(now) {
-    for (const [nonce, record9] of this.#activations) {
-      if (now - record9.activatedAt > this.#nonceTtlMs) {
+    for (const [nonce, record12] of this.#activations) {
+      if (now - record12.activatedAt > this.#nonceTtlMs) {
         this.#activations.delete(nonce);
       }
     }
@@ -7034,9 +7666,9 @@ function truncate(value, maximum) {
   return value.length <= maximum ? value : `${value.slice(0, maximum - 1)}\u2026`;
 }
 function sha2562(value) {
-  return createHash7("sha256").update(value, "utf8").digest("hex");
+  return createHash8("sha256").update(value, "utf8").digest("hex");
 }
-function scopeKey(entry) {
+function scopeKey2(entry) {
   return `${entry.scope.kind}\0${entry.scope.namespace}\0${entry.scope.id}`;
 }
 function scalarText(value) {
@@ -7309,7 +7941,7 @@ function createWorkspaceLookupCallback(options) {
     prune(checkedAt);
     const grant = candidateGrants.get(candidateRef);
     const entry = await options.registry.find(request.host.task);
-    if (grant === void 0 || entry === void 0 || grant.expiresAt <= checkedAt || grant.targetId !== request.host.targetId || grant.bindingGeneration !== request.host.bindingGeneration || grant.contextFingerprint !== request.contextFingerprint || grant.selectionDigest !== request.selection.digest || grant.selectionGeneration !== request.selection.generation || grant.bindingRevision !== entry.bindingRevision || grant.scopeKey !== scopeKey(entry)) {
+    if (grant === void 0 || entry === void 0 || grant.expiresAt <= checkedAt || grant.targetId !== request.host.targetId || grant.bindingGeneration !== request.host.bindingGeneration || grant.contextFingerprint !== request.contextFingerprint || grant.selectionDigest !== request.selection.digest || grant.selectionGeneration !== request.selection.generation || grant.bindingRevision !== entry.bindingRevision || grant.scopeKey !== scopeKey2(entry)) {
       return void 0;
     }
     candidateGrants.delete(candidateRef);
@@ -7333,7 +7965,7 @@ function createWorkspaceLookupCallback(options) {
         selectionDigest: request.selection.digest,
         selectionGeneration: request.selection.generation,
         entityId: candidate.entityId,
-        scopeKey: scopeKey(entry),
+        scopeKey: scopeKey2(entry),
         bindingRevision: entry.bindingRevision,
         expiresAt: issuedAt + candidateRefTtlMs
       });
@@ -7429,7 +8061,7 @@ function createWorkspaceLookupCallback(options) {
       selectionGeneration: request.selection.generation,
       entityId: outcome.detail.entityId,
       entityType: outcome.detail.entityType,
-      scopeKey: scopeKey(activeEntry),
+      scopeKey: scopeKey2(activeEntry),
       bindingRevision: activeEntry.bindingRevision,
       probeRevision: probe.revision,
       detail,
@@ -7444,7 +8076,7 @@ function createWorkspaceLookupCallback(options) {
     prune(checkedAt);
     const grant = detailGrants.get(detailRef);
     if (grant === void 0) return void 0;
-    if (grant.expiresAt <= checkedAt || grant.targetId !== request.host.targetId || grant.bindingGeneration !== request.host.bindingGeneration || grant.contextFingerprint !== request.contextFingerprint || grant.selectionDigest !== request.selection.digest || grant.selectionGeneration !== request.selection.generation || grant.bindingRevision !== activeEntry.bindingRevision || grant.scopeKey !== scopeKey(activeEntry)) {
+    if (grant.expiresAt <= checkedAt || grant.targetId !== request.host.targetId || grant.bindingGeneration !== request.host.bindingGeneration || grant.contextFingerprint !== request.contextFingerprint || grant.selectionDigest !== request.selection.digest || grant.selectionGeneration !== request.selection.generation || grant.bindingRevision !== activeEntry.bindingRevision || grant.scopeKey !== scopeKey2(activeEntry)) {
       detailGrants.delete(detailRef);
       return void 0;
     }
@@ -7557,7 +8189,7 @@ function createWorkspaceLookupCallback(options) {
 }
 
 // src/host/codex-cdp/workspace-annotations.ts
-import { createHash as createHash8 } from "node:crypto";
+import { createHash as createHash9 } from "node:crypto";
 var DEFAULT_MAX_ANNOTATIONS = 256;
 var TYPE_PRIORITY = Object.freeze({
   task: 95,
@@ -7576,14 +8208,14 @@ function normalizedTerm(value) {
 function usableTerm(value) {
   return value === value.trim() && value.length >= 3 && value.length <= 256 && !/[\p{Cc}\p{Cf}]/u.test(value);
 }
-function objectKey(record9) {
-  return createHash8("sha256").update(record9.scope.kind, "utf8").update("\0", "utf8").update(record9.scope.namespace, "utf8").update("\0", "utf8").update(record9.scope.id, "utf8").update("\0", "utf8").update(record9.entityId, "utf8").digest("hex");
+function objectKey(record12) {
+  return createHash9("sha256").update(record12.scope.kind, "utf8").update("\0", "utf8").update(record12.scope.namespace, "utf8").update("\0", "utf8").update(record12.scope.id, "utf8").update("\0", "utf8").update(record12.entityId, "utf8").digest("hex");
 }
-function recordTerms(record9) {
+function recordTerms(record12) {
   const values = [
-    { term: record9.canonicalName, bonus: 4 },
-    ...record9.canonicalKey === void 0 ? [] : [{ term: record9.canonicalKey, bonus: 2 }],
-    ...record9.aliases.map((term) => ({ term, bonus: 0 }))
+    { term: record12.canonicalName, bonus: 4 },
+    ...record12.canonicalKey === void 0 ? [] : [{ term: record12.canonicalKey, bonus: 2 }],
+    ...record12.aliases.map((term) => ({ term, bonus: 0 }))
   ];
   const seen = /* @__PURE__ */ new Set();
   return values.filter(({ term }) => {
@@ -7599,18 +8231,18 @@ function buildWorkspaceAnnotationCatalog(records, bindingRevision, contextFinger
     throw new RangeError("maxAnnotations must be an integer from 1 to 256");
   }
   const byTerm = /* @__PURE__ */ new Map();
-  for (const record9 of records) {
-    if (record9.deleted) continue;
-    for (const term of recordTerms(record9)) {
+  for (const record12 of records) {
+    if (record12.deleted) continue;
+    for (const term of recordTerms(record12)) {
       const normalized = normalizedTerm(term.term);
       const bucket = byTerm.get(normalized) ?? [];
-      bucket.push({ record: record9, term: term.term, bonus: term.bonus });
+      bucket.push({ record: record12, term: term.term, bonus: term.bonus });
       byTerm.set(normalized, bucket);
     }
   }
   const entries = [];
   for (const bucket of byTerm.values()) {
-    const objectIds = new Set(bucket.map(({ record: record9 }) => record9.entityId));
+    const objectIds = new Set(bucket.map(({ record: record12 }) => record12.entityId));
     if (objectIds.size !== 1) continue;
     const candidate = bucket[0];
     if (candidate === void 0) continue;
@@ -7638,7 +8270,7 @@ function buildWorkspaceAnnotationCatalog(records, bindingRevision, contextFinger
     ...primary.slice(0, maxAnnotations),
     ...aliases2
   ].slice(0, maxAnnotations);
-  const revision2 = createHash8("sha256").update(bindingRevision, "utf8").update("\0", "utf8").update(JSON.stringify(bounded), "utf8").digest("hex");
+  const revision2 = createHash9("sha256").update(bindingRevision, "utf8").update("\0", "utf8").update(JSON.stringify(bounded), "utf8").digest("hex");
   return Object.freeze({
     revision: revision2,
     contextFingerprint,
@@ -7698,22 +8330,22 @@ function createWorkspaceAnnotationProvider(options) {
 }
 
 // src/host/codex-cdp/milestone-observation.ts
-import { createHash as createHash9, randomUUID as randomUUID4 } from "node:crypto";
+import { createHash as createHash10, randomUUID as randomUUID4 } from "node:crypto";
 import { lstat, mkdir as mkdir2, open as open4, readFile as readFile2, realpath as realpath5, rename as rename2, rm, stat as stat5 } from "node:fs/promises";
 import { basename as basename6, dirname as dirname3, isAbsolute as isAbsolute3, relative as relative4, resolve as resolve7, sep as sep4 } from "node:path";
 var MILESTONE_OBSERVATION_MAX_EVENTS = 512;
 var MILESTONE_OBSERVATION_MAX_BYTES = 4 * 1024 * 1024;
 var MAX_RECURRING_NEEDS = 32;
-function record7(value) {
+function record10(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-function exactKeys3(value, expected) {
+function exactKeys5(value, expected) {
   const actual = Object.keys(value).sort();
   const sortedExpected = [...expected].sort();
   return actual.length === expected.length && actual.every((key, index) => key === sortedExpected[index]);
 }
 function sha2563(value) {
-  return createHash9("sha256").update(value, "utf8").digest("hex");
+  return createHash10("sha256").update(value, "utf8").digest("hex");
 }
 function termSha256(value) {
   return sha2563(value.normalize("NFKC").trim().toLocaleLowerCase("en-US"));
@@ -7756,7 +8388,7 @@ var needStates = /* @__PURE__ */ new Set([
   "type_mismatch"
 ]);
 function parseNeed(value) {
-  if (!record7(value) || !exactKeys3(value, [
+  if (!record10(value) || !exactKeys5(value, [
     "termSha256",
     "expectedEntityType",
     "needKind",
@@ -7788,7 +8420,7 @@ function parseReview(value) {
     "omissionRate",
     "resolutionFailureRate"
   ];
-  if (!record7(value) || !exactKeys3(value, keys) || !integer(value.needCount, 32) || !integer(value.available, 32) || !integer(value.missing, 32) || !integer(value.ambiguous, 32) || !integer(value.typeMismatch, 32) || !rate(value.availabilityRate) || !rate(value.omissionRate) || !rate(value.resolutionFailureRate) || Number(value.available) + Number(value.missing) + Number(value.ambiguous) + Number(value.typeMismatch) !== Number(value.needCount)) {
+  if (!record10(value) || !exactKeys5(value, keys) || !integer(value.needCount, 32) || !integer(value.available, 32) || !integer(value.missing, 32) || !integer(value.ambiguous, 32) || !integer(value.typeMismatch, 32) || !rate(value.availabilityRate) || !rate(value.omissionRate) || !rate(value.resolutionFailureRate) || Number(value.available) + Number(value.missing) + Number(value.ambiguous) + Number(value.typeMismatch) !== Number(value.needCount)) {
     throw new Error("milestone_observation_event_invalid");
   }
   return Object.freeze({ ...value });
@@ -7803,7 +8435,7 @@ function parseCuration(value) {
     "terminalArchiveReady",
     "terminalAmbiguous"
   ];
-  if (!record7(value) || !exactKeys3(value, [...countKeys, "stableOverlapRate", "registrySnapshotSha256"]) || !countKeys.every((key) => integer(value[key], 1024)) || !rate(value.stableOverlapRate) || !isSha256(value.registrySnapshotSha256)) {
+  if (!record10(value) || !exactKeys5(value, [...countKeys, "stableOverlapRate", "registrySnapshotSha256"]) || !countKeys.every((key) => integer(value[key], 1024)) || !rate(value.stableOverlapRate) || !isSha256(value.registrySnapshotSha256)) {
     throw new Error("milestone_observation_event_invalid");
   }
   return Object.freeze({ ...value });
@@ -7817,7 +8449,7 @@ function parseCapacity(value) {
     "archivedRecords",
     "warnings"
   ];
-  if (!record7(value) || !exactKeys3(value, keys) || !integer(value.active, 256) || !integer(value.terminal, 1024) || !integer(value.currentTaskRecords, 1024) || !integer(value.registryRecords, 1024) || !integer(value.archivedRecords, 8192) || Number(value.active) + Number(value.terminal) !== Number(value.currentTaskRecords) || !Array.isArray(value.warnings) || value.warnings.length > 1 || !value.warnings.every((item) => item === "active_soft_limit_reached")) {
+  if (!record10(value) || !exactKeys5(value, keys) || !integer(value.active, 256) || !integer(value.terminal, 1024) || !integer(value.currentTaskRecords, 1024) || !integer(value.registryRecords, 1024) || !integer(value.archivedRecords, 8192) || Number(value.active) + Number(value.terminal) !== Number(value.currentTaskRecords) || !Array.isArray(value.warnings) || value.warnings.length > 1 || !value.warnings.every((item) => item === "active_soft_limit_reached")) {
     throw new Error("milestone_observation_event_invalid");
   }
   return Object.freeze({
@@ -7857,7 +8489,7 @@ function parseEvent(value) {
     "previousEventSha256",
     "eventSha256"
   ];
-  if (!record7(value) || !exactKeys3(value, keys) || value.schemaVersion !== 1 || typeof value.eventId !== "string" || !/^[a-f0-9-]{36}$/u.test(value.eventId) || !isIsoTime(value.observedAt) || !isSha256(value.milestoneSha256) || !isSha256(value.contextSha256) || !isSha256(value.bindingSha256) || typeof value.indexSnapshot !== "string" || !/^context-index:[a-f0-9]{64}$/u.test(value.indexSnapshot) || !Array.isArray(value.needs) || value.needs.length < 1 || value.needs.length > 32 || value.previousEventSha256 !== null && !isSha256(value.previousEventSha256) || !isSha256(value.eventSha256)) {
+  if (!record10(value) || !exactKeys5(value, keys) || value.schemaVersion !== 1 || typeof value.eventId !== "string" || !/^[a-f0-9-]{36}$/u.test(value.eventId) || !isIsoTime(value.observedAt) || !isSha256(value.milestoneSha256) || !isSha256(value.contextSha256) || !isSha256(value.bindingSha256) || typeof value.indexSnapshot !== "string" || !/^context-index:[a-f0-9]{64}$/u.test(value.indexSnapshot) || !Array.isArray(value.needs) || value.needs.length < 1 || value.needs.length > 32 || value.previousEventSha256 !== null && !isSha256(value.previousEventSha256) || !isSha256(value.eventSha256)) {
     throw new Error("milestone_observation_event_invalid");
   }
   const event = Object.freeze({
@@ -7884,7 +8516,7 @@ function parseEvent(value) {
   return event;
 }
 function parseDocument2(value) {
-  if (!record7(value) || !exactKeys3(value, ["schemaVersion", "events"]) || value.schemaVersion !== 1 || !Array.isArray(value.events) || value.events.length > MILESTONE_OBSERVATION_MAX_EVENTS) {
+  if (!record10(value) || !exactKeys5(value, ["schemaVersion", "events"]) || value.schemaVersion !== 1 || !Array.isArray(value.events) || value.events.length > MILESTONE_OBSERVATION_MAX_EVENTS) {
     throw new Error("milestone_observation_ledger_invalid");
   }
   const events = value.events.map(parseEvent);
@@ -8183,7 +8815,7 @@ var MilestoneObservationLedger = class {
 };
 
 // src/host/codex-cdp/task-object-registry.ts
-import { createHash as createHash10, randomUUID as randomUUID5 } from "node:crypto";
+import { createHash as createHash11, randomUUID as randomUUID5 } from "node:crypto";
 import { mkdir as mkdir3, readFile as readFile3, rename as rename3, stat as stat6, writeFile as writeFile2 } from "node:fs/promises";
 import { dirname as dirname4, isAbsolute as isAbsolute4, resolve as resolve8 } from "node:path";
 var TASK_OBJECT_PROVIDER_ID = "agent-task-context";
@@ -8200,7 +8832,7 @@ var MAX_CURATION_REVIEW_NEEDS = 32;
 function objectRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-function exactKeys4(value, expected) {
+function exactKeys6(value, expected) {
   return Reflect.ownKeys(value).every((key) => typeof key === "string") && Object.keys(value).sort().join("\0") === [...expected].sort().join("\0");
 }
 function boundedText5(value, name, minimum = 1, maximum = 1024) {
@@ -8241,12 +8873,12 @@ function curationNeedKind(value) {
   return value;
 }
 function parseTaskObjectCurationReviewInput(value) {
-  if (!objectRecord(value) || !exactKeys4(value, ["schemaVersion", "milestoneKey", "needs"]) || value.schemaVersion !== 1 || !Array.isArray(value.needs) || value.needs.length < 1 || value.needs.length > MAX_CURATION_REVIEW_NEEDS) {
+  if (!objectRecord(value) || !exactKeys6(value, ["schemaVersion", "milestoneKey", "needs"]) || value.schemaVersion !== 1 || !Array.isArray(value.needs) || value.needs.length < 1 || value.needs.length > MAX_CURATION_REVIEW_NEEDS) {
     throw new ContractError("task object curation review input is invalid");
   }
   const seen = /* @__PURE__ */ new Set();
   const needs = value.needs.map((rawNeed, index) => {
-    if (!objectRecord(rawNeed) || !exactKeys4(rawNeed, ["term", "expectedEntityType", "needKind"])) {
+    if (!objectRecord(rawNeed) || !exactKeys6(rawNeed, ["term", "expectedEntityType", "needKind"])) {
       throw new ContractError(`needs[${index}] is invalid`);
     }
     const term = boundedText5(rawNeed.term, `needs[${index}].term`, 2, 256);
@@ -8284,7 +8916,7 @@ function mentalModel(value, entityType) {
   }
   const text = (key) => boundedText5(value[key], `mentalModel.${key}`);
   if (entityType === "concept") {
-    if (!exactKeys4(value, ["kind", "meaning", "context", "boundary", "sequence", "evidence"])) {
+    if (!exactKeys6(value, ["kind", "meaning", "context", "boundary", "sequence", "evidence"])) {
       throw new ContractError("concept mentalModel fields are invalid");
     }
     if (!Array.isArray(value.sequence) || value.sequence.length < 2 || value.sequence.length > 4) {
@@ -8304,7 +8936,7 @@ function mentalModel(value, entityType) {
     };
   }
   if (entityType === "change") {
-    if (!exactKeys4(value, ["kind", "before", "after", "impact", "evidence"])) {
+    if (!exactKeys6(value, ["kind", "before", "after", "impact", "evidence"])) {
       throw new ContractError("change mentalModel fields are invalid");
     }
     return {
@@ -8316,7 +8948,7 @@ function mentalModel(value, entityType) {
     };
   }
   if (entityType === "decision") {
-    if (!exactKeys4(value, ["kind", "problem", "choice", "consequence", "evidence"])) {
+    if (!exactKeys6(value, ["kind", "problem", "choice", "consequence", "evidence"])) {
       throw new ContractError("decision mentalModel fields are invalid");
     }
     return {
@@ -8328,7 +8960,7 @@ function mentalModel(value, entityType) {
     };
   }
   if (entityType === "task") {
-    if (!exactKeys4(value, ["kind", "goal", "status", "completed", "next", "blocker", "evidence"])) {
+    if (!exactKeys6(value, ["kind", "goal", "status", "completed", "next", "blocker", "evidence"])) {
       throw new ContractError("task mentalModel fields are invalid");
     }
     return {
@@ -8341,7 +8973,7 @@ function mentalModel(value, entityType) {
       evidence: text("evidence")
     };
   }
-  if (!exactKeys4(value, ["kind", "claim", "result", "gap", "evidence"])) {
+  if (!exactKeys6(value, ["kind", "claim", "result", "gap", "evidence"])) {
     throw new ContractError("verification mentalModel fields are invalid");
   }
   return {
@@ -8353,7 +8985,7 @@ function mentalModel(value, entityType) {
   };
 }
 function parseTaskObjectInput(value) {
-  if (!objectRecord(value) || !exactKeys4(value, [
+  if (!objectRecord(value) || !exactKeys6(value, [
     "schemaVersion",
     "objectKey",
     "entityType",
@@ -8384,15 +9016,15 @@ function parseTaskObjectInput(value) {
     mentalModel: Object.freeze(mentalModel(value.mentalModel, entityType))
   });
 }
-function scopeKey2(scope) {
+function scopeKey3(scope) {
   return `${scope.kind}\0${scope.namespace}\0${scope.id}`;
 }
 function entityIdFor(binding, task, key) {
-  const digest = createHash10("sha256").update(scopeKey2(binding.scope), "utf8").update("\0", "utf8").update(codexTaskThreadRef(task), "utf8").update("\0", "utf8").update(key, "utf8").digest("hex");
-  return `${TASK_OBJECT_ENTITY_PREFIX}${digest}`;
+  const digest2 = createHash11("sha256").update(scopeKey3(binding.scope), "utf8").update("\0", "utf8").update(codexTaskThreadRef(task), "utf8").update("\0", "utf8").update(key, "utf8").digest("hex");
+  return `${TASK_OBJECT_ENTITY_PREFIX}${digest2}`;
 }
 function revisionFor(input, lifecycle, replacement) {
-  return `task-object:${createHash10("sha256").update(JSON.stringify({ input, lifecycle, replacement: replacement ?? null }), "utf8").digest("hex")}`;
+  return `task-object:${createHash11("sha256").update(JSON.stringify({ input, lifecycle, replacement: replacement ?? null }), "utf8").digest("hex")}`;
 }
 function sameObjectIdentity(left, right) {
   return left.objectKey === right.objectKey && left.entityType === right.entityType && left.canonicalName === right.canonicalName && left.aliases.length === right.aliases.length && left.aliases.every((alias, index) => alias === right.aliases[index]);
@@ -8407,39 +9039,39 @@ function copyInput(input) {
     }
   };
 }
-function copyStored(record9) {
+function copyStored(record12) {
   return {
-    ...copyInput(record9),
-    scope: { ...record9.scope },
-    threadRef: record9.threadRef,
-    routeRef: record9.routeRef,
-    workspaceRoot: record9.workspaceRoot,
-    bindingRevision: record9.bindingRevision,
-    entityId: record9.entityId,
-    lifecycle: record9.lifecycle,
-    ...record9.replacedByObjectKey === void 0 ? {} : { replacedByObjectKey: record9.replacedByObjectKey },
-    createdAt: record9.createdAt,
-    updatedAt: record9.updatedAt,
-    entityRevision: record9.entityRevision
+    ...copyInput(record12),
+    scope: { ...record12.scope },
+    threadRef: record12.threadRef,
+    routeRef: record12.routeRef,
+    workspaceRoot: record12.workspaceRoot,
+    bindingRevision: record12.bindingRevision,
+    entityId: record12.entityId,
+    lifecycle: record12.lifecycle,
+    ...record12.replacedByObjectKey === void 0 ? {} : { replacedByObjectKey: record12.replacedByObjectKey },
+    createdAt: record12.createdAt,
+    updatedAt: record12.updatedAt,
+    entityRevision: record12.entityRevision
   };
 }
-function summary(record9) {
+function summary(record12) {
   return Object.freeze({
-    objectKey: record9.objectKey,
-    entityId: record9.entityId,
-    entityType: record9.entityType,
-    canonicalName: record9.canonicalName,
-    summary: record9.summary,
-    lifecycle: record9.lifecycle,
-    ...record9.replacedByObjectKey === void 0 ? {} : { replacedByObjectKey: record9.replacedByObjectKey },
-    updatedAt: record9.updatedAt,
-    entityRevision: record9.entityRevision
+    objectKey: record12.objectKey,
+    entityId: record12.entityId,
+    entityType: record12.entityType,
+    canonicalName: record12.canonicalName,
+    summary: record12.summary,
+    lifecycle: record12.lifecycle,
+    ...record12.replacedByObjectKey === void 0 ? {} : { replacedByObjectKey: record12.replacedByObjectKey },
+    updatedAt: record12.updatedAt,
+    entityRevision: record12.entityRevision
   });
 }
 function parseStored(value, index) {
   if (!objectRecord(value)) throw new ContractError(`task object record ${index} is invalid`);
   const optionalReplacement = value.replacedByObjectKey === void 0 ? [] : ["replacedByObjectKey"];
-  if (!exactKeys4(value, [
+  if (!exactKeys6(value, [
     "schemaVersion",
     "objectKey",
     "entityType",
@@ -8470,7 +9102,7 @@ function parseStored(value, index) {
     summary: value.summary,
     mentalModel: value.mentalModel
   });
-  if (!objectRecord(value.scope) || !exactKeys4(value.scope, ["kind", "namespace", "id"]) || value.scope.kind !== "workspace" || typeof value.scope.namespace !== "string" || typeof value.scope.id !== "string" || typeof value.workspaceRoot !== "string" || !isAbsolute4(value.workspaceRoot) || typeof value.bindingRevision !== "string" || !/^[a-f0-9]{64}$/u.test(value.bindingRevision) || typeof value.entityId !== "string" || !new RegExp(`^${TASK_OBJECT_ENTITY_PREFIX}[a-f0-9]{64}$`, "u").test(value.entityId) || value.lifecycle !== "active" && value.lifecycle !== "superseded" && value.lifecycle !== "retired" || typeof value.entityRevision !== "string" || !/^task-object:[a-f0-9]{64}$/u.test(value.entityRevision)) {
+  if (!objectRecord(value.scope) || !exactKeys6(value.scope, ["kind", "namespace", "id"]) || value.scope.kind !== "workspace" || typeof value.scope.namespace !== "string" || typeof value.scope.id !== "string" || typeof value.workspaceRoot !== "string" || !isAbsolute4(value.workspaceRoot) || typeof value.bindingRevision !== "string" || !/^[a-f0-9]{64}$/u.test(value.bindingRevision) || typeof value.entityId !== "string" || !new RegExp(`^${TASK_OBJECT_ENTITY_PREFIX}[a-f0-9]{64}$`, "u").test(value.entityId) || value.lifecycle !== "active" && value.lifecycle !== "superseded" && value.lifecycle !== "retired" || typeof value.entityRevision !== "string" || !/^task-object:[a-f0-9]{64}$/u.test(value.entityRevision)) {
     throw new ContractError(`task object record ${index} authority fields are invalid`);
   }
   const replacedByObjectKey = value.replacedByObjectKey === void 0 ? void 0 : objectKey2(value.replacedByObjectKey);
@@ -8497,13 +9129,13 @@ function parseStored(value, index) {
   };
 }
 function parseRecordsDocument(value, maximumRecords, invalidMessage) {
-  if (!objectRecord(value) || !exactKeys4(value, ["schemaVersion", "records"]) || value.schemaVersion !== REGISTRY_SCHEMA_VERSION2 || !Array.isArray(value.records) || value.records.length > maximumRecords) {
+  if (!objectRecord(value) || !exactKeys6(value, ["schemaVersion", "records"]) || value.schemaVersion !== REGISTRY_SCHEMA_VERSION2 || !Array.isArray(value.records) || value.records.length > maximumRecords) {
     throw new ContractError(invalidMessage);
   }
   const records = value.records.map(parseStored);
   const identities = /* @__PURE__ */ new Set();
-  for (const record9 of records) {
-    const identity2 = `${record9.threadRef}\0${record9.bindingRevision}\0${record9.objectKey}`;
+  for (const record12 of records) {
+    const identity2 = `${record12.threadRef}\0${record12.bindingRevision}\0${record12.objectKey}`;
     if (identities.has(identity2)) throw new ContractError("task object registry has duplicate identities");
     identities.add(identity2);
   }
@@ -8531,76 +9163,76 @@ function documentBytes(document2) {
   return Buffer.byteLength(serializedDocument(document2), "utf8");
 }
 function archiveRevision(records) {
-  return `task-object-archive:${createHash10("sha256").update(records.map((record9) => `${record9.entityId}:${record9.entityRevision}`).sort().join("\n"), "utf8").digest("hex")}`;
+  return `task-object-archive:${createHash11("sha256").update(records.map((record12) => `${record12.entityId}:${record12.entityRevision}`).sort().join("\n"), "utf8").digest("hex")}`;
 }
 function contextIndexSnapshot(records) {
-  return `context-index:${createHash10("sha256").update(
-    records.filter((record9) => !record9.deleted).map((record9) => `${record9.entityId}\0${record9.entityType}\0${record9.indexRevision}`).sort().join("\n"),
+  return `context-index:${createHash11("sha256").update(
+    records.filter((record12) => !record12.deleted).map((record12) => `${record12.entityId}\0${record12.entityType}\0${record12.indexRevision}`).sort().join("\n"),
     "utf8"
   ).digest("hex")}`;
 }
 function normalizedIdentity(value) {
   return value.normalize("NFKC").toLocaleLowerCase("en-US");
 }
-function stableMatchesFor(record9, stableRecords) {
-  const name = normalizedIdentity(record9.canonicalName);
-  return stableRecords.filter((stable) => !stable.deleted && stable.authorityRef.provider !== TASK_OBJECT_PROVIDER_ID && stable.entityType === record9.entityType && normalizedIdentity(stable.canonicalName) === name);
+function stableMatchesFor(record12, stableRecords) {
+  const name = normalizedIdentity(record12.canonicalName);
+  return stableRecords.filter((stable) => !stable.deleted && stable.authorityRef.provider !== TASK_OBJECT_PROVIDER_ID && stable.entityType === record12.entityType && normalizedIdentity(stable.canonicalName) === name);
 }
-function matchesBinding(record9, binding) {
-  return sameContextScope(record9.scope, binding.scope) && record9.bindingRevision === binding.bindingRevision && record9.threadRef === binding.threadRef && record9.routeRef === binding.routeRef && record9.workspaceRoot === binding.workspaceRoot;
+function matchesBinding(record12, binding) {
+  return sameContextScope(record12.scope, binding.scope) && record12.bindingRevision === binding.bindingRevision && record12.threadRef === binding.threadRef && record12.routeRef === binding.routeRef && record12.workspaceRoot === binding.workspaceRoot;
 }
-function matchesEntry(record9, task, entry) {
-  return matchesTaskWorkspace(record9, task, entry) && record9.bindingRevision === entry.bindingRevision;
+function matchesEntry(record12, task, entry) {
+  return matchesTaskWorkspace(record12, task, entry) && record12.bindingRevision === entry.bindingRevision;
 }
-function matchesTaskWorkspace(record9, task, entry) {
-  return sameContextScope(record9.scope, entry.scope) && record9.threadRef === codexTaskThreadRef(task) && record9.routeRef === task.routeRef && record9.workspaceRoot === entry.workspaceRoot;
+function matchesTaskWorkspace(record12, task, entry) {
+  return sameContextScope(record12.scope, entry.scope) && record12.threadRef === codexTaskThreadRef(task) && record12.routeRef === task.routeRef && record12.workspaceRoot === entry.workspaceRoot;
 }
-function facts(record9) {
+function facts(record12) {
   const common = {
-    "\u751F\u547D\u5468\u671F": record9.lifecycle,
-    ...record9.replacedByObjectKey === void 0 ? {} : { "\u66FF\u4EE3\u5BF9\u8C61": record9.replacedByObjectKey },
+    "\u751F\u547D\u5468\u671F": record12.lifecycle,
+    ...record12.replacedByObjectKey === void 0 ? {} : { "\u66FF\u4EE3\u5BF9\u8C61": record12.replacedByObjectKey },
     "\u4FE1\u606F\u8FB9\u754C": "\u5F53\u524D Codex \u4EFB\u52A1\u5185\u7531 Agent \u663E\u5F0F\u767B\u8BB0\u7684\u4E34\u65F6\u4E0A\u4E0B\u6587\uFF1B\u5C1A\u672A\u56FA\u5316\u4E3A\u4ED3\u5E93\u8BC1\u636E",
-    "\u66F4\u65B0\u65F6\u95F4": record9.updatedAt,
-    "\u8BC1\u636E": record9.mentalModel.evidence
+    "\u66F4\u65B0\u65F6\u95F4": record12.updatedAt,
+    "\u8BC1\u636E": record12.mentalModel.evidence
   };
-  switch (record9.mentalModel.kind) {
+  switch (record12.mentalModel.kind) {
     case "concept":
       return {
-        "\u5B83\u662F\u4EC0\u4E48\u610F\u601D": record9.mentalModel.meaning,
-        "\u4E3A\u4EC0\u4E48\u73B0\u5728\u51FA\u73B0": record9.mentalModel.context,
-        "\u5B83\u4E0D\u662F\u4EC0\u4E48": record9.mentalModel.boundary,
-        "\u6240\u5904\u6D41\u7A0B": [...record9.mentalModel.sequence],
+        "\u5B83\u662F\u4EC0\u4E48\u610F\u601D": record12.mentalModel.meaning,
+        "\u4E3A\u4EC0\u4E48\u73B0\u5728\u51FA\u73B0": record12.mentalModel.context,
+        "\u5B83\u4E0D\u662F\u4EC0\u4E48": record12.mentalModel.boundary,
+        "\u6240\u5904\u6D41\u7A0B": [...record12.mentalModel.sequence],
         ...common
       };
     case "change":
       return {
-        "\u539F\u6765\u600E\u6837": record9.mentalModel.before,
-        "\u73B0\u5728\u600E\u6837": record9.mentalModel.after,
-        "\u5F71\u54CD\u4EC0\u4E48": record9.mentalModel.impact,
+        "\u539F\u6765\u600E\u6837": record12.mentalModel.before,
+        "\u73B0\u5728\u600E\u6837": record12.mentalModel.after,
+        "\u5F71\u54CD\u4EC0\u4E48": record12.mentalModel.impact,
         ...common
       };
     case "decision":
       return {
-        "\u4E3A\u4EC0\u4E48\u9700\u8981\u51B3\u5B9A": record9.mentalModel.problem,
-        "\u9009\u62E9\u4E86\u4EC0\u4E48": record9.mentalModel.choice,
-        "\u540E\u679C\u662F\u4EC0\u4E48": record9.mentalModel.consequence,
+        "\u4E3A\u4EC0\u4E48\u9700\u8981\u51B3\u5B9A": record12.mentalModel.problem,
+        "\u9009\u62E9\u4E86\u4EC0\u4E48": record12.mentalModel.choice,
+        "\u540E\u679C\u662F\u4EC0\u4E48": record12.mentalModel.consequence,
         ...common
       };
     case "task":
       return {
-        "\u76EE\u6807": record9.mentalModel.goal,
-        "\u5F53\u524D\u72B6\u6001": record9.mentalModel.status,
-        "\u5DF2\u5B8C\u6210": record9.mentalModel.completed,
-        "\u4E0B\u4E00\u6B65": record9.mentalModel.next,
-        "\u963B\u585E": record9.mentalModel.blocker,
+        "\u76EE\u6807": record12.mentalModel.goal,
+        "\u5F53\u524D\u72B6\u6001": record12.mentalModel.status,
+        "\u5DF2\u5B8C\u6210": record12.mentalModel.completed,
+        "\u4E0B\u4E00\u6B65": record12.mentalModel.next,
+        "\u963B\u585E": record12.mentalModel.blocker,
         ...common
       };
     case "verification":
       return {
-        "\u8981\u8BC1\u660E\u4EC0\u4E48": record9.mentalModel.claim,
-        "\u7ED3\u679C": record9.mentalModel.result,
-        "\u5C1A\u672A\u8BC1\u660E": record9.mentalModel.gap,
-        "\u6267\u884C\u65F6\u95F4": record9.updatedAt,
+        "\u8981\u8BC1\u660E\u4EC0\u4E48": record12.mentalModel.claim,
+        "\u7ED3\u679C": record12.mentalModel.result,
+        "\u5C1A\u672A\u8BC1\u660E": record12.mentalModel.gap,
+        "\u6267\u884C\u65F6\u95F4": record12.updatedAt,
         ...common
       };
   }
@@ -8700,7 +9332,7 @@ var TaskObjectRegistry = class {
   async upsert(task, binding, rawInput) {
     const input = parseTaskObjectInput(rawInput);
     return await this.#mutate(async (document2) => {
-      const index = document2.records.findIndex((record10) => matchesEntry(record10, task, binding) && record10.objectKey === input.objectKey);
+      const index = document2.records.findIndex((record13) => matchesEntry(record13, task, binding) && record13.objectKey === input.objectKey);
       const existing = index < 0 ? void 0 : document2.records[index];
       if (existing !== void 0 && existing.lifecycle !== "active") {
         throw new ContractError("retired or superseded objectKey cannot be reactivated");
@@ -8712,12 +9344,12 @@ var TaskObjectRegistry = class {
       if (existing !== void 0 && existing.lifecycle === "active" && existing.entityRevision === nextRevision) {
         return { kind: "unchanged", object: summary(existing) };
       }
-      const activeCount = document2.records.filter((record10) => matchesEntry(record10, task, binding) && record10.lifecycle === "active" && record10.objectKey !== input.objectKey).length;
+      const activeCount = document2.records.filter((record13) => matchesEntry(record13, task, binding) && record13.lifecycle === "active" && record13.objectKey !== input.objectKey).length;
       if (activeCount >= TASK_OBJECT_ACTIVE_HARD_LIMIT) {
         throw new ContractError("active task object capacity is full");
       }
       const now = (/* @__PURE__ */ new Date()).toISOString();
-      const record9 = {
+      const record12 = {
         ...copyInput(input),
         scope: { ...binding.scope },
         threadRef: codexTaskThreadRef(task),
@@ -8734,12 +9366,12 @@ var TaskObjectRegistry = class {
         if (document2.records.length >= TASK_OBJECT_REGISTRY_MAX_RECORDS) {
           throw new ContractError("task object registry is full");
         }
-        document2.records.push(record9);
+        document2.records.push(record12);
       } else {
-        document2.records[index] = record9;
+        document2.records[index] = record12;
       }
       await this.#write(document2);
-      return { kind: existing === void 0 ? "created" : "updated", object: summary(record9) };
+      return { kind: existing === void 0 ? "created" : "updated", object: summary(record12) };
     });
   }
   async supersede(task, binding, replacedObjectKey, rawReplacement) {
@@ -8749,10 +9381,10 @@ var TaskObjectRegistry = class {
       throw new ContractError("replacement objectKey must differ from the superseded object");
     }
     return await this.#mutate(async (document2) => {
-      const oldIndex = document2.records.findIndex((record9) => matchesEntry(record9, task, binding) && record9.objectKey === replacedKey && record9.lifecycle === "active");
+      const oldIndex = document2.records.findIndex((record12) => matchesEntry(record12, task, binding) && record12.objectKey === replacedKey && record12.lifecycle === "active");
       const old = oldIndex < 0 ? void 0 : document2.records[oldIndex];
       if (old === void 0) throw new ContractError("active task object to supersede was not found");
-      const replacementIndex = document2.records.findIndex((record9) => matchesEntry(record9, task, binding) && record9.objectKey === replacement.objectKey);
+      const replacementIndex = document2.records.findIndex((record12) => matchesEntry(record12, task, binding) && record12.objectKey === replacement.objectKey);
       const existingReplacement = replacementIndex < 0 ? void 0 : document2.records[replacementIndex];
       if (existingReplacement !== void 0) {
         throw new ContractError("replacement objectKey has already been used");
@@ -8790,7 +9422,7 @@ var TaskObjectRegistry = class {
   async retire(task, binding, rawObjectKey) {
     const key = objectKey2(rawObjectKey);
     return await this.#mutate(async (document2) => {
-      const index = document2.records.findIndex((record9) => matchesEntry(record9, task, binding) && record9.objectKey === key && record9.lifecycle === "active");
+      const index = document2.records.findIndex((record12) => matchesEntry(record12, task, binding) && record12.objectKey === key && record12.lifecycle === "active");
       const current = index < 0 ? void 0 : document2.records[index];
       if (current === void 0) throw new ContractError("active task object to retire was not found");
       const retired = {
@@ -8805,8 +9437,8 @@ var TaskObjectRegistry = class {
     });
   }
   #capacityStatus(document2, archive, task, binding) {
-    const current = document2.records.filter((record9) => matchesEntry(record9, task, binding));
-    const active = current.filter((record9) => record9.lifecycle === "active").length;
+    const current = document2.records.filter((record12) => matchesEntry(record12, task, binding));
+    const active = current.filter((record12) => record12.lifecycle === "active").length;
     const warnings = active >= TASK_OBJECT_ACTIVE_SOFT_LIMIT ? ["active_soft_limit_reached"] : [];
     return Object.freeze({
       active,
@@ -8827,7 +9459,7 @@ var TaskObjectRegistry = class {
   }
   async inventoryForTask(task, binding) {
     const [document2, archive] = await Promise.all([this.#read(), this.#readArchive()]);
-    const objects = document2.records.filter((record9) => matchesEntry(record9, task, binding)).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)).map(summary);
+    const objects = document2.records.filter((record12) => matchesEntry(record12, task, binding)).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)).map(summary);
     return Object.freeze({
       objects: Object.freeze(objects),
       capacity: this.#capacityStatus(document2, archive, task, binding)
@@ -8838,15 +9470,15 @@ var TaskObjectRegistry = class {
   }
   async auditCuration(task, binding, rawStableRecords) {
     const stableRecords = validateContextIndexForRuntime(rawStableRecords, binding.scope);
-    const current = (await this.#read()).records.filter((record9) => matchesEntry(record9, task, binding)).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-    const items = current.map((record9) => {
-      const stableMatchCount = stableMatchesFor(record9, stableRecords).length;
-      const state = record9.lifecycle === "active" ? stableMatchCount === 0 ? "active_partial" : stableMatchCount === 1 ? "active_stable_overlap" : "active_ambiguous_overlap" : stableMatchCount === 0 ? "terminal_unmatched" : stableMatchCount === 1 ? "terminal_archive_ready" : "terminal_ambiguous";
+    const current = (await this.#read()).records.filter((record12) => matchesEntry(record12, task, binding)).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    const items = current.map((record12) => {
+      const stableMatchCount = stableMatchesFor(record12, stableRecords).length;
+      const state = record12.lifecycle === "active" ? stableMatchCount === 0 ? "active_partial" : stableMatchCount === 1 ? "active_stable_overlap" : "active_ambiguous_overlap" : stableMatchCount === 0 ? "terminal_unmatched" : stableMatchCount === 1 ? "terminal_archive_ready" : "terminal_ambiguous";
       return Object.freeze({
-        objectKey: record9.objectKey,
-        entityType: record9.entityType,
-        canonicalName: record9.canonicalName,
-        lifecycle: record9.lifecycle,
+        objectKey: record12.objectKey,
+        entityType: record12.entityType,
+        canonicalName: record12.canonicalName,
+        lifecycle: record12.lifecycle,
         state,
         stableMatchCount
       });
@@ -8874,14 +9506,14 @@ var TaskObjectRegistry = class {
   async reviewCuration(task, binding, rawWorkspaceRecords, rawReview) {
     const workspaceRecords = validateContextIndexForRuntime(rawWorkspaceRecords, binding.scope);
     const review = parseTaskObjectCurationReviewInput(rawReview);
-    const taskRecords = (await this.#read()).records.filter((record9) => matchesEntry(record9, task, binding)).filter((record9) => record9.lifecycle === "active" || stableMatchesFor(record9, workspaceRecords).length === 0);
+    const taskRecords = (await this.#read()).records.filter((record12) => matchesEntry(record12, task, binding)).filter((record12) => record12.lifecycle === "active" || stableMatchesFor(record12, workspaceRecords).length === 0);
     const records = [
       ...workspaceRecords,
       ...this.#identityRecords(taskRecords)
-    ].filter((record9) => !record9.deleted);
+    ].filter((record12) => !record12.deleted);
     const items = review.needs.map((need) => {
       const normalizedTerm2 = normalizedIdentity(need.term);
-      const matches = records.filter((record9) => [record9.canonicalKey, record9.canonicalName, ...record9.aliases].filter((candidate) => typeof candidate === "string").some((candidate) => normalizedIdentity(candidate) === normalizedTerm2));
+      const matches = records.filter((record12) => [record12.canonicalKey, record12.canonicalName, ...record12.aliases].filter((candidate) => typeof candidate === "string").some((candidate) => normalizedIdentity(candidate) === normalizedTerm2));
       const candidateTypes = [...new Set(matches.map((match) => match.entityType))].sort();
       const unique = matches.length === 1 ? matches[0] : void 0;
       const state = matches.length === 0 ? "missing" : matches.length > 1 ? "ambiguous" : unique.entityType === need.expectedEntityType ? "available" : "type_mismatch";
@@ -8926,10 +9558,10 @@ var TaskObjectRegistry = class {
    */
   async adoptBinding(task, binding) {
     return await this.#mutate(async (document2) => {
-      const candidates2 = document2.records.filter((record9) => matchesTaskWorkspace(record9, task, binding) && record9.bindingRevision !== binding.bindingRevision);
+      const candidates2 = document2.records.filter((record12) => matchesTaskWorkspace(record12, task, binding) && record12.bindingRevision !== binding.bindingRevision);
       if (candidates2.length === 0) return 0;
-      const candidateIds = new Set(candidates2.map((record9) => record9.entityId));
-      document2.records = document2.records.map((record9) => candidateIds.has(record9.entityId) ? { ...copyStored(record9), bindingRevision: binding.bindingRevision } : record9);
+      const candidateIds = new Set(candidates2.map((record12) => record12.entityId));
+      document2.records = document2.records.map((record12) => candidateIds.has(record12.entityId) ? { ...copyStored(record12), bindingRevision: binding.bindingRevision } : record12);
       await this.#write(document2);
       return candidates2.length;
     });
@@ -8943,9 +9575,9 @@ var TaskObjectRegistry = class {
   async archiveGraduated(task, binding, rawStableRecords) {
     const stableRecords = validateContextIndexForRuntime(rawStableRecords, binding.scope);
     return await this.#mutate(async (document2) => {
-      const eligible = document2.records.filter((record9) => {
-        if (record9.lifecycle === "active" || !matchesEntry(record9, task, binding)) return false;
-        return stableMatchesFor(record9, stableRecords).length === 1;
+      const eligible = document2.records.filter((record12) => {
+        if (record12.lifecycle === "active" || !matchesEntry(record12, task, binding)) return false;
+        return stableMatchesFor(record12, stableRecords).length === 1;
       });
       const archive = await this.#readArchive();
       if (eligible.length === 0) {
@@ -8956,15 +9588,15 @@ var TaskObjectRegistry = class {
         });
       }
       const archivedByEntityId = new Map(
-        archive.records.map((record9) => [record9.entityId, record9])
+        archive.records.map((record12) => [record12.entityId, record12])
       );
-      for (const record9 of eligible) {
-        const existing = archivedByEntityId.get(record9.entityId);
-        if (existing !== void 0 && existing.entityRevision !== record9.entityRevision) {
+      for (const record12 of eligible) {
+        const existing = archivedByEntityId.get(record12.entityId);
+        if (existing !== void 0 && existing.entityRevision !== record12.entityRevision) {
           throw new ContractError("task object archive contains a conflicting revision");
         }
         if (existing === void 0) {
-          const copied = copyStored(record9);
+          const copied = copyStored(record12);
           archive.records.push(copied);
           archivedByEntityId.set(copied.entityId, copied);
         }
@@ -8973,8 +9605,8 @@ var TaskObjectRegistry = class {
         throw new ContractError("task object archive is full");
       }
       await this.#writeArchive(archive);
-      const eligibleIds = new Set(eligible.map((record9) => record9.entityId));
-      document2.records = document2.records.filter((record9) => !eligibleIds.has(record9.entityId));
+      const eligibleIds = new Set(eligible.map((record12) => record12.entityId));
+      document2.records = document2.records.filter((record12) => !eligibleIds.has(record12.entityId));
       await this.#write(document2);
       return Object.freeze({
         kind: "archived",
@@ -8988,37 +9620,37 @@ var TaskObjectRegistry = class {
   }
   async listActive(binding, signal) {
     if (signal?.aborted) throw signal.reason;
-    const records = (await this.#read()).records.filter((record9) => record9.lifecycle === "active" && matchesBinding(record9, binding));
+    const records = (await this.#read()).records.filter((record12) => record12.lifecycle === "active" && matchesBinding(record12, binding));
     return this.#identityRecords(records, signal);
   }
   async listForLookup(binding, stableRecords, signal) {
     if (signal?.aborted) throw signal.reason;
-    const records = (await this.#read()).records.filter((record9) => matchesBinding(record9, binding)).filter((record9) => {
-      if (record9.lifecycle === "active") return true;
-      const name = record9.canonicalName.normalize("NFKC").toLocaleLowerCase("en-US");
-      return !stableRecords.some((stable) => !stable.deleted && stable.entityType === record9.entityType && stable.canonicalName.normalize("NFKC").toLocaleLowerCase("en-US") === name);
+    const records = (await this.#read()).records.filter((record12) => matchesBinding(record12, binding)).filter((record12) => {
+      if (record12.lifecycle === "active") return true;
+      const name = record12.canonicalName.normalize("NFKC").toLocaleLowerCase("en-US");
+      return !stableRecords.some((stable) => !stable.deleted && stable.entityType === record12.entityType && stable.canonicalName.normalize("NFKC").toLocaleLowerCase("en-US") === name);
     });
     return this.#identityRecords(records, signal);
   }
   async list(binding, signal) {
     if (signal?.aborted) throw signal.reason;
-    const records = (await this.#read()).records.filter((record9) => matchesBinding(record9, binding));
+    const records = (await this.#read()).records.filter((record12) => matchesBinding(record12, binding));
     return this.#identityRecords(records, signal);
   }
   #identityRecords(records, signal) {
     if (signal?.aborted) throw signal.reason;
-    const revision2 = `task-objects:${createHash10("sha256").update(records.map((record9) => `${record9.entityId}:${record9.entityRevision}`).sort().join("\n"), "utf8").digest("hex")}`;
+    const revision2 = `task-objects:${createHash11("sha256").update(records.map((record12) => `${record12.entityId}:${record12.entityRevision}`).sort().join("\n"), "utf8").digest("hex")}`;
     const indexedAt = (/* @__PURE__ */ new Date()).toISOString();
-    return records.map((record9) => ({
+    return records.map((record12) => ({
       schemaVersion: "1.0",
-      scope: { ...record9.scope },
-      entityId: record9.entityId,
-      entityType: record9.entityType,
-      canonicalKey: record9.objectKey,
-      canonicalName: record9.canonicalName,
-      aliases: [...record9.aliases],
-      summary: record9.summary,
-      authorityRef: { provider: TASK_OBJECT_PROVIDER_ID, locator: record9.entityId },
+      scope: { ...record12.scope },
+      entityId: record12.entityId,
+      entityType: record12.entityType,
+      canonicalKey: record12.objectKey,
+      canonicalName: record12.canonicalName,
+      aliases: [...record12.aliases],
+      summary: record12.summary,
+      authorityRef: { provider: TASK_OBJECT_PROVIDER_ID, locator: record12.entityId },
       indexRevision: revision2,
       indexedAt,
       deleted: false
@@ -9029,18 +9661,18 @@ var TaskObjectRegistry = class {
     if (!this.ownsEntityId(request.entityId) || request.authorityLocator !== request.entityId) {
       return { kind: "not_found" };
     }
-    const record9 = (await this.#read()).records.find((candidate) => candidate.entityId === request.entityId && candidate.entityType === request.entityType && matchesBinding(candidate, request.binding));
-    if (record9 === void 0) return { kind: "not_found" };
+    const record12 = (await this.#read()).records.find((candidate) => candidate.entityId === request.entityId && candidate.entityType === request.entityType && matchesBinding(candidate, request.binding));
+    if (record12 === void 0) return { kind: "not_found" };
     const snapshot = {
-      scope: { ...record9.scope },
-      entityId: record9.entityId,
-      entityType: record9.entityType,
-      entityRevision: record9.entityRevision,
+      scope: { ...record12.scope },
+      entityId: record12.entityId,
+      entityType: record12.entityType,
+      entityRevision: record12.entityRevision,
       observedAt: (/* @__PURE__ */ new Date()).toISOString(),
       freshness: "partial",
-      facts: facts(record9),
+      facts: facts(record12),
       relations: [],
-      sourceRefs: [{ sourceType: TASK_OBJECT_PROVIDER_ID, sourceId: record9.objectKey }]
+      sourceRefs: [{ sourceType: TASK_OBJECT_PROVIDER_ID, sourceId: record12.objectKey }]
     };
     return {
       kind: "snapshot",
@@ -9052,8 +9684,8 @@ var TaskObjectRegistry = class {
     const observedAt = (/* @__PURE__ */ new Date()).toISOString();
     if (request.signal?.aborted) return { kind: "unavailable", observedAt, retryable: true };
     if (!this.ownsEntityId(request.entityId)) return { kind: "not_found", observedAt };
-    const record9 = (await this.#read()).records.find((candidate) => candidate.entityId === request.entityId && candidate.entityType === request.entityType && matchesBinding(candidate, request.binding));
-    return record9 === void 0 ? { kind: "not_found", observedAt } : { kind: "current", revision: record9.entityRevision, observedAt };
+    const record12 = (await this.#read()).records.find((candidate) => candidate.entityId === request.entityId && candidate.entityType === request.entityType && matchesBinding(candidate, request.binding));
+    return record12 === void 0 ? { kind: "not_found", observedAt } : { kind: "current", revision: record12.entityRevision, observedAt };
   }
 };
 var ActiveTaskObjectAnnotationIndex = class {
@@ -9105,6 +9737,30 @@ var RoutedWorkspaceRevisionProbe = class {
   fallback;
   async probe(request) {
     return this.taskObjects.ownsEntityId(request.entityId) ? await this.taskObjects.probe(request) : await this.fallback.probe(request);
+  }
+};
+
+// src/evaluation/recovery-observation-host.ts
+var RecoveryObservationHostBridge = class {
+  #adapter;
+  constructor(adapter = new RecoveryObservationAdapter()) {
+    this.#adapter = adapter;
+  }
+  observe = (request) => this.#adapter.record(request.scopeKey, request.signal);
+  begin(scopeKey4, definition) {
+    this.#adapter.begin(scopeKey4, definition);
+  }
+  complete(scopeKey4, outcome) {
+    return this.#adapter.complete(scopeKey4, outcome);
+  }
+  abort(scopeKey4) {
+    return this.#adapter.abort(scopeKey4);
+  }
+  status(scopeKey4) {
+    return Object.freeze({
+      active: this.#adapter.active(scopeKey4),
+      eventCount: this.#adapter.eventCount(scopeKey4)
+    });
   }
 };
 
@@ -9251,6 +9907,11 @@ function createWorkspaceCompanion(options) {
     actionLabel: options.actionLabel ?? "\u67E5\u770B\u4E0A\u4E0B\u6587",
     presentationMode,
     annotationProvider,
+    ...options.recoveryObservationBridge === void 0 ? {} : {
+      interactionObserver: (request) => {
+        options.recoveryObservationBridge.observe(request);
+      }
+    },
     ...options.annotationRefreshIntervalMs === void 0 ? {} : { annotationRefreshIntervalMs: options.annotationRefreshIntervalMs }
   };
   const adapter = new CodexCdpHostAdapter(adapterOptions);
@@ -9377,6 +10038,37 @@ function createWorkspaceCompanion(options) {
   const refreshObjectAnnotations = async () => {
     await adapter.refreshAnnotations(void 0, true);
   };
+  const currentRecoveryTask = async () => {
+    if (state !== "running") throw new Error("workspace_companion_not_running");
+    if (options.recoveryObservationBridge === void 0) {
+      throw new Error("recovery_observation_bridge_unavailable");
+    }
+    const tasks = await adapter.activeTasks();
+    activeTaskCount = tasks.length;
+    if (tasks.length === 0) throw new Error("active_codex_task_unavailable");
+    if (tasks.length !== 1) throw new Error("active_codex_task_ambiguous");
+    const binding = await options.registry.find(tasks[0]);
+    if (binding === void 0) throw new Error("context_binding_missing");
+    activeBinding = binding;
+    return tasks[0];
+  };
+  const beginCurrentTaskRecoveryObservation = async (definition) => {
+    const task = await currentRecoveryTask();
+    options.recoveryObservationBridge.begin(task.contextFingerprint, definition);
+    return options.recoveryObservationBridge.status(task.contextFingerprint);
+  };
+  const completeCurrentTaskRecoveryObservation = async (outcome) => {
+    const task = await currentRecoveryTask();
+    return options.recoveryObservationBridge.complete(task.contextFingerprint, outcome);
+  };
+  const abortCurrentTaskRecoveryObservation = async () => {
+    const task = await currentRecoveryTask();
+    return options.recoveryObservationBridge.abort(task.contextFingerprint);
+  };
+  const currentTaskRecoveryObservationStatus = async () => {
+    const task = await currentRecoveryTask();
+    return options.recoveryObservationBridge.status(task.contextFingerprint);
+  };
   const trustedBindingFor = async (current) => {
     const port = new CodexTaskWorkspaceBindingPort(
       options.registry,
@@ -9433,9 +10125,9 @@ function createWorkspaceCompanion(options) {
     ]);
     const checkedPaths = new Set([
       ...artifacts.valid ? artifacts.artifacts.map((artifact) => artifact.path) : [],
-      ...records.valid ? records.records.map((record9) => record9.path) : []
+      ...records.valid ? records.records.map((record12) => record12.path) : []
     ].map((path) => `file:${path}`));
-    return indexed.filter((record9) => checkedPaths.has(record9.entityId));
+    return indexed.filter((record12) => checkedPaths.has(record12.entityId));
   };
   const auditCurrentTaskObjects = async () => {
     const current = await currentTaskBinding();
@@ -9543,6 +10235,10 @@ function createWorkspaceCompanion(options) {
     observeCurrentTaskMilestone,
     summarizeCurrentTaskMilestones,
     archiveGraduatedCurrentTaskObjects,
+    beginCurrentTaskRecoveryObservation,
+    completeCurrentTaskRecoveryObservation,
+    abortCurrentTaskRecoveryObservation,
+    currentTaskRecoveryObservationStatus,
     stop,
     status
   });
@@ -9557,7 +10253,7 @@ var MAX_REQUEST_BYTES = 8 * 1024;
 function fail(message) {
   throw new Error(message);
 }
-function record8(value) {
+function record11(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function packageRoot(start) {
@@ -9588,9 +10284,9 @@ function boundedInteger2(value, name) {
 }
 function parseArguments(argv) {
   const command = argv[0];
-  if (command !== "start" && command !== "status" && command !== "bind" && command !== "unbind" && command !== "stop" && command !== "run" && command !== "object-upsert" && command !== "object-supersede" && command !== "object-retire" && command !== "object-audit" && command !== "object-review" && command !== "object-archive" && command !== "object-list" && command !== "milestone-observe" && command !== "milestone-summary") {
+  if (command !== "start" && command !== "status" && command !== "bind" && command !== "unbind" && command !== "stop" && command !== "run" && command !== "object-upsert" && command !== "object-supersede" && command !== "object-retire" && command !== "object-audit" && command !== "object-review" && command !== "object-archive" && command !== "object-list" && command !== "milestone-observe" && command !== "milestone-summary" && command !== "recovery-start" && command !== "recovery-status" && command !== "recovery-complete" && command !== "recovery-abort") {
     return fail(
-      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-audit|object-review|object-archive|object-list|milestone-observe|milestone-summary> [options]"
+      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-audit|object-review|object-archive|object-list|milestone-observe|milestone-summary|recovery-start|recovery-status|recovery-complete|recovery-abort> [options]"
     );
   }
   const stateRoot = localStateRoot();
@@ -9604,6 +10300,8 @@ function parseArguments(argv) {
   let reviewFile;
   let objectKey3;
   let replaces;
+  let recoveryFile;
+  let recoveryOutcome;
   let json = false;
   for (let index = 1; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -9642,6 +10340,14 @@ function parseArguments(argv) {
       objectKey3 = value;
     } else if (argument === "--replaces") {
       replaces = value;
+    } else if (argument === "--recovery-file") {
+      if (!isAbsolute5(value)) fail("--recovery-file must be absolute");
+      recoveryFile = resolve9(value);
+    } else if (argument === "--outcome") {
+      if (value !== "resumed_correctly" && value !== "resumed_incorrectly") {
+        fail("--outcome must be resumed_correctly or resumed_incorrectly");
+      }
+      recoveryOutcome = value;
     } else {
       fail(`unknown option: ${argument}`);
     }
@@ -9661,6 +10367,12 @@ function parseArguments(argv) {
   if (command === "object-retire" && objectKey3 === void 0) {
     fail("object-retire requires --object-key <object-key>");
   }
+  if (command === "recovery-start" && recoveryFile === void 0) {
+    fail("recovery-start requires --recovery-file <absolute-path>");
+  }
+  if (command === "recovery-complete" && recoveryOutcome === void 0) {
+    fail("recovery-complete requires --outcome <resumed_correctly|resumed_incorrectly>");
+  }
   return {
     command,
     stateDir,
@@ -9673,6 +10385,8 @@ function parseArguments(argv) {
     ...reviewFile === void 0 ? {} : { reviewFile },
     ...objectKey3 === void 0 ? {} : { objectKey: objectKey3 },
     ...replaces === void 0 ? {} : { replaces },
+    ...recoveryFile === void 0 ? {} : { recoveryFile },
+    ...recoveryOutcome === void 0 ? {} : { recoveryOutcome },
     json
   };
 }
@@ -9680,7 +10394,7 @@ var statePath = (directory) => join3(directory, "state.json");
 var lockPath = (directory) => join3(directory, "runtime.lock");
 var logPath = (directory) => join3(directory, "companion.log");
 function parseState(value) {
-  if (!record8(value) || value.schemaVersion !== CONTROL_SCHEMA_VERSION || value.mode !== "live-local-workspace" || !Number.isSafeInteger(value.pid) || Number(value.pid) < 1 || !Number.isSafeInteger(value.port) || Number(value.port) < 1 || Number(value.port) > 65535 || typeof value.token !== "string" || !/^[a-f0-9]{64}$/u.test(value.token) || typeof value.startedAt !== "string" || !Number.isFinite(Date.parse(value.startedAt))) {
+  if (!record11(value) || value.schemaVersion !== CONTROL_SCHEMA_VERSION || value.mode !== "live-local-workspace" || !Number.isSafeInteger(value.pid) || Number(value.pid) < 1 || !Number.isSafeInteger(value.port) || Number(value.port) < 1 || Number(value.port) > 65535 || typeof value.token !== "string" || !/^[a-f0-9]{64}$/u.test(value.token) || typeof value.startedAt !== "string" || !Number.isFinite(Date.parse(value.startedAt))) {
     return fail("invalid workspace companion state");
   }
   return {
@@ -9780,7 +10494,7 @@ async function readRequestJson(request) {
     chunks.push(value);
   }
   const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-  if (!record8(parsed)) throw new Error("control request JSON is invalid");
+  if (!record11(parsed)) throw new Error("control request JSON is invalid");
   return parsed;
 }
 async function readJsonInputFile(path) {
@@ -9789,7 +10503,7 @@ async function readJsonInputFile(path) {
     throw new Error("input file is invalid or too large");
   }
   const parsed = JSON.parse(await readFile4(path, "utf8"));
-  if (!record8(parsed)) throw new Error("input JSON is invalid");
+  if (!record11(parsed)) throw new Error("input JSON is invalid");
   return parsed;
 }
 async function controlRequest(state, method, path, body) {
@@ -9823,7 +10537,7 @@ async function controlRequest(state, method, path, body) {
       response.on("end", () => {
         try {
           const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-          if (!record8(parsed)) throw new Error("control response is invalid");
+          if (!record11(parsed)) throw new Error("control response is invalid");
           if ((response.statusCode ?? 500) >= 400) {
             rejectRequest(new Error(
               typeof parsed.error === "string" ? parsed.error : "control request failed"
@@ -9870,10 +10584,12 @@ async function runServer(arguments_) {
   const milestoneObservationLedger = new MilestoneObservationLedger(
     join3(arguments_.stateDir, "milestone-observations.json")
   );
+  const recoveryObservationBridge = new RecoveryObservationHostBridge();
   const companion = createWorkspaceCompanion({
     registry,
     taskObjectRegistry,
     milestoneObservationLedger,
+    recoveryObservationBridge,
     endpoint: arguments_.endpoint,
     refreshIntervalMs: arguments_.refreshIntervalMs,
     presentationMode: arguments_.presentationMode
@@ -9984,6 +10700,53 @@ async function runServer(arguments_) {
         (error) => sendJson(response, 409, {
           ok: false,
           error: error instanceof Error ? error.message : "milestone_summary_failed"
+        })
+      );
+      return;
+    }
+    if (request.method === "POST" && request.url === "/recovery/start") {
+      void readRequestJson(request).then(async (body) => await companion.beginCurrentTaskRecoveryObservation(
+        body.definition
+      )).then(
+        (recovery) => sendJson(response, 200, { ok: true, recovery }),
+        (error) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "recovery_start_failed"
+        })
+      );
+      return;
+    }
+    if (request.method === "GET" && request.url === "/recovery/status") {
+      void companion.currentTaskRecoveryObservationStatus().then(
+        (recovery) => sendJson(response, 200, { ok: true, recovery }),
+        (error) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "recovery_status_failed"
+        })
+      );
+      return;
+    }
+    if (request.method === "POST" && request.url === "/recovery/complete") {
+      void readRequestJson(request).then(async (body) => {
+        if (body.outcome !== "resumed_correctly" && body.outcome !== "resumed_incorrectly") {
+          throw new Error("recovery_outcome_invalid");
+        }
+        return await companion.completeCurrentTaskRecoveryObservation(body.outcome);
+      }).then(
+        (result) => sendJson(response, 200, { ok: true, result }),
+        (error) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "recovery_complete_failed"
+        })
+      );
+      return;
+    }
+    if (request.method === "POST" && request.url === "/recovery/abort") {
+      void companion.abortCurrentTaskRecoveryObservation().then(
+        (result) => sendJson(response, 200, { ok: true, result }),
+        (error) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "recovery_abort_failed"
         })
       );
       return;
@@ -10127,7 +10890,7 @@ function print(value, json) {
 `);
     return;
   }
-  const binding = record8(value.binding) ? value.binding : void 0;
+  const binding = record11(value.binding) ? value.binding : void 0;
   if (binding !== void 0) {
     process.stdout.write(
       `${value.replaced === true ? "Rebound" : "Bound"} active Codex task ${String(binding.threadId)} to ${String(binding.workspaceRoot)}
@@ -10135,7 +10898,7 @@ function print(value, json) {
     );
     return;
   }
-  const unbound = record8(value.unbound) ? value.unbound : void 0;
+  const unbound = record11(value.unbound) ? value.unbound : void 0;
   if (value.wasBound === true && unbound !== void 0) {
     process.stdout.write(
       `Unbound active Codex task ${String(unbound.threadId)} from ${String(unbound.workspaceRoot)}
@@ -10147,8 +10910,8 @@ function print(value, json) {
     process.stdout.write("Active Codex task was not bound\n");
     return;
   }
-  const result = record8(value.result) ? value.result : void 0;
-  const object = result && record8(result.object) ? result.object : void 0;
+  const result = record11(value.result) ? value.result : void 0;
+  const object = result && record11(result.object) ? result.object : void 0;
   if (result !== void 0 && object !== void 0) {
     process.stdout.write(
       `Task object ${String(object.objectKey)}: ${String(result.kind)} (${String(object.lifecycle)})
@@ -10156,16 +10919,16 @@ function print(value, json) {
     );
     return;
   }
-  if (record8(value.event) && typeof value.event.milestoneSha256 === "string") {
+  if (record11(value.event) && typeof value.event.milestoneSha256 === "string") {
     const event = value.event;
-    const review = record8(event.review) ? event.review : {};
+    const review = record11(event.review) ? event.review : {};
     process.stdout.write(
       `Private milestone observation ${String(event.milestoneSha256).slice(0, 12)}: available=${String(review.available)}; missing=${String(review.missing)}; ambiguous=${String(review.ambiguous)}; type-mismatch=${String(review.typeMismatch)}
 `
     );
     return;
   }
-  if (record8(value.summary) && value.summary.measurement === "private_milestone_observation") {
+  if (record11(value.summary) && value.summary.measurement === "private_milestone_observation") {
     const summary2 = value.summary;
     process.stdout.write(
       `Milestone summary: events=${String(summary2.eventCount)}; milestones=${String(summary2.milestoneCount)}; available=${String(summary2.available)}; missing=${String(summary2.missing)}; failures=${String(Number(summary2.ambiguous) + Number(summary2.typeMismatch))}
@@ -10173,7 +10936,7 @@ function print(value, json) {
     );
     return;
   }
-  if (record8(value.audit) && typeof value.audit.currentTaskRecords === "number") {
+  if (record11(value.audit) && typeof value.audit.currentTaskRecords === "number") {
     const audit = value.audit;
     process.stdout.write(
       `Curation audit: active partial=${String(audit.activePartials)}; stable overlap=${String(Number(audit.activeStableOverlaps) + Number(audit.activeAmbiguousOverlaps))}; archive ready=${String(audit.terminalArchiveReady)}; terminal unresolved=${String(Number(audit.terminalUnmatched) + Number(audit.terminalAmbiguous))}
@@ -10192,13 +10955,13 @@ function print(value, json) {
     process.stdout.write(`Current task objects: ${value.objects.length}
 `);
     for (const item of value.objects) {
-      if (!record8(item)) continue;
+      if (!record11(item)) continue;
       process.stdout.write(
         `- ${String(item.objectKey)} [${String(item.entityType)}] ${String(item.lifecycle)}
 `
       );
     }
-    const capacity = record8(value.capacity) ? value.capacity : void 0;
+    const capacity = record11(value.capacity) ? value.capacity : void 0;
     if (capacity !== void 0) {
       process.stdout.write(
         `Capacity: active=${String(capacity.active)}/${String(capacity.activeHardLimit)}; registry=${String(capacity.registryRecords)}/${String(capacity.registryRecordLimit)}; archived=${String(capacity.archivedRecords)}/${String(capacity.archiveRecordLimit)}
@@ -10211,12 +10974,12 @@ function print(value, json) {
     }
     return;
   }
-  const companion = record8(value.companion) ? value.companion : void 0;
-  const adapter = companion && record8(companion.adapter) ? companion.adapter : void 0;
+  const companion = record11(value.companion) ? value.companion : void 0;
+  const adapter = companion && record11(companion.adapter) ? companion.adapter : void 0;
   const state = typeof companion?.state === "string" ? companion.state : value.stopped === true ? "stopped" : "inactive";
   const targets = typeof adapter?.targetCount === "number" ? adapter.targetCount : 0;
   const tasks = typeof companion?.activeTaskCount === "number" ? companion.activeTaskCount : 0;
-  const compatibility = companion && record8(companion.compatibility) ? companion.compatibility : void 0;
+  const compatibility = companion && record11(companion.compatibility) ? companion.compatibility : void 0;
   const compatibilityState = typeof compatibility?.state === "string" ? compatibility.state : "unchecked";
   const compatibilityCode = typeof compatibility?.code === "string" ? compatibility.code : "not_checked";
   process.stdout.write(
@@ -10256,7 +11019,7 @@ async function main() {
     print(await controlRequest(state, "POST", "/unbind"), arguments_.json);
     return;
   }
-  if (arguments_.command === "object-upsert" || arguments_.command === "object-supersede" || arguments_.command === "object-retire" || arguments_.command === "object-audit" || arguments_.command === "object-review" || arguments_.command === "object-archive" || arguments_.command === "object-list" || arguments_.command === "milestone-observe" || arguments_.command === "milestone-summary") {
+  if (arguments_.command === "object-upsert" || arguments_.command === "object-supersede" || arguments_.command === "object-retire" || arguments_.command === "object-audit" || arguments_.command === "object-review" || arguments_.command === "object-archive" || arguments_.command === "object-list" || arguments_.command === "milestone-observe" || arguments_.command === "milestone-summary" || arguments_.command === "recovery-start" || arguments_.command === "recovery-status" || arguments_.command === "recovery-complete" || arguments_.command === "recovery-abort") {
     const state = await readState(arguments_.stateDir);
     if (state === void 0 || !processIsAlive(state.pid)) {
       fail("workspace companion is not running");
@@ -10281,6 +11044,25 @@ async function main() {
     }
     if (arguments_.command === "milestone-summary") {
       print(await controlRequest(state, "GET", "/milestones/summary"), arguments_.json);
+      return;
+    }
+    if (arguments_.command === "recovery-start") {
+      const definition = await readJsonInputFile(arguments_.recoveryFile);
+      print(await controlRequest(state, "POST", "/recovery/start", { definition }), arguments_.json);
+      return;
+    }
+    if (arguments_.command === "recovery-status") {
+      print(await controlRequest(state, "GET", "/recovery/status"), arguments_.json);
+      return;
+    }
+    if (arguments_.command === "recovery-complete") {
+      print(await controlRequest(state, "POST", "/recovery/complete", {
+        outcome: arguments_.recoveryOutcome
+      }), arguments_.json);
+      return;
+    }
+    if (arguments_.command === "recovery-abort") {
+      print(await controlRequest(state, "POST", "/recovery/abort"), arguments_.json);
       return;
     }
     if (arguments_.command === "object-archive") {

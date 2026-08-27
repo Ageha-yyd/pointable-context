@@ -12,6 +12,8 @@ import {
   createUpdatePointableAnnotationsExpression,
   createUninstallPointableRendererExpression,
   parsePointableLookupIntent,
+  parsePointableRendererInteractionEvent,
+  pointableBindingPayloadKind,
 } from "../dist/src/host/codex-cdp/index.js";
 import {
   createActivateStudyV2NativeAnswerControlExpression,
@@ -101,6 +103,7 @@ function waitForBindingIntent(connection, bindingName, expectedOperation, timeou
         event.method !== "Runtime.bindingCalled" ||
         event.params?.name !== bindingName
       ) return;
+      if (pointableBindingPayloadKind(event.params.payload) !== "lookup") return;
       const intent = parsePointableLookupIntent(event.params.payload, bindingName);
       if (intent.operation !== expectedOperation) return;
       clearTimeout(timeout);
@@ -115,6 +118,8 @@ let lifecycleId;
 let studyTrialToken;
 let unsubscribeStudy;
 const studyEvents = [];
+const rendererInteractionEvents = [];
+let unsubscribeRendererInteractions;
 try {
   const port = await debuggerPort();
   const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
@@ -165,6 +170,16 @@ try {
   })()`);
   const bindingName = `__pointableContextBinding_${randomUUID().replaceAll("-", "_")}`;
   await connection.send("Runtime.addBinding", { name: bindingName });
+  unsubscribeRendererInteractions = connection.onEvent((event) => {
+    if (
+      event.method !== "Runtime.bindingCalled" ||
+      event.params?.name !== bindingName ||
+      pointableBindingPayloadKind(event.params.payload) !== "interaction"
+    ) return;
+    rendererInteractionEvents.push(
+      parsePointableRendererInteractionEvent(event.params.payload),
+    );
+  });
   const studyBindingName = `__pointableStudyBinding_${randomUUID().replaceAll("-", "_")}`;
   studyTrialToken = "f".repeat(64);
   await connection.send("Runtime.addBinding", { name: studyBindingName });
@@ -202,6 +217,7 @@ try {
       revisionCheckIntervalMs: 500,
       actionLabel: "查看任务上下文",
       presentationMode: "mental-model",
+      interactionObservation: true,
     }),
   );
   lifecycleId = installed.lifecycleId;
@@ -371,6 +387,7 @@ try {
         event.method !== "Runtime.bindingCalled" ||
         event.params?.name !== bindingName
       ) return;
+      if (pointableBindingPayloadKind(event.params.payload) !== "lookup") return;
       clearTimeout(timeout);
       unsubscribe();
       resolveIntent(parsePointableLookupIntent(event.params.payload, bindingName));
@@ -792,6 +809,18 @@ try {
   ) {
     throw new Error(`study metric observer captured foreign or unidentified UI: ${JSON.stringify(studyEvents)}`);
   }
+  const recoveryTypes = rendererInteractionEvents.map((event) => event.eventType);
+  if (
+    !recoveryTypes.includes("entry_presented") ||
+    recoveryTypes.filter((eventType) => eventType === "selection_completed").length !== 1 ||
+    recoveryTypes.filter((eventType) => eventType === "quick_action_shown").length !== 1 ||
+    !recoveryTypes.includes("evidence_expanded") ||
+    !recoveryTypes.includes("card_closed")
+  ) {
+    throw new Error(
+      `native recovery interaction stream is incomplete: ${JSON.stringify(rendererInteractionEvents)}`,
+    );
+  }
 
   const offscreenIntentPromise = waitForBindingIntent(connection, bindingName, "resolve");
   await connection.send("Input.dispatchMouseEvent", {
@@ -974,6 +1003,7 @@ try {
     closeClearedSelection: true,
     closePreventedRemountAfterMs: 250,
     studyMetricCardEventsScoped: true,
+    nativeRecoveryInteractionStream: true,
     anchorOutsideViewportClosedCard: true,
     manuallyPinnedCardSurvivedAnchorDisplacement: true,
   }, null, 2)}\n`);
@@ -986,6 +1016,7 @@ try {
       ).catch(() => undefined);
     }
     unsubscribeStudy?.();
+    unsubscribeRendererInteractions?.();
     if (typeof lifecycleId === "string") {
       await evaluate(
         connection,

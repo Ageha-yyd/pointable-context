@@ -16,6 +16,11 @@ import {
 import type { PointablePresentationMode } from "./protocol.js";
 import { TaskObjectRegistry } from "./task-object-registry.js";
 import { MilestoneObservationLedger } from "./milestone-observation.js";
+import { RecoveryObservationHostBridge } from "../../evaluation/recovery-observation-host.js";
+import type {
+  RecoveryEpisodeDefinition,
+  RecoveryEpisodeOutcome,
+} from "../../evaluation/recovery-observation.js";
 
 const CONTROL_SCHEMA_VERSION = 1;
 const CONTROL_TIMEOUT_MS = 3_000;
@@ -48,7 +53,11 @@ interface ParsedArguments {
     | "object-archive"
     | "object-list"
     | "milestone-observe"
-    | "milestone-summary";
+    | "milestone-summary"
+    | "recovery-start"
+    | "recovery-status"
+    | "recovery-complete"
+    | "recovery-abort";
   stateDir: string;
   registryPath: string;
   endpoint: string;
@@ -59,6 +68,8 @@ interface ParsedArguments {
   reviewFile?: string;
   objectKey?: string;
   replaces?: string;
+  recoveryFile?: string;
+  recoveryOutcome?: RecoveryEpisodeOutcome;
   json: boolean;
 }
 
@@ -119,10 +130,14 @@ function parseArguments(argv: string[]): ParsedArguments {
     command !== "object-archive" &&
     command !== "object-list" &&
     command !== "milestone-observe" &&
-    command !== "milestone-summary"
+    command !== "milestone-summary" &&
+    command !== "recovery-start" &&
+    command !== "recovery-status" &&
+    command !== "recovery-complete" &&
+    command !== "recovery-abort"
   ) {
     return fail(
-      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-audit|object-review|object-archive|object-list|milestone-observe|milestone-summary> [options]",
+      "usage: pointable-context-workspace-companion <start|status|bind|unbind|stop|object-upsert|object-supersede|object-retire|object-audit|object-review|object-archive|object-list|milestone-observe|milestone-summary|recovery-start|recovery-status|recovery-complete|recovery-abort> [options]",
     );
   }
   const stateRoot = localStateRoot();
@@ -136,6 +151,8 @@ function parseArguments(argv: string[]): ParsedArguments {
   let reviewFile: string | undefined;
   let objectKey: string | undefined;
   let replaces: string | undefined;
+  let recoveryFile: string | undefined;
+  let recoveryOutcome: RecoveryEpisodeOutcome | undefined;
   let json = false;
   for (let index = 1; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -174,6 +191,14 @@ function parseArguments(argv: string[]): ParsedArguments {
       objectKey = value;
     } else if (argument === "--replaces") {
       replaces = value;
+    } else if (argument === "--recovery-file") {
+      if (!isAbsolute(value)) fail("--recovery-file must be absolute");
+      recoveryFile = resolve(value);
+    } else if (argument === "--outcome") {
+      if (value !== "resumed_correctly" && value !== "resumed_incorrectly") {
+        fail("--outcome must be resumed_correctly or resumed_incorrectly");
+      }
+      recoveryOutcome = value;
     } else {
       fail(`unknown option: ${argument}`);
     }
@@ -193,6 +218,12 @@ function parseArguments(argv: string[]): ParsedArguments {
   if (command === "object-retire" && objectKey === undefined) {
     fail("object-retire requires --object-key <object-key>");
   }
+  if (command === "recovery-start" && recoveryFile === undefined) {
+    fail("recovery-start requires --recovery-file <absolute-path>");
+  }
+  if (command === "recovery-complete" && recoveryOutcome === undefined) {
+    fail("recovery-complete requires --outcome <resumed_correctly|resumed_incorrectly>");
+  }
   return {
     command,
     stateDir,
@@ -205,6 +236,8 @@ function parseArguments(argv: string[]): ParsedArguments {
     ...(reviewFile === undefined ? {} : { reviewFile }),
     ...(objectKey === undefined ? {} : { objectKey }),
     ...(replaces === undefined ? {} : { replaces }),
+    ...(recoveryFile === undefined ? {} : { recoveryFile }),
+    ...(recoveryOutcome === undefined ? {} : { recoveryOutcome }),
     json,
   };
 }
@@ -372,7 +405,11 @@ async function controlRequest(
     | "/objects/review"
     | "/objects/archive"
     | "/milestones/observe"
-    | "/milestones/summary",
+    | "/milestones/summary"
+    | "/recovery/start"
+    | "/recovery/status"
+    | "/recovery/complete"
+    | "/recovery/abort",
   body?: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const encoded = body === undefined ? undefined : Buffer.from(JSON.stringify(body), "utf8");
@@ -457,10 +494,12 @@ async function runServer(arguments_: ParsedArguments): Promise<void> {
   const milestoneObservationLedger = new MilestoneObservationLedger(
     join(arguments_.stateDir, "milestone-observations.json"),
   );
+  const recoveryObservationBridge = new RecoveryObservationHostBridge();
   const companion: WorkspaceCompanion = createWorkspaceCompanion({
     registry,
     taskObjectRegistry,
     milestoneObservationLedger,
+    recoveryObservationBridge,
     endpoint: arguments_.endpoint,
     refreshIntervalMs: arguments_.refreshIntervalMs,
     presentationMode: arguments_.presentationMode,
@@ -578,6 +617,57 @@ async function runServer(arguments_: ParsedArguments): Promise<void> {
         (error: unknown) => sendJson(response, 409, {
           ok: false,
           error: error instanceof Error ? error.message : "milestone_summary_failed",
+        }),
+      );
+      return;
+    }
+    if (request.method === "POST" && request.url === "/recovery/start") {
+      void readRequestJson(request).then(async (body) =>
+        await companion.beginCurrentTaskRecoveryObservation(
+          body.definition as RecoveryEpisodeDefinition,
+        )).then(
+        (recovery) => sendJson(response, 200, { ok: true, recovery }),
+        (error: unknown) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "recovery_start_failed",
+        }),
+      );
+      return;
+    }
+    if (request.method === "GET" && request.url === "/recovery/status") {
+      void companion.currentTaskRecoveryObservationStatus().then(
+        (recovery) => sendJson(response, 200, { ok: true, recovery }),
+        (error: unknown) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "recovery_status_failed",
+        }),
+      );
+      return;
+    }
+    if (request.method === "POST" && request.url === "/recovery/complete") {
+      void readRequestJson(request).then(async (body) => {
+        if (
+          body.outcome !== "resumed_correctly" &&
+          body.outcome !== "resumed_incorrectly"
+        ) {
+          throw new Error("recovery_outcome_invalid");
+        }
+        return await companion.completeCurrentTaskRecoveryObservation(body.outcome);
+      }).then(
+        (result) => sendJson(response, 200, { ok: true, result }),
+        (error: unknown) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "recovery_complete_failed",
+        }),
+      );
+      return;
+    }
+    if (request.method === "POST" && request.url === "/recovery/abort") {
+      void companion.abortCurrentTaskRecoveryObservation().then(
+        (result) => sendJson(response, 200, { ok: true, result }),
+        (error: unknown) => sendJson(response, 409, {
+          ok: false,
+          error: error instanceof Error ? error.message : "recovery_abort_failed",
         }),
       );
       return;
@@ -883,7 +973,11 @@ async function main(): Promise<void> {
     arguments_.command === "object-archive" ||
     arguments_.command === "object-list" ||
     arguments_.command === "milestone-observe" ||
-    arguments_.command === "milestone-summary"
+    arguments_.command === "milestone-summary" ||
+    arguments_.command === "recovery-start" ||
+    arguments_.command === "recovery-status" ||
+    arguments_.command === "recovery-complete" ||
+    arguments_.command === "recovery-abort"
   ) {
     const state = await readState(arguments_.stateDir);
     if (state === undefined || !processIsAlive(state.pid)) {
@@ -909,6 +1003,25 @@ async function main(): Promise<void> {
     }
     if (arguments_.command === "milestone-summary") {
       print(await controlRequest(state, "GET", "/milestones/summary"), arguments_.json);
+      return;
+    }
+    if (arguments_.command === "recovery-start") {
+      const definition = await readJsonInputFile(arguments_.recoveryFile!);
+      print(await controlRequest(state, "POST", "/recovery/start", { definition }), arguments_.json);
+      return;
+    }
+    if (arguments_.command === "recovery-status") {
+      print(await controlRequest(state, "GET", "/recovery/status"), arguments_.json);
+      return;
+    }
+    if (arguments_.command === "recovery-complete") {
+      print(await controlRequest(state, "POST", "/recovery/complete", {
+        outcome: arguments_.recoveryOutcome,
+      }), arguments_.json);
+      return;
+    }
+    if (arguments_.command === "recovery-abort") {
+      print(await controlRequest(state, "POST", "/recovery/abort"), arguments_.json);
       return;
     }
     if (arguments_.command === "object-archive") {

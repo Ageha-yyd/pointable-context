@@ -6,7 +6,17 @@ export {
   type PointableLookupCallbackRequest,
   type PointableAnnotationProvider,
   type PointableAnnotationProviderRequest,
+  type PointableInteractionObserver,
+  type PointableInteractionObserverRequest,
 } from "./adapter.js";
+export {
+  POINTABLE_INTERACTION_EVENT_KIND,
+  PointableInteractionProtocolError,
+  parsePointableRendererInteractionEvent,
+  pointableBindingPayloadKind,
+  type PointableRendererInteractionEventType,
+  type PointableRendererInteractionEventV1,
+} from "./interaction-protocol.js";
 export {
   buildWorkspaceAnnotationCatalog,
   createWorkspaceAnnotationProvider,

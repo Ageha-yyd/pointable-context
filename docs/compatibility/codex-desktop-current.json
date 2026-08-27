@@ -9,18 +9,18 @@
     "capturedAt": "2026-08-26T04:05:32+08:00"
   },
   "implementation": {
-    "productVersion": "v2.33",
-    "rendererBundleSha256": "73e78bbc37443f2cd93ecfcfb72ad552b57831b6f0901a13433a8b52f02808d2"
+    "productVersion": "v2.34",
+    "rendererBundleSha256": "e12d713aeb310682ce28a49696fa95d986568afd7d613fc2f8928881cf53dca2"
   },
   "automatic": {
-    "checkedAt": "2026-08-25T20:05:32.452Z",
-    "state": "qualified",
-    "code": "qualified_current_runtime",
+    "checkedAt": "2026-08-27T01:22:28.151Z",
+    "state": "unavailable",
+    "code": "target_discovery_aborted",
     "gates": {
-      "exactMainTarget": "pass",
-      "mainFrame": "pass",
-      "mainExecutionContext": "pass",
-      "rendererLifecycle": "pass"
+      "exactMainTarget": "unavailable",
+      "mainFrame": "unavailable",
+      "mainExecutionContext": "unavailable",
+      "rendererLifecycle": "unavailable"
     }
   },
   "manualChecks": [

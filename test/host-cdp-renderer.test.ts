@@ -300,14 +300,40 @@ test("install expression is namespaced, generic, click-gated, text-only, and cle
   assert.match(expression, /let reconcileFrame/u);
   assert.match(expression, /readContextFingerprint\(\) !== current\.contextFingerprint/u);
   assert.match(expression, /removeEventListener/u);
+  assert.match(expression, /pointable\.interaction\.event/u);
+  assert.match(expression, /config\.interactionObservation !== true/u);
+  assert.match(expression, /emitInteraction\("selection_completed"\)/u);
+  assert.match(expression, /emitInteraction\("quick_action_shown"\)/u);
+  assert.match(expression, /emitInteraction\("entry_presented"\)/u);
+  assert.match(expression, /emitInteraction\("card_closed"\)/u);
+  assert.match(expression, /emitInteraction\("evidence_expanded"\)/u);
+  assert.match(expression, /visibilitychange/u);
   assert.match(expression, /textContent/u);
   assert.doesNotMatch(expression, /innerHTML|insertAdjacentHTML|srcdoc/u);
   assert.doesNotMatch(expression, /项目/u);
 
   const submitStart = expression.indexOf("async function submitLookup");
-  const bindingCall = expression.indexOf("binding(JSON.stringify(payload))");
+  const lookupPayload = expression.indexOf('kind: "pointable.selection.lookup"');
+  const bindingCall = expression.indexOf("binding(JSON.stringify(payload))", lookupPayload);
+  const interactionStart = expression.indexOf("function emitInteraction");
+  const interactionEnd = expression.indexOf("function closeForUser", interactionStart);
+  const interactionSource = expression.slice(interactionStart, interactionEnd);
   assert.ok(submitStart > 0);
+  assert.ok(lookupPayload > submitStart);
   assert.ok(bindingCall > submitStart, "binding payload must only be emitted by submitLookup");
+  assert.match(interactionSource, /rendererSequence/u);
+  assert.doesNotMatch(
+    interactionSource,
+    /(selectionText|entityId|threadId|filePath|workspacePath)\s*:/u,
+  );
+});
+
+test("renderer interaction observation is explicit opt-in", () => {
+  const expression = createInstallPointableRendererExpression({
+    bindingName: "__pointableContextBinding_test_12345678",
+    interactionObservation: true,
+  });
+  assert.match(expression, /"interactionObservation":true/u);
 });
 
 test("renderer accepts one fixed presentation condition per installation", () => {
