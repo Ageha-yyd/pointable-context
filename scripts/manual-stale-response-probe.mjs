@@ -1,3 +1,7 @@
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { isAbsolute, join, resolve } from "node:path";
+
 import { CodexCdpHostAdapter } from "../dist/src/host/codex-cdp/index.js";
 
 const endpoint = process.argv[2] ?? "http://127.0.0.1:9223";
@@ -6,6 +10,37 @@ const lifetimeMs = 15 * 60_000;
 
 const sleep = (duration) => new Promise((resolve) => setTimeout(resolve, duration));
 
+async function runningWorkspaceCompanionPid() {
+  const local = process.env.LOCALAPPDATA;
+  const stateRoot = resolve(local && isAbsolute(local) ? local : homedir(), "PointableContext");
+  try {
+    const raw = await readFile(join(stateRoot, "workspace-companion", "state.json"), "utf8");
+    if (Buffer.byteLength(raw, "utf8") > 16 * 1024) return undefined;
+    const state = JSON.parse(raw);
+    const pid = Number(state?.pid);
+    if (!Number.isSafeInteger(pid) || pid < 1) return undefined;
+    try {
+      process.kill(pid, 0);
+      return pid;
+    } catch (error) {
+      return error?.code === "EPERM" ? pid : undefined;
+    }
+  } catch {
+    return undefined;
+  }
+}
+
+const companionPid = await runningWorkspaceCompanionPid();
+if (companionPid !== undefined) {
+  process.stderr.write(`${JSON.stringify({
+    event: "stale_probe_refused",
+    code: "exclusive_renderer_in_use",
+    companionPid,
+    remedy: "Stop the workspace companion before this probe, then restart it after the probe exits.",
+  })}\n`);
+  process.exit(2);
+}
+
 const adapter = new CodexCdpHostAdapter({
   endpoint,
   actionLabel: "查看上下文（stale probe）",
@@ -13,6 +48,14 @@ const adapter = new CodexCdpHostAdapter({
   lookupTimeoutMs: 8_000,
   lookup: async (request) => {
     const text = request.selection.text.trim();
+    if (text !== "stale-alpha" && text !== "stale-beta") {
+      return {
+        kind: "error",
+        code: "manual_probe_text_out_of_scope",
+        message: "This probe accepts only stale-alpha or stale-beta.",
+        retryable: false,
+      };
+    }
     if (text === "stale-alpha") await sleep(delayMs);
     return {
       kind: "detail",

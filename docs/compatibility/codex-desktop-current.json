@@ -13,7 +13,7 @@
     "rendererBundleSha256": "e12d713aeb310682ce28a49696fa95d986568afd7d613fc2f8928881cf53dca2"
   },
   "automatic": {
-    "checkedAt": "2026-08-27T01:53:18.933Z",
+    "checkedAt": "2026-08-27T02:21:10.822Z",
     "state": "qualified",
     "code": "qualified_current_runtime",
     "gates": {
@@ -24,15 +24,15 @@
     }
   },
   "manualChecks": [
-    { "id": "selection_inert", "result": "pending" },
-    { "id": "trusted_click", "result": "pending" },
-    { "id": "anchored_card", "result": "pending" },
-    { "id": "progressive_disclosure", "result": "pending" },
-    { "id": "close_and_focus_restore", "result": "pending" },
-    { "id": "composer_persistence", "result": "pending" },
-    { "id": "scroll_and_virtualization", "result": "pending" },
-    { "id": "navigation_recovery", "result": "pending" },
-    { "id": "stale_response_cleanup", "result": "pending" },
-    { "id": "refresh_continuity", "result": "pending" }
+    { "id": "selection_inert", "result": "pass", "observedAt": "2026-08-27T10:22:25+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.818.5229.0-v2.34-manual.txt:1", "evidenceExcerpt": "selection_inert=PASS 2026-08-27T10:22:25+08:00 user confirmed selecting an unmarked registered object showed only the quiet action and did not open detail automatically." },
+    { "id": "trusted_click", "result": "pass", "observedAt": "2026-08-27T10:22:25+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.818.5229.0-v2.34-manual.txt:2", "evidenceExcerpt": "trusted_click=PASS 2026-08-27T10:22:25+08:00 user confirmed both the explicit selection action and a marked-object click opened registered workspace context without another Chat turn." },
+    { "id": "anchored_card", "result": "pass", "observedAt": "2026-08-27T10:22:25+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.818.5229.0-v2.34-manual.txt:3", "evidenceExcerpt": "anchored_card=PASS 2026-08-27T10:22:25+08:00 user confirmed the detail appeared beside the current Chat reference without opening a browser." },
+    { "id": "progressive_disclosure", "result": "pass", "observedAt": "2026-08-27T10:22:25+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.818.5229.0-v2.34-manual.txt:4", "evidenceExcerpt": "progressive_disclosure=PASS 2026-08-27T10:22:25+08:00 user confirmed 查看详情 and 收起详情 operated within the same summary-first card." },
+    { "id": "close_and_focus_restore", "result": "pass", "observedAt": "2026-08-27T10:22:25+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.818.5229.0-v2.34-manual.txt:5", "evidenceExcerpt": "close_and_focus_restore=PASS 2026-08-27T10:22:25+08:00 user confirmed close removed the card without a Chat Lane jump and left the composer usable." },
+    { "id": "composer_persistence", "result": "pass", "observedAt": "2026-08-27T10:22:25+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.818.5229.0-v2.34-manual.txt:6", "evidenceExcerpt": "composer_persistence=PASS 2026-08-27T10:22:25+08:00 user confirmed focusing and temporarily typing in the composer kept the open card present." },
+    { "id": "scroll_and_virtualization", "result": "pass", "observedAt": "2026-08-27T10:22:25+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.818.5229.0-v2.34-manual.txt:7", "evidenceExcerpt": "scroll_and_virtualization=PASS 2026-08-27T10:22:25+08:00 user confirmed an unpinned off-screen card left no orphan or duplicate, a moved pinned card survived scrolling, and a fresh reveal worked after returning." },
+    { "id": "navigation_recovery", "result": "pass", "observedAt": "2026-08-27T10:22:25+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.818.5229.0-v2.34-manual.txt:8", "evidenceExcerpt": "navigation_recovery=PASS 2026-08-27T10:22:25+08:00 user confirmed switching tasks cleaned the prior UI and returning restored one current interaction without stale or duplicate surfaces." },
+    { "id": "stale_response_cleanup", "result": "pass", "observedAt": "2026-08-27T10:22:25+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.818.5229.0-v2.34-manual.txt:9", "evidenceExcerpt": "stale_response_cleanup=PASS 2026-08-27T10:22:25+08:00 user confirmed the controlled three-second stale-alpha response was discarded after selecting stale-beta; old detail did not mount and beta did not auto-open." },
+    { "id": "refresh_continuity", "result": "pass", "observedAt": "2026-08-27T10:22:25+08:00", "evidenceSource": "docs/evidence/codex-compatibility-26.818.5229.0-v2.34-manual.txt:10", "evidenceExcerpt": "refresh_continuity=PASS 2026-08-27T10:22:25+08:00 user confirmed the real manual-refresh-probe.md revision produced 内容已更新 and trusted refresh reused the same moved, expanded card with sixth snapshot content and zero Chat turns." }
   ]
 }

@@ -1,0 +1,10 @@
+selection_inert=PASS 2026-08-27T10:22:25+08:00 user confirmed selecting an unmarked registered object showed only the quiet action and did not open detail automatically.
+trusted_click=PASS 2026-08-27T10:22:25+08:00 user confirmed both the explicit selection action and a marked-object click opened registered workspace context without another Chat turn.
+anchored_card=PASS 2026-08-27T10:22:25+08:00 user confirmed the detail appeared beside the current Chat reference without opening a browser.
+progressive_disclosure=PASS 2026-08-27T10:22:25+08:00 user confirmed 查看详情 and 收起详情 operated within the same summary-first card.
+close_and_focus_restore=PASS 2026-08-27T10:22:25+08:00 user confirmed close removed the card without a Chat Lane jump and left the composer usable.
+composer_persistence=PASS 2026-08-27T10:22:25+08:00 user confirmed focusing and temporarily typing in the composer kept the open card present.
+scroll_and_virtualization=PASS 2026-08-27T10:22:25+08:00 user confirmed an unpinned off-screen card left no orphan or duplicate, a moved pinned card survived scrolling, and a fresh reveal worked after returning.
+navigation_recovery=PASS 2026-08-27T10:22:25+08:00 user confirmed switching tasks cleaned the prior UI and returning restored one current interaction without stale or duplicate surfaces.
+stale_response_cleanup=PASS 2026-08-27T10:22:25+08:00 user confirmed the controlled three-second stale-alpha response was discarded after selecting stale-beta; old detail did not mount and beta did not auto-open.
+refresh_continuity=PASS 2026-08-27T10:22:25+08:00 user confirmed the real manual-refresh-probe.md revision produced 内容已更新 and trusted refresh reused the same moved, expanded card with sixth snapshot content and zero Chat turns.

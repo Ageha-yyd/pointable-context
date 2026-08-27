@@ -147,7 +147,12 @@ test("v2.34 keeps recovery observation explicit, bounded, and qualification-safe
   const current = JSON.parse(compatibility) as {
     implementation?: { productVersion?: string; rendererBundleSha256?: string };
     automatic?: { state?: string };
-    manualChecks?: Array<{ result?: string }>;
+    manualChecks?: Array<{
+      result?: string;
+      observedAt?: string;
+      evidenceSource?: string;
+      evidenceExcerpt?: string;
+    }>;
   };
   assert.equal(current.implementation?.productVersion, "v2.34");
   assert.equal(
@@ -156,7 +161,13 @@ test("v2.34 keeps recovery observation explicit, bounded, and qualification-safe
   );
   assert.equal(current.automatic?.state, "qualified");
   assert.equal(current.manualChecks?.length, 10);
-  assert.ok(current.manualChecks?.every((check) => check.result === "pending"));
+  assert.ok(current.manualChecks?.every((check) =>
+    check.result === "pass" &&
+    typeof check.observedAt === "string" &&
+    Number.isFinite(Date.parse(check.observedAt)) &&
+    check.evidenceSource?.startsWith("docs/evidence/") === true &&
+    check.evidenceExcerpt?.includes("=PASS ") === true
+  ));
 });
 
 test("plugin defaults enable Quiet Mode instead of proactively rendering capsules", async () => {
