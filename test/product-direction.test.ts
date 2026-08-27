@@ -82,7 +82,7 @@ test("v2.34 keeps recovery observation explicit, bounded, and qualification-safe
   assert.match(readme, /one primary annotation term per unambiguous object before aliases/u);
   assert.match(
     readme,
-    /current v2\.34 bundle.*automatic qualification.*unavailable.*all ten manual interaction gates remain pending/u,
+    /current v2\.34 bundle.*passed automatic Host gates 4\/4.*all ten manual interaction gates remain pending/u,
   );
   assert.match(readme, /complete development-context surface/u);
   assert.match(readme, /malformed milestone review returns an error without killing the detached companion/u);
@@ -154,7 +154,7 @@ test("v2.34 keeps recovery observation explicit, bounded, and qualification-safe
     current.implementation?.rendererBundleSha256,
     createHash("sha256").update(bundle).digest("hex"),
   );
-  assert.equal(current.automatic?.state, "unavailable");
+  assert.equal(current.automatic?.state, "qualified");
   assert.equal(current.manualChecks?.length, 10);
   assert.ok(current.manualChecks?.every((check) => check.result === "pending"));
 });

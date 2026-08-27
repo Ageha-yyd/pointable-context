@@ -13,14 +13,14 @@
     "rendererBundleSha256": "e12d713aeb310682ce28a49696fa95d986568afd7d613fc2f8928881cf53dca2"
   },
   "automatic": {
-    "checkedAt": "2026-08-27T01:22:28.151Z",
-    "state": "unavailable",
-    "code": "target_discovery_aborted",
+    "checkedAt": "2026-08-27T01:53:18.933Z",
+    "state": "qualified",
+    "code": "qualified_current_runtime",
     "gates": {
-      "exactMainTarget": "unavailable",
-      "mainFrame": "unavailable",
-      "mainExecutionContext": "unavailable",
-      "rendererLifecycle": "unavailable"
+      "exactMainTarget": "pass",
+      "mainFrame": "pass",
+      "mainExecutionContext": "pass",
+      "rendererLifecycle": "pass"
     }
   },
   "manualChecks": [
